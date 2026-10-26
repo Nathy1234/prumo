@@ -1,0 +1,11 @@
+{
+  "name": "prumo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prumo · sistema de gestão do departamento Financeiro e Contábil (Supabase + Vercel)",
+  "scripts": {
+    "build": "node scripts/build-config.mjs",
+    "dev": "node scripts/build-config.mjs && npx --yes serve@14.2.4 public -l 3000"
+  },
+  "engines": { "node": ">=18" }
+}

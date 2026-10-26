@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Prumo · Financeiro e Contábil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Newsreader:ital,opsz,wght@1,6..72,400&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><div class="mark">P</div><div><b>Prumo</b><span>Financeiro e Contábil</span></div></div>
+    <div id="quem"></div>
+    <div id="simbox"><label class="lbl" for="perfil">Simular perfil</label><select id="perfil" class="inp"><option value="dir">Diretor</option></select></div>
+    <nav id="nav" aria-label="Módulos"></nav>
+    <div class="secure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Sem valores, contas ou dados de fornecedores. Registra só quem fez, o quê e quando.</span></div>
+  </aside>
+  <main><div class="wrap" id="main"><p class="sub">Carregando o portal…</p></div></main>
+</div>
+<div class="ov" id="ov" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="adapter.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

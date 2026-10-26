@@ -1,0 +1,9 @@
+# Gerado no deploy a partir das variáveis de ambiente
+public/config.js
+# Nunca suba chaves para o GitHub
+.env
+.env.*
+!.env.example
+node_modules/
+.vercel/
+.DS_Store
