@@ -10,27 +10,60 @@ if (existsSync('.env')) {
 }
 
 const limpar = v => String(v || '').trim().replace(/^['"]|['"]$/g, '').trim();
-const brutoUrl = limpar(process.env.SUPABASE_URL);
-const chave = limpar(process.env.SUPABASE_ANON_KEY);
-const microsoft = /^(1|true|sim|yes)$/i.test(limpar(process.env.LOGIN_MICROSOFT));
 
-// Aceita o endereço com ou sem https:// e ignora caminhos extras (ex.: /rest/v1).
-let url = '';
-try {
-  const u = new URL(/^https?:\/\//i.test(brutoUrl) ? brutoUrl : 'https://' + brutoUrl);
-  if (u.hostname.includes('.')) url = 'https://' + u.hostname;
-} catch (e) { /* tratado abaixo */ }
-const variaveis = Object.keys(process.env).filter(k => /SUPA|ANON|MICROSOFT/i.test(k));
+// Procura as variáveis mesmo que o nome tenha espaço, letra minúscula ou prefixo diferente.
+const relevantes = Object.entries(process.env)
+  .map(([k, v]) => [k, k.trim().toUpperCase(), limpar(v)])
+  .filter(([, n]) => /SUPA|ANON|PUBLISHABLE|MICROSOFT/.test(n));
+const pegar = teste => (relevantes.find(([, n, v]) => teste(n) && v) || [])[2] || '';
+
+const ehChave = v => /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(v) || /^sb_(publishable|secret)_/i.test(v);
+const ehUrl = v => /supabase\.(co|com)|^https?:\/\//i.test(v) && !ehChave(v);
+
+// Converte o que foi colado no endereço do projeto: https://REF.supabase.co
+function paraUrl(v) {
+  if (!v || ehChave(v)) return '';
+  if (/^[a-z0-9]{15,30}$/.test(v)) return `https://${v}.supabase.co`;              // só o ID do projeto
+  try {
+    const u = new URL(/^https?:\/\//i.test(v) ? v : 'https://' + v);
+    const painel = u.pathname.match(/\/project\/([a-z0-9]{15,30})/);                  // link do painel
+    if (/(^|\.)supabase\.com$/i.test(u.hostname) && painel) return `https://${painel[1]}.supabase.co`;
+    if (u.hostname.includes('.') && !/(^|\.)supabase\.com$/i.test(u.hostname)) return 'https://' + u.hostname;
+  } catch (e) {}
+  return '';
+}
+const refDaChave = c => { try { return JSON.parse(Buffer.from(c.split('.')[1], 'base64url').toString()).ref || ''; } catch (e) { return ''; } };
+
+let chave = pegar(n => /ANON|PUBLISHABLE|KEY/.test(n) && !/SERVICE|SECRET/.test(n));
+if (!ehChave(chave)) chave = (relevantes.find(([, , v]) => ehChave(v) && !/sb_secret_/i.test(v)) || [])[2] || chave;
+
+let url = paraUrl(pegar(n => /URL/.test(n)));
+if (!url) url = paraUrl((relevantes.find(([, , v]) => ehUrl(v)) || [])[2] || '');
+if (!url && refDaChave(chave)) url = `https://${refDaChave(chave)}.supabase.co`;      // a chave anon já traz o ID do projeto
+
+const microsoft = /^(1|true|sim|yes)$/i.test(pegar(n => /MICROSOFT/.test(n)));
+
+function diagnostico() {
+  console.error('Variáveis encontradas na Vercel (sem mostrar os valores):');
+  if (!relevantes.length) console.error('  nenhuma com SUPABASE no nome');
+  for (const [k, , v] of relevantes) {
+    const tipo = !v ? 'VAZIA' : ehChave(v) ? 'parece uma chave' : paraUrl(v) ? 'parece um endereço' : 'formato não reconhecido';
+    console.error(`  ${JSON.stringify(k)} · ${v.length} caracteres · ${tipo}`);
+  }
+  console.error('');
+}
 if (!url) {
-  console.error('\n[ERRO] SUPABASE_URL ausente ou inválida.');
-  console.error('Na Vercel: Settings > Environment Variables > crie SUPABASE_URL com a Project URL do Supabase (ex.: https://abcdefgh.supabase.co).');
-  console.error('Variáveis parecidas encontradas: ' + (variaveis.length ? variaveis.join(', ') : 'nenhuma') + '\n');
+  console.error('\n[ERRO] Não encontrei o endereço do Supabase.');
+  console.error('Na Vercel: Settings > Environment Variables > SUPABASE_URL = Project URL (ex.: https://abcdefgh.supabase.co).');
+  diagnostico();
   process.exit(1);
 }
 if (chave.length < 30) {
-  console.error('\n[ERRO] SUPABASE_ANON_KEY ausente. Use a chave "anon public" (nunca a service_role).\n');
+  console.error('\n[ERRO] Não encontrei a chave do Supabase. Crie SUPABASE_ANON_KEY com a chave "anon public" (nunca a service_role).');
+  diagnostico();
   process.exit(1);
 }
+console.log('Supabase: ' + url);
 try {
   const carga = JSON.parse(Buffer.from(chave.split('.')[1] || '', 'base64').toString());
   if (carga.role === 'service_role') {
