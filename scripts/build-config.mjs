@@ -9,12 +9,22 @@ if (existsSync('.env')) {
   }
 }
 
-const url = (process.env.SUPABASE_URL || '').trim();
-const chave = (process.env.SUPABASE_ANON_KEY || '').trim();
-const microsoft = /^(1|true|sim|yes)$/i.test(process.env.LOGIN_MICROSOFT || '');
+const limpar = v => String(v || '').trim().replace(/^['"]|['"]$/g, '').trim();
+const brutoUrl = limpar(process.env.SUPABASE_URL);
+const chave = limpar(process.env.SUPABASE_ANON_KEY);
+const microsoft = /^(1|true|sim|yes)$/i.test(limpar(process.env.LOGIN_MICROSOFT));
 
-if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(url)) {
-  console.error('\n[ERRO] SUPABASE_URL ausente ou inválida. Exemplo: https://abcdefgh.supabase.co\n');
+// Aceita o endereço com ou sem https:// e ignora caminhos extras (ex.: /rest/v1).
+let url = '';
+try {
+  const u = new URL(/^https?:\/\//i.test(brutoUrl) ? brutoUrl : 'https://' + brutoUrl);
+  if (u.hostname.includes('.')) url = 'https://' + u.hostname;
+} catch (e) { /* tratado abaixo */ }
+const variaveis = Object.keys(process.env).filter(k => /SUPA|ANON|MICROSOFT/i.test(k));
+if (!url) {
+  console.error('\n[ERRO] SUPABASE_URL ausente ou inválida.');
+  console.error('Na Vercel: Settings > Environment Variables > crie SUPABASE_URL com a Project URL do Supabase (ex.: https://abcdefgh.supabase.co).');
+  console.error('Variáveis parecidas encontradas: ' + (variaveis.length ? variaveis.join(', ') : 'nenhuma') + '\n');
   process.exit(1);
 }
 if (chave.length < 30) {
@@ -35,5 +45,5 @@ if (/^sb_secret_/i.test(chave)) {
 
 writeFileSync('public/config.js',
   '// Gerado automaticamente por scripts/build-config.mjs. Não edite.\n' +
-  'window.PORTAL_CONFIG = ' + JSON.stringify({ supabaseUrl: url.replace(/\/$/, ''), supabaseAnonKey: chave, microsoft }, null, 2) + ';\n');
+  'window.PORTAL_CONFIG = ' + JSON.stringify({ supabaseUrl: url, supabaseAnonKey: chave, microsoft }, null, 2) + ';\n');
 console.log('config.js gerado' + (microsoft ? ' (login Microsoft ligado)' : ''));
