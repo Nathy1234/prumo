@@ -108,7 +108,9 @@ function alertas(){
   if(podeAdmin()){const n=D.pedidos.filter(p=>!acessoDe(p.id)).length;if(n)A.push({n:2,ic:'usuarios',c:'wa',t:`${n} ${n>1?'pedidos':'pedido'} de acesso aguardando`,s:'Revise em Usuários e permissões',ir:'usuarios'});
    if(real()&&S.bkCarregado&&CFG.bkAuto!==false&&!D.backups.some(b=>b.id==='d-'+HJ)&&!S.bk)A.push({n:1,ic:'backup',c:'wa',t:'Backup de hoje ainda não foi feito',s:'Ele é criado em instantes, com o portal aberto',ir:'backup'})}
   /* por enquanto os alertas vêm só do cronograma; os outros voltam em Cronograma > Ajustes */
-  return (modOn('outros')?A:A.filter(a=>a.ic==='rotinas')).sort((a,b)=>b.n-a.n)}
+  if(!solic()&&S.perfil!=='pendente'){const am=proxUtil(HJ),hm=agoraHM();
+   D.eventos.filter(vejoEv).forEach(e=>[HJ,am].forEach(d=>{if(evOcorre(e,d)&&!(d===HJ&&e.hora&&e.hora<hm))A.push({n:1,ic:'evento',c:'wa',t:`${d===HJ?'Hoje':'Próximo dia útil ('+fmt(d)+')'}${e.hora?' às '+e.hora:''}: ${e.t}`,s:`${e.tipo||'Prazo'} · ${quemEv(e)}${e.obs?' · '+e.obs:''}`,ir:'calendario'})}))}
+  return (modOn('outros')?A:A.filter(a=>['rotinas','evento'].includes(a.ic))).sort((a,b)=>b.n-a.n)}
 function resumoDep(){
   return D.departamentos.map(d=>{const l=D.entregas.filter(e=>e.dep===d.id),rec=l.filter(e=>e.recebido&&e.prazo);
    return {d,pend:l.filter(e=>!e.recebido).length,atr:l.filter(entAtrasada).length,pont:rec.length?Math.round(rec.filter(e=>e.recebido<=e.prazo).length/rec.length*100):null,tot:l.length}}).sort((a,b)=>b.atr-a.atr||a.d.n.localeCompare(b.d.n))}
@@ -290,12 +292,13 @@ function detalheCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;FORM={
  const h=D.logs.filter(l=>(l.alvo||'').includes(c.proto)||(l.acao||'').includes(c.proto));
  const linha=(l,v)=>v?`<div class="row"><div class="t"><span>${l}</span><b>${esc(v)}</b></div></div>`:'';
  const sp=stPrazo(c),eq=!solic()&&pode('chamados'),le=pode('ler_email');
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(c.st)}${c.sub?' · '+esc(c.sub):''}</span>${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}</div></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(c.st)}${c.sub?' · '+esc(c.sub):''}</span>${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}</div>
+ ${pode('chamados')||dir()?`<div class="chegada"><span class="lbl" style="margin:0">Chegou ao financeiro</span><button class="chip ${c.chegada==='prazo'?'on':''}" onclick="marcaChegada('${esc(c.id)}','prazo')">No prazo</button><button class="chip ${c.chegada==='atrasado'?'on bad':''}" onclick="marcaChegada('${esc(c.id)}','atrasado')">Atrasado</button>${c.chegada?`<span class="meta">marcado por ${esc(c.chegadaPor||'—')}</span>`:''}</div>`:''}</div>
  ${c.pend?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>Pendência: ${esc(c.pend)}</span></div>`:''}
  <div>${linha('Tipo',c.tipo)}${linha('Assunto',c.cat||c.subcat?catTxt(c):'Sem assunto')}${linha('Setor',c.dep?depNome(c.dep):'Não definido')}${linha(c.origem==='email'?'Remetente':'Solicitante',c.solicitante)}${linha('Chegou em',c.recebidoEm?fmtHora(c.recebidoEm)+'/'+c.recebidoEm.slice(0,4):fmtAno(c.aberto))}${linha('Fornecedor ou favorecido',c.favorecido)}${linha('NF ou documento',c.nf)}${linha('Vencimento do pagamento',c.venc?fmtAno(c.venc):'')}${linha('Centro de custo',c.cc)}${linha('Gestor que aprovou',c.aprovador)}${linha('Responsável no financeiro',c.resp?respNome(c.resp):'Ninguém aceitou ainda')}${linha('Prazo de entrega',c.prazo?fmtAno(c.prazo):'')}${linha('Aceita por',c.aceitoEm?`${c.aceitoNome||'—'} · ${fmtHora(c.aceitoEm)}`:'')}${linha('Realizada por',c.st==='Concluído'?`${quemFezNome(c)} · ${c.conclEm?fmtHora(c.conclEm):fmt(c.concl)}`:'')}${linha('Descrição',c.desc)}
  ${c.origem==='email'&&le&&(c.msgId||c.emailLink)?`<div class="row"><div class="t"><span>E-mail de origem</span></div>${c.msgId?`<button class="btn" onclick="lerEmail('c:${esc(c.id)}')">Ler aqui</button>`:''}${c.emailLink?`<a class="btn ghost" href="${esc(c.emailLink)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}${c.doc&&/^https?:\/\//.test(c.doc)?`<div class="row"><div class="t"><span>Documento</span></div><a class="btn" href="${esc(c.doc)}" target="_blank" rel="noopener">Abrir documento</a></div>`:''}</div>
  <div><span class="lbl">Histórico</span>${h.length?h.map(l=>`<div class="row"><span class="meta" style="width:96px">${fmtHora(l.em)}</span><div class="t"><b style="font-weight:400">${esc(l.acao)}</b><span>${esc(quemLog(l))}</span></div></div>`).join(''):'<p class="meta">Sem registros.</p>'}</div>
- <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap">${eq&&c.st!=='Concluído'?`<button class="btn" onclick="aceitarSheet({ch:'${esc(c.id)}'})">${c.aceitoEm?'Prazo, assunto e responsável':'Aceitar'}</button>`:''}${eq&&c.st==='Concluído'?`<button class="btn" onclick="reabrirCh('${esc(c.id)}')">${S.reab===c.id?'Confirmar reabertura':'Reabrir'}</button>`:''}</div><button class="btn" onclick="fechar()">Fechar</button></div>`;
+ <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap">${eq&&c.st!=='Concluído'?`<button class="btn" onclick="aceitarSheet({ch:'${esc(c.id)}'})">${c.aceitoEm?'Prazo, assunto e responsável':'Aceitar'}</button>`:''}${eq&&c.st==='Concluído'?`<button class="btn" onclick="reabrirCh('${esc(c.id)}')">${S.reab===c.id?'Confirmar reabertura':'Reabrir'}</button>`:''}${eq&&c.st!=='Concluído'?`<button class="btn" onclick="chParaCron('${esc(c.id)}')">${D.cronograma.some(r=>r.chamadoId===c.id)?'Levar de novo ao cronograma':'Levar para o cronograma'}</button>`:''}</div><button class="btn" onclick="fechar()">Fechar</button></div>`;
  document.getElementById('ov').hidden=false}
 function pendCh(id){const c=D.chamados.find(x=>x.id===id);FORM={tipo:'_pend'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)}</p><h2 id="sheet-title">Devolver com pendência</h2><p class="sub" style="font-size:13px">O solicitante recebe a notificação e corrige o chamado.</p></div>
@@ -311,7 +314,7 @@ function avCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;const nx=pr
  const pz=nx==='Concluído'&&c.prazo?(HJ>c.prazo?' com atraso':' no prazo'):'';
  patch('chamados',id,mud,nx==='Concluído'?`Concluído${pz}. Foi para Demandas realizadas.`:`Chamado ${nx.toLowerCase()}`,nx==='Concluído'?`Concluiu o chamado ${c.proto}${pz}`:`Moveu o chamado ${c.proto} para ${nx}`)}
 function cardCh(c,interno){const du=c.venc?diasAte(c.venc):null,sp=stPrazo(c),subs=subEtapas(c.st),nx=proxEtapa(c);
- return `<div class="kcard${interno&&chAtrasado(c)?' late':''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':''}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(c.dep?depNome(c.dep):'Setor não definido')}</span>
+ return `<div class="kcard${interno&&chAtrasado(c)?' late':''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${c.chegada==='atrasado'?'<span class="tag bad" style="font-size:10.5px">Chegou atrasado</span>':c.chegada==='prazo'?'<span class="tag ok" style="font-size:10.5px">Chegou no prazo</span>':c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':''}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(c.dep?depNome(c.dep):'Setor não definido')}</span>
  <div class="ktags">${c.cat||c.subcat?`<span class="tag ac">${esc(catTxt(c))}</span>`:''}${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${bloqueioForn(c.favorecido)&&!['Programado','Concluído'].includes(c.st)?'<span class="tag bad">Dados bancários em verificação</span>':''}${c.origem==='email'?`<span class="tag ne">${c.aceitoEm?'Via e-mail':'Via e-mail · conferir'}</span>`:''}</div>
  ${c.origem==='email'&&(c.solicitante||c.rem)?(interno&&c.rem?`<button class="lnk" style="display:block;font-size:12px" onclick="S.fRem='${esc(c.rem)}';render();window.scrollTo({top:0})" title="Ver tudo deste remetente">De: ${esc(remNomeCh(c))}</button>`:`<span style="display:block">De: ${esc(remNomeCh(c))}</span>`):''}
  ${c.venc?`<span style="display:block;color:${du!==null&&du<=1&&c.st!=='Concluído'&&c.st!=='Programado'?'var(--bad)':'var(--ink-3)'}">Pagamento vence ${fmt(c.venc)}${du!==null&&du>=0&&c.st!=='Concluído'?` · ${du===0?'hoje':du===1?'amanhã':`em ${du} dias`}`:''}</span>`:''}
@@ -466,12 +469,14 @@ function notifs(){
  return L.slice(0,30)}
 function lido(){if(S.prefs?.lido&&!S.sim)return S.prefs.lido;try{return localStorage.getItem('lido_'+(ME.uid||'')+S.perfil)||''}catch(e){return S['lido_'+S.perfil]||''}}
 function marcarLido(){const v=new Date().toISOString();try{localStorage.setItem('lido_'+(ME.uid||'')+S.perfil,v)}catch(e){S['lido_'+S.perfil]=v}if(DB&&ME.uid&&!S.sim){S.prefs={...(S.prefs||{}),lido:v};DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs).catch(()=>{})}}
-function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs(),lv=lido(),novos=N.filter(n=>n.em>lv).length+A.length;
+function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs(),lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph;
  return `<div class="tb"><span class="meta">${esc(quemSou())}</span>${temaBox()}<div style="position:relative"><button class="btn bell" id="bellbtn" onclick="tgBell()" aria-label="Notificações" aria-expanded="${!!S.bell}">${ic('alertas').replace('aria-hidden','style="width:18px;height:18px" aria-hidden')}${novos?`<span class="dot">${novos}</span>`:''}</button>
  ${S.bell?`<div class="pop" role="dialog" aria-label="Notificações"><div class="ph" style="padding:12px 14px 4px"><h2>Notificações</h2><button class="btn ghost" onclick="ir('alertas')">Ver tudo</button></div>
+ ${avPodePedir()?`<div style="padding:4px 14px 8px"><button class="btn pri" style="width:100%" onclick="ativarAvisos()">Ativar avisos no canto da tela</button></div>`:''}
  ${A.map(a=>`<button class="pi" onclick="ir('${a.ir}')"><span class="tag bad" style="flex:none">Alerta</span><span><b>${esc(a.t)}</b><small>${esc(a.s)}</small></span></button>`).join('')}
+ ${P.length?`<p class="eyebrow" style="margin:8px 14px 2px">Próximos prazos</p>${P.map(x=>`<button class="pi ${x.d===HJ?'new':''}" onclick="ir('calendario')"><span class="meta" style="flex:none;width:72px">${x.d===HJ?'Hoje':fmt(x.d)}${x.h?' '+x.h:''}</span><span><b style="font-weight:400">${esc(x.t)}</b><small>${esc(x.g)}${x.fixo?' · fixo':''}${x.quem&&x.quem!=='Todos'?' · '+esc(x.quem):''}</small></span></button>`).join('')}<p class="eyebrow" style="margin:8px 14px 2px">Atividades</p>`:''}
  ${N.map(n=>`<button class="pi ${n.em>lv?'new':''}" onclick="${/CH-\d+/.test(n.acao)?`abrirLogCh('${(n.acao.match(/CH-\d+/)||[''])[0]}')`:`ir('${pode('logs')?'logs':'alertas'}')`}"><span class="meta" style="flex:none;width:72px">${fmtHora(n.em)}</span><span><b style="font-weight:400">${esc(n.acao)}</b><small>${esc(quemLog(n))}</small></span></button>`).join('')}
- ${!A.length&&!N.length?'<p class="empty">Nenhuma notificação nos últimos 7 dias.</p>':''}</div>`:''}</div></div>`}
+ ${!A.length&&!N.length&&!P.length?'<p class="empty">Nenhuma notificação nos últimos 7 dias.</p>':''}</div>`:''}</div></div>`}
 function tgBell(){S.bell=!S.bell;if(S.bell)setTimeout(marcarLido,1500);render()}
 function abrirLogCh(p){const c=D.chamados.find(x=>x.proto===p);S.bell=false;render();if(c)detalheCh(c.id)}
 document.addEventListener('click',e=>{if(S.bell&&!e.target.closest('.pop')&&!e.target.closest('#bellbtn')){S.bell=false;render()}});
@@ -1151,6 +1156,8 @@ async function enviarResumo(){const para=listaEnd(val('rs_para'));errEl('rse_par
    (coleção "execucoes", um registro por rotina por dia: dia_idDaRotina). */
 const PROC_PAD=['Identificação','Conferência','Lançamento','Baixa','Pagamento','Conciliação'];
 const SIS_PAD=['WAE','Protheus'];
+const emTeste=x=>(Array.isArray(CFG.cronTeste)?CFG.cronTeste:['Protheus']).includes(x);
+const sisTxt=x=>x+(emTeste(x)?' (em teste)':'');
 const procs=()=>Array.isArray(CFG.cronEtapas)&&CFG.cronEtapas.length?CFG.cronEtapas:PROC_PAD;
 const sists=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_PAD;
 /* módulos guardados para depois: ficam fora do menu até o administrador ligar */
@@ -1221,18 +1228,39 @@ async function ocSet(rid,dia,s){const r=D.cronograma.find(x=>x.id===rid);if(!r)r
 function ocFeita(rid,dia){ocSet(rid,dia,exDe(rid,dia)?.s==='feita'?null:'feita')}
 function ocAnd(rid,dia){const x=exDe(rid,dia);if(x?.s==='feita')return;ocSet(rid,dia,x?.s==='andamento'?null:'andamento')}
 function linOc(r,dia,comDia){const x=exDe(r.id,dia),st=stOc(r,dia),done=x?.s==='feita',pm=podeMarcar(r)&&dia<=HJ;
- const info=[(r.sis||[]).join(' · '),nomesRs(r),r.apoio?'apoio: '+r.apoio:''].filter(Boolean).map(esc).join(' · ');
+ const info=[(r.sis||[]).map(sisTxt).join(' · '),nomesRs(r),r.apoio?'apoio: '+r.apoio:''].filter(Boolean).map(esc).join(' · ');
  return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}"><button class="chkbtn" ${pm?'':'disabled'} onclick="ocFeita('${r.id}','${dia}')" aria-label="${done?'Reabrir':'Concluir'} ${esc(r.t)}" title="${pm?(done?'Reabrir':'Marcar como concluída'):'Só os responsáveis marcam'}">${done?'✓':''}</button>
  <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
  ${done?`<span class="pos">Concluída por ${esc(x.porNome||'—')}${x.concl!==dia?` em ${fmt(x.concl)}`:''}${x.hora?` às ${x.hora}`:''}</span>`:x?.s==='andamento'?`<span style="color:var(--accent)">Em andamento com ${esc(x.porNome||'—')} desde ${hmDe(x.ini)}</span>`:''}
- ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}</div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}
+ ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}</div>${r.chamado?`<span class="tag ac" title="Veio do chamado">${esc(r.chamado)}</span>`:''}${r.fim&&r.freq!=='unica'?`<span class="tag ne">só até ${fmt(r.fim)}</span>`:''}${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}
  <button class="tag ${st[0]}" ${pm&&!done?'':'disabled'} onclick="ocAnd('${r.id}','${dia}')" title="${pm&&!done?(x?.s==='andamento'?'Voltar para a fazer':'Marcar em andamento'):''}">${st[1]}</button>${podeEditRot()?`<button class="btn ghost" onclick="editRot('${r.id}')" aria-label="Editar ${esc(r.t)}">Editar</button>`:''}</div>`}
 const filtroCron=()=>r=>(!S.cQuem||rsDe(r).includes(S.cQuem))&&(!S.cSis||(r.sis||[]).includes(S.cSis));
 const pessoasCron=()=>[...new Set(D.cronograma.flatMap(rsDe))].filter(pessoa).sort((a,b)=>nomeDe(a).localeCompare(nomeDe(b)));
 function cronFiltros(){const b=(on,txt,js)=>`<button class="chip ${on?'on':''}" onclick="${js};render();salvarEstado()">${esc(txt)}</button>`;
  return `<div class="filtros cronf">${b(!S.cQuem,'Todas as pessoas',"S.cQuem=''")}${pessoasCron().map(p=>b(S.cQuem===p,nomeDe(p)+(p===S.perfil?' (você)':''),`S.cQuem='${p}'`)).join('')}<span class="sep"></span>${b(!S.cSis,'Todos os sistemas',"S.cSis=''")}${sists().map((s,i)=>b(S.cSis===s,s,`S.cSis=sists()[${i}]`)).join('')}</div>`}
 function cronAbas(){const t=S.cTab||'dia';return `<div class="tabs big" role="tablist" aria-label="Cronograma">${[['dia','Dia'],['semana','Semana'],['quem','Quem faz o quê'],['rotinas','Rotinas cadastradas'],['tri','Trimestre']].map(([k,l])=>`<button role="tab" aria-selected="${t===k}" class="${t===k?'on':''}" onclick="S.cTab='${k}';render();salvarEstado()">${l}</button>`).join('')}</div>`}
-const irData=v=>`<label class="sr-only" for="c_data">Escolher o dia</label><input class="inp cdata" id="c_data" type="date" data-nodraft="1" value="${v}" onchange="if(this.value){S.cDia=this.value;render()}" title="Escolher o dia">`;
+const irData=(v,k='cDia')=>`<label class="sr-only" for="c_data_${k}">Escolher o dia</label><input class="inp cdata" id="c_data_${k}" type="date" data-nodraft="1" value="${v}" onchange="if(this.value){S.${k}=this.value;render()}" title="Escolher o dia">`;
+function mvDia(k,n){let d=S[k]||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S[k]=d;render()}
+/* painel de andamento: etapa por etapa, por sistema, com quem concluiu e a hora */
+function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:'',L=D.cronograma.filter(r=>ocorre(r,dia));
+ const nav=semNav?'':`<div class="cronbar"><div class="seg"><button onclick="mvDia('${k}',-1)" aria-label="Dia útil anterior">‹</button><span>${dia===HJ?'Hoje, ':''}${diaTxt(dia)}</span><button onclick="mvDia('${k}',1)" aria-label="Próximo dia útil">›</button></div>${irData(dia,k)}${dia!==HJ?`<button class="btn" onclick="S.${k}='';render()">Hoje</button>`:''}</div>`;
+ if(!L.length){const px=proxComRotina(dia,()=>true);return `<div class="panel and"><div class="ph"><h2>Andamento do departamento</h2></div>${nav}<p class="meta" style="margin:0 0 8px">Nenhuma rotina prevista neste dia.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
+ const E=[...procs(),...(L.some(r=>!grp(r))?['']:[])],SS=sists().filter(x=>L.some(r=>(r.sis||[]).includes(x)));
+ const cel=(g,x)=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x));if(!l.length)return '<td><span class="andn">—</span></td>';
+  const xs=l.map(r=>({r,x:exDe(r.id,dia),st:stOc(r,dia)[0]})),ok=xs.filter(o=>o.x?.s==='feita'),an=xs.filter(o=>o.x?.s==='andamento'),bad=xs.filter(o=>o.st==='bad');
+  const cls=ok.length===l.length?(ok.some(o=>o.st==='wa')?'wa':'ok'):bad.length?'bad':an.length||ok.length?'ac':'ne';
+  const lab=ok.length===l.length?(cls==='wa'?'Concluído com atraso':'Concluído'):bad.length?'Atrasado':ok.length?`${ok.length} de ${l.length} concluídas`:an.length?'Em andamento':'A fazer';
+  const feitoPor=[...new Set(ok.map(o=>`✓ ${o.x.porNome||'—'}${o.x.hora?' · '+o.x.hora:''}`))],emAnd=[...new Set(an.map(o=>`● ${o.x.porNome||'—'} desde ${hmDe(o.x.ini)}`))];
+  const resp=ok.length===l.length?[]:[`Responsável: ${[...new Set(xs.filter(o=>o.x?.s!=='feita').flatMap(o=>rsDe(o.r)))].map(nomeDe).join(', ')}`];
+  const tit=xs.map(o=>`${o.r.t}: ${o.x?.s==='feita'?`concluída por ${o.x.porNome||'—'} ${o.x.hora||''}`:o.x?.s==='andamento'?`em andamento com ${o.x.porNome||'—'}`:stOc(o.r,dia)[1]}`).join('\n');
+  return `<td><button class="andb ${cls}" title="${esc(tit)}" onclick="S.cTab='dia';S.cDia='${dia}';S.cQuem='';S.cSis=sists()[${sists().indexOf(x)}];ir('rotinas')"><b>${lab}</b>${[...feitoPor,...emAnd,...resp].map(t=>`<span>${esc(t)}</span>`).join('')}</button></td>`};
+ const geral=E.map(g=>{const l=L.filter(r=>grp(r)===g);if(!l.length)return null;const ok=l.filter(r=>exDe(r.id,dia)?.s==='feita').length;return {g:g||'Outras atividades',done:ok===l.length,parc:ok>0||l.some(r=>exDe(r.id,dia)?.s==='andamento')}}).filter(Boolean);
+ const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' e '+a[a.length-1]:a[0]||'';
+ const fe=geral.filter(o=>o.done).map(o=>o.g),pa=geral.filter(o=>!o.done&&o.parc).map(o=>o.g),fa=geral.filter(o=>!o.done&&!o.parc).map(o=>o.g);
+ const frase=`${fe.length?`<b class="pos">Concluído:</b> ${esc(lista(fe))}. `:'<b>Nada concluído ainda.</b> '}${pa.length?`<b style="color:var(--accent)">Em andamento:</b> ${esc(lista(pa))}. `:''}${fa.length?`<b>Falta:</b> ${esc(lista(fa))}.`:'<b class="pos">Tudo concluído no dia.</b>'}`;
+ return `<div class="panel and"><div class="ph"><h2>Andamento do departamento</h2><span>${dia===HJ?'hoje':diaTxt(dia)}</span></div>${nav}<p class="andf">${frase}</p>
+ <div class="tbl-wrap"><table class="andt"><thead><tr><th>Sistema</th>${E.map(g=>`<th>${g?`${procs().indexOf(g)+1}. ${esc(g)}`:'Outras'}</th>`).join('')}</tr></thead><tbody>${SS.map(x=>`<tr><th scope="row">${esc(x)}${emTeste(x)?'<small>em teste</small>':''}</th>${E.map(g=>cel(g,x)).join('')}</tr>`).join('')}</tbody></table></div>
+ <p class="meta" style="margin:8px 0 0">Clique numa etapa para ver as rotinas e marcar.</p></div>`}
 function proxComRotina(dia,f){let d=dia;for(let i=0;i<120;i++){d=addDia(d,1);if(D.cronograma.some(r=>ocorre(r,d)&&f(r)))return d}return ''}
 function cDia(n){let d=S.cDia||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S.cDia=d;render()}
 function cronDia(){const dia=S.cDia||HJ,f=filtroCron(),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
@@ -1240,12 +1268,13 @@ function cronDia(){const dia=S.cDia||HJ,f=filtroCron(),L=D.cronograma.filter(r=>
  const ant=dia===HJ?atrasosCron(f).filter(o=>o.dia<HJ).sort((a,b)=>a.dia<b.dia?-1:1):[];
  const grupos=[...procs(),''].map(g=>[g,L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g)]).filter(([,l])=>l.length);
  const tav=D.tarefas.filter(t=>(!S.cQuem||t.r===S.cQuem)&&(t.prazo===dia||(dia===HJ&&atrasada(t)))&&(dir()||pode('ver_tudo')||t.r===S.perfil));
- return `<div class="cronbar">${nav2}</div>${cronFiltros()}`+
+ return `<div class="cronbar">${nav2}</div>${andamento(dia,'cDia',true)}${cronFiltros()}`+
  `<div class="stats"><div class="stat"><p>Previstas</p><strong>${c.tot}</strong><small>${dia===HJ?'hoje':fmt(dia)}</small></div><div class="stat"><p>Concluídas</p><strong style="color:${c.tot&&c.ok===c.tot?'var(--ok)':'var(--ink)'}">${c.ok}</strong><small>${c.tot?Math.round(c.ok/c.tot*100):0}%</small></div><div class="stat"><p>Em andamento</p><strong style="color:${c.and?'var(--accent)':'var(--ink)'}">${c.and}</strong><small>começadas</small></div><div class="stat"><p>Atrasadas</p><strong style="color:${c.atr+ant.length?'var(--bad)':'var(--ink)'}">${c.atr+ant.length}</strong><small>${ant.length?`${ant.length} de dias anteriores`:'passaram do horário'}</small></div></div>`+
  (()=>{const E=D.eventos.filter(e=>vejoEv(e)&&evOcorre(e,dia)&&(!S.cQuem||e.quem!=='pessoas'||(e.ps||[]).includes(S.cQuem))).sort((a,b)=>(a.hora||'99').localeCompare(b.hora||'99'));
   return E.length?`<div class="panel"><div class="ph"><h2>Compromissos do dia</h2><span>${E.length}</span></div>${E.map(e=>`<div class="row"><span class="meta" style="width:44px">${esc(e.hora||'')}</span><div class="t"><b>${esc(e.t)}</b><span>${esc(quemEv(e))}${e.obs?' · '+esc(e.obs):''}</span></div><span class="tag ${corEv(e)}">${esc(e.tipo||'Outro')}</span>${podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')">Editar</button>`:''}</div>`).join('')}</div>`:''})()+
  (ant.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${ant.length} ${ant.length>1?'rotinas':'rotina'} de dias anteriores</span></div>${ant.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:'')+
  (grupos.length?grupos.map(([g,l])=>{const k=l.filter(r=>exDe(r.id,dia)?.s==='feita').length,i=procs().indexOf(g);return `<div class="panel"><div class="ph"><h2>${i>=0?`<span class="meta">${i+1}.</span> `:''}${esc(g||'Outras atividades')}</h2><span>${k} de ${l.length} concluídas</span></div><div class="bar" style="margin:6px 0 8px"><i style="width:${k/l.length*100}%"></i></div>${l.map(r=>linOc(r,dia)).join('')}</div>`}).join(''):`<div class="panel">${vazio(D.cronograma.length?'Nenhuma rotina neste dia':'Cronograma ainda não montado',D.cronograma.length?'Feriado, fim de semana, rotinas que ainda não começaram ou nenhuma rotina para o filtro escolhido.':'Monte o cronograma com as rotinas de cada pessoa.',null)}${(()=>{const px=proxComRotina(dia,f);return px?`<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="S.cDia='${px}';render()">Ir para ${diaTxt(px)}</button></div>`:''})()}${!D.cronograma.length&&podeCron()?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div>':''}</div>`)+
+ (D.cronograma.length&&dia<=addDia(HJ,60)?`<div style="margin:0 0 16px"><button class="btn" onclick="outraAtiv('${dia}')">+ Outra atividade em ${fmt(dia)}</button></div>`:'')+
  (tav.length?`<div class="panel"><div class="ph"><h2>Tarefas avulsas</h2><span>${tav.length}</span></div>${tav.map(linTar).join('')}</div>`:'')}
 function cronSemana(){const base=S.cDia||HJ,d0=new Date(base+'T12:00');d0.setDate(d0.getDate()-((d0.getDay()+6)%7));const dias=[0,1,2,3,4].map(i=>addDia(isoD(d0),i));
  const f=filtroCron(),L=D.cronograma.filter(r=>f(r)&&dias.some(d=>ocorre(r,d))).sort(ordR);
@@ -1259,9 +1288,15 @@ function cronQuem(){const vig=D.cronograma.filter(r=>r.ativo!==false&&(!r.fim||r
  return `<div class="panel"><div class="ph"><h2>Etapa do processo × sistema</h2><span>rotinas em vigor</span></div><div class="tbl-wrap"><table class="grade lista"><thead><tr><th>Etapa</th>${S2.map(s=>`<th>${esc(s)}</th>`).join('')}</tr></thead><tbody>${G.filter(g=>g||vig.some(r=>!procs().includes(r.etapa))).map((g,i)=>`<tr><td><b style="font-weight:500">${g?`${i+1}. ${esc(g)}`:'Outras atividades'}</b></td>${S2.map(s=>`<td>${cel(g,s)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
  <div class="cards">${ps.map(p=>{const l=vig.filter(r=>rsDe(r).includes(p)).sort(ordR);return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><div class="av">${esc((nomeDe(p)||'?')[0])}</div><b style="font-weight:500">${esc(nomeDe(p))}</b><span class="meta" style="margin-left:auto">${l.length} ${l.length>1?'rotinas':'rotina'}</span></div>${l.map(r=>`<div class="row"><div class="t"><b style="font-weight:400">${esc(r.t)}</b><span>${esc(r.etapa||'Outras')} · ${esc((r.sis||[]).join(', '))} · ${esc(freqTxt(r))}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}</div>`).join('')}</div>`}).join('')}</div>`+
  (ap.length?note(`Apoio: ${ap.map(esc).join(', ')}.`):'')}
-function cronRotinas(){const pc=podeEditRot(),G=[...procs(),''],L=[...D.cronograma].sort(ordR);
- const lin=r=>`<div class="row"><div class="t"><b>${esc(r.t)}</b><span>${esc(freqTxt(r))} · ${esc((r.sis||[]).join(', ')||'Sem sistema')} · ${esc(nomesRs(r))}${r.apoio?' · apoio: '+esc(r.apoio):''}</span><span>${r.ini?`Vale de ${fmt(r.ini)}/${r.ini.slice(0,4)}`:'Vale sempre'}${r.fim?` até ${fmt(r.fim)}/${r.fim.slice(0,4)}`:''}${r.editadoPor?` · editada por ${esc(r.editadoPor)} em ${fmt((r.editadoEm||'').slice(0,10))} às ${hmDe(r.editadoEm)}`:''}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${r.ativo===false?'<span class="tag ne">Pausada</span>':r.fim&&r.fim<HJ?'<span class="tag ne">Encerrada</span>':''}${pc?`<button class="btn ghost" onclick="editRot('${r.id}')">Editar</button>`:''}</div>`;
- return (L.length?G.map(g=>{const l=L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g);return l.length?`<div class="panel"><div class="ph"><h2>${esc(g||'Outras atividades')}</h2><span>${l.length}</span></div>${l.map(lin).join('')}</div>`:''}).join(''):`<div class="panel">${vazio('Nenhuma rotina cadastrada','Use o modelo de novembro ou cadastre cada rotina com etapa, sistema, responsáveis e horário.',null)}${pc?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" onclick="editRot()">Nova rotina</button><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div>':''}</div>`)+
+function cronRotinas(){const pc=podeEditRot(),L=[...D.cronograma].sort(ordR);
+ const lin=r=>`<div class="row"><div class="t"><b>${esc(r.t)}</b><span>${esc(r.etapa||'Outras atividades')} · ${esc(freqTxt(r))} · ${esc((r.sis||[]).map(sisTxt).join(', ')||'Sem sistema')} · ${esc(nomesRs(r))}${r.apoio?' · apoio: '+esc(r.apoio):''}</span>${r.obs?`<span>${esc(r.obs)}</span>`:''}${r.editadoPor?`<span>Editada por ${esc(r.editadoPor)} em ${fmt((r.editadoEm||'').slice(0,10))} às ${hmDe(r.editadoEm)}</span>`:''}</div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${r.ativo===false?'<span class="tag ne">Pausada</span>':r.fim&&r.fim<HJ?'<span class="tag ne">Encerrada</span>':r.ini&&r.ini>HJ?`<span class="tag ac">Começa em ${fmt(r.ini)}</span>`:''}${pc?`<button class="btn ghost" onclick="editRot('${r.id}')">Editar</button>`:''}</div>`;
+ const per=[...new Set(L.filter(r=>r.fim&&r.freq!=='unica').map(r=>(r.ini||'')+'|'+r.fim))].sort((a,b)=>a.split('|')[1].localeCompare(b.split('|')[1]));
+ const blocos=[['Valem sempre','A ordem do processo e o D-5 valem todos os dias.',L.filter(r=>!r.fim&&r.freq!=='unica')],
+  ...per.map(k=>{const [a,b]=k.split('|');return [`Período especial: ${a?fmt(a)+' a ':'até '}${fmt(b)}`,'Valem só neste período. Depois saem sozinhas do cronograma.',L.filter(r=>r.fim&&r.freq!=='unica'&&(r.ini||'')+'|'+r.fim===k)]}),
+  ['Demandas de um dia só','Inclui as que vieram de chamados.',L.filter(r=>r.freq==='unica')]].filter(b=>b[2].length);
+ const etp=l=>{let ult=null;return l.map(r=>{const g=r.etapa||'Outras atividades',h=g!==ult?`<p class="eyebrow" style="margin:14px 0 2px">${esc(g)}</p>`:'';ult=g;return h+lin(r)}).join('')};
+ return (orgPendente()?`<div class="banner"><span>Há uma versão mais organizada do cronograma: D-5 sempre, pagamento D-2 só em novembro e D-1 a partir de dezembro. As rotinas atuais são atualizadas sem perder o que já foi marcado.</span><button class="btn pri" onclick="organizarModelo()">Organizar agora</button></div>`:'')+
+ (L.length?blocos.map(([t,d,l])=>`<div class="panel"><div class="ph"><h2>${t}</h2><span>${l.length} ${l.length>1?'rotinas':'rotina'}</span></div><p class="meta" style="margin:0">${d}</p>${etp(l)}</div>`).join(''):`<div class="panel">${vazio('Nenhuma rotina cadastrada','Use o modelo pronto ou cadastre cada rotina com etapa, sistema, responsáveis e horário.',null)}${podeCron()?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" onclick="editRot()">Nova rotina</button><button class="btn pri" onclick="montarModelo()">Montar o cronograma</button></div>':''}</div>`)+
  note('Pausar ou dar data final a uma rotina mantém o histórico. Ao excluir, os registros de dias já feitos deixam de contar.')}
 function cronTri(){const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
  const lin=(n,o)=>`<tr><td>${n}</td><td>${o.prev}</td><td>${o.ok}</td><td>${o.atr?`<span class="tag wa">${o.atr}</span>`:'0'}</td><td>${o.pend?`<span class="tag bad">${o.pend}</span>`:'0'}</td><td>${o.pct===null?'—':`<span class="${o.pct<70?'neg':o.pct>=90?'pos':''}">${o.pct}%</span>`}</td></tr>`;
@@ -1272,11 +1307,12 @@ function cronTri(){const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
  <div class="panel"><div class="ph"><h2>Por etapa do processo</h2></div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Etapa</th>${th}</tr></thead><tbody>${G.map(g=>lin(esc(g||'Outras atividades'),resumoCron(r=>(procs().includes(r.etapa)?r.etapa:'')===g,ini,fim))).join('')}</tbody></table></div></div>`+
  note('Cada dia em que a rotina estava prevista conta uma vez. Concluir depois do dia conta como atraso. Esses números entram nos prazos cumpridos de cada pessoa em Equipe e metas e no feedback do trimestre.')}
 /* cadastro de rotina */
-function editRot(id){const r=id?D.cronograma.find(x=>x.id===id):{freq:'diaria',rs:S.cQuem?[S.cQuem]:[],sis:S.cSis?[S.cSis]:[],etapa:procs()[0],prio:'normal',ini:HJ,ativo:true,dias:[1],n:1,antes:0};if(!r)return;
+function outraAtiv(dia){editRot('',{freq:'unica',data:dia||S.cDia||HJ,etapa:'',ini:''})}
+function editRot(id,pre){const r=id?D.cronograma.find(x=>x.id===id):{...{freq:'diaria',rs:S.cQuem?[S.cQuem]:[],sis:S.cSis?[S.cSis]:[],etapa:procs()[0],prio:'normal',ini:HJ,ativo:true,dias:[1],n:1,antes:0},...(pre||{})};if(!r)return;
  FORM={tipo:'_rot',id:id||'',del:false};const ps=colabs(),SS=[...new Set([...sists(),...(r.sis||[])])];
  const ck=(id2,on,txt)=>`<label class="ck"><input type="checkbox" id="${id2}" ${on?'checked':''}> ${esc(txt)}</label>`;
  const ets=[...new Set([...procs(),...(r.etapa?[r.etapa]:[])])];
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">${id?'Editar rotina':'Nova rotina'}</h2><p class="sub" style="font-size:13px">Atividade que se repete, com etapa do processo, sistema, responsáveis e horário. Cada pessoa marca em andamento e concluída no dia.</p></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">${id?'Editar rotina':pre?'Outra atividade':'Nova rotina'}</h2><p class="sub" style="font-size:13px">Atividade que se repete, com etapa do processo, sistema, responsáveis e horário. Cada pessoa marca em andamento e concluída no dia.</p></div>
  <div class="fgrid">
  <div class="full"><label class="lbl" for="rt_t">Descrição</label><input class="inp" id="rt_t" value="${esc(r.t||'')}" placeholder="Baixa no WAE"><p class="ferr" id="rte_t"></p></div>
  <div><label class="lbl" for="rt_et">Etapa do processo</label><select class="inp" id="rt_et">${ets.map(e=>`<option ${e===r.etapa?'selected':''}>${esc(e)}</option>`).join('')}<option value="" ${!r.etapa?'selected':''}>Outras atividades</option></select></div>
@@ -1315,17 +1351,18 @@ async function salvaRot(){['rte_t','rte_r','rte_freq'].forEach(e=>errEl(e,''));
 async function delRot(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
  const r=D.cronograma.find(x=>x.id===FORM.id);try{await DB.collection('cronograma').doc(FORM.id).delete();log(`Excluiu a rotina "${r?.t||''}" do cronograma`);toast('Rotina excluída');fechar()}catch(e){toast('Não foi possível excluir.')}}
 /* ajustes: etapas, sistemas e módulos guardados */
-function cfgCron(){FORM={tipo:'_cfgcron',listas:{et:[...procs()],sis:[...sists()]}};
+function cfgCron(){FORM={tipo:'_cfgcron',listas:{et:[...procs()],sis:[...sists()],teste:Array.isArray(CFG.cronTeste)?[...CFG.cronTeste]:['Protheus']}};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">Ajustes</h2><p class="sub" style="font-size:13px">Etapas do processo, sistemas usados e quais telas antigas ficam no menu.</p></div>
  <div class="fgrid one"><div><span class="lbl">Etapas do processo (na ordem em que acontecem)</span>${chipsEd('et','Ex.: Aprovação')}</div>
  <div><span class="lbl">Sistemas</span>${chipsEd('sis','Ex.: Internet banking')}</div>
+ <div><span class="lbl">Sistemas em teste</span>${chipsEd('teste','Ex.: Protheus')}<p class="meta" style="margin:4px 0 0">Aparecem com a marca "em teste". Tire daqui quando o sistema passar a valer de vez.</p></div>
  <div><span class="lbl">Guardados para depois (ligue quando quiser usar)</span>${MODS.map(([k,n,d])=>`<label class="perm"><input type="checkbox" id="md_${k}" ${modOn(k)?'checked':''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>
- <div><span class="lbl">Modelo pronto</span><button class="btn" type="button" onclick="montarModelo()">Montar o cronograma de novembro</button><p class="meta" style="margin:4px 0 0">Cria as rotinas de WAE e Protheus com Natalia, Jeferson e Natasha. Depois é só ajustar.</p></div></div>
+ <div><span class="lbl">Modelo pronto</span><div style="display:flex;gap:8px;flex-wrap:wrap">${D.cronograma.length?`<button class="btn" type="button" onclick="organizarModelo()">Organizar com o modelo atualizado</button>`:`<button class="btn" type="button" onclick="montarModelo()">Montar o cronograma</button>`}</div><p class="meta" style="margin:4px 0 0">D-5 sempre, pagamento D-2 em novembro e D-1 a partir de dezembro, com Natalia, Jeferson e Natasha. Atualiza as rotinas existentes sem apagar nada.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgCron()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
 async function salvaCfgCron(){const L=FORM.listas;if(!L.et.length||!L.sis.length){toast('Deixe ao menos uma etapa e um sistema.');return}
  const modulos=Object.fromEntries(MODS.map(([k])=>[k,!!document.getElementById('md_'+k)?.checked]));
- try{await DB.doc('config/estrutura').set({...CFG,cronEtapas:L.et,cronSis:L.sis,modulos});log('Alterou os ajustes do cronograma');toast('Ajustes salvos');fechar()}
+ try{await DB.doc('config/estrutura').set({...CFG,cronEtapas:L.et,cronSis:L.sis,cronTeste:L.teste,modulos});log('Alterou os ajustes do cronograma');toast('Ajustes salvos');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar os ajustes.':'Não foi possível salvar.')}}
 /* departamentos (usados pelos chamados) quando a tela de entregas está guardada */
 function gerirDeps(){FORM={tipo:'_deps'};
@@ -1334,32 +1371,53 @@ function gerirDeps(){FORM={tipo:'_deps'};
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Fechar</button><button class="btn pri" onclick="abrir('departamento')">Novo departamento</button></div></div>`;
  document.getElementById('ov').hidden=false}
 /* modelo pronto: cronograma de novembro (transição WAE → Protheus) */
-async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode montar o cronograma.');return}
- if(D.cronograma.length&&!S.confMod){S.confMod=true;toast('Já existem rotinas. Clique de novo para adicionar o modelo mesmo assim.');setTimeout(()=>S.confMod=false,6000);return}
- S.confMod=false;const faltam=[];
+/* modelo do departamento. "chave" identifica cada rotina para atualizações futuras sem duplicar */
+function modeloCron({NA,JN}){const EV='Evandro (Protheus)',N0='2026-11-01',N1='2026-11-30',DZ='2026-12-01';
+ const r=(chave,etapa,t,sis,rs,x)=>({chave,etapa,t,sis,rs,apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:N0,fim:'',ativo:true,...(x||{})});
+ return [
+  r('ident','Identificação','Identificar as contas a pagar (D-5)',['WAE','Protheus'],JN,{obs:'D-5: contas que vencem daqui a 5 dias úteis. Vale sempre.'}),
+  r('confer','Conferência','Conferir documentos, valores, vencimentos e centro de custo',['WAE','Protheus'],JN,{obs:'Contas identificadas no D-5.'}),
+  r('lanc-wae','Lançamento','Lançamento no WAE',['WAE'],NA),
+  r('lanc-pro','Lançamento','Lançamento no Protheus',['Protheus'],JN,{apoio:EV,obs:'Protheus em teste em novembro.'}),
+  r('baixa-wae','Baixa','Baixa no WAE',['WAE'],NA),
+  r('baixa-pro','Baixa','Baixa no Protheus',['Protheus'],JN,{apoio:EV,obs:'Protheus em teste em novembro.'}),
+  r('pag-nov','Pagamento','Pagamento · todas as contas (D-2 em novembro)',['WAE','Protheus'],JN,{hora:'10:00',fim:N1,obs:'Novembro: pagamento adiantado para 2 dias úteis antes do vencimento (D-2), porque trabalhamos no WAE e no Protheus.'}),
+  r('pag','Pagamento','Pagamento · todas as contas (D-1)',['WAE','Protheus'],JN,{hora:'10:00',ini:DZ,obs:'Pagamento 1 dia útil antes do vencimento (D-1).'}),
+  r('pag-wae','Pagamento','Pagamento · WAE',['WAE'],JN,{hora:'14:30',obs:'A partir das 14:30: WAE. Segue o D-1 (D-2 em novembro).'}),
+  r('pag-polos','Pagamento','Pagamento dos polos',['WAE','Protheus'],JN,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'}),
+  r('folha','Pagamento','Folha de pagamento',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'}),
+  r('imp-nov','Pagamento','Impostos do dia 20 (D-2 em novembro)',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:2,fim:N1,obs:'Atenção: confira as guias. Em novembro, pagar 2 dias úteis antes.'}),
+  r('imp','Pagamento','Impostos do dia 20 (D-1)',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:1,ini:DZ,obs:'Atenção: confira as guias. Crie uma rotina para cada vencimento diferente.'}),
+  r('concil','Conciliação','Conciliação bancária',['WAE','Protheus'],JN),
+  r('acomp','','Acompanhamento diário do Protheus',['Protheus'],JN,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a implantação do Protheus.'})]}
+/* títulos da primeira versão do modelo, para atualizar no lugar */
+const MODELO_ANTIGO={ident:['Identificar as contas que vencem em 5 dias úteis (D-5)','Identificar as contas que vencem no próximo dia útil'],'pag-nov':['Pagamento · todas as contas'],'imp-nov':['Impostos (vencimento dia 20)']};
+const orgPendente=()=>podeCron()&&D.cronograma.length>0&&!D.cronograma.some(r=>r.chave);
+async function pessoasModelo(faltam){
  const achar=async(chaves,n)=>{const p=D.equipe.find(x=>chaves.includes(norm(x.n).split(/\s+/)[0]));if(p)return p.id;
   if(!(dir()||pode('cadastros'))){faltam.push(n);return ''}
   const id='p'+Math.random().toString(36).slice(2,12);try{await DB.collection('equipe').doc(id).set({n,c:'Financeiro',vinc:'CLT',categ:'colab',criado:HJ});log(`Cadastrou colaborador: ${n}`);return id}catch(e){faltam.push(n);return ''}};
  const nt=await achar(['natalia'],'Natalia'),jf=await achar(['jeferson','jefferson'],'Jeferson'),ns=await achar(['natasha'],'Natasha');
- const JN=[jf,ns].filter(Boolean),NA=[nt].filter(Boolean),EV='Evandro (Protheus)',ini=HJ>'2026-11-01'?HJ:'2026-11-01';
- const M=[
-  ['Identificação','Identificar as contas que vencem em 5 dias úteis (D-5)',['WAE','Protheus'],JN,{obs:'D-5: identificar com 5 dias úteis de antecedência. O pagamento é 1 dia antes do vencimento (D-1).'}],
-  ['Conferência','Conferir documentos, valores, vencimentos e centro de custo',['WAE','Protheus'],JN,{obs:'Contas identificadas no D-5.'}],
-  ['Lançamento','Lançamento no WAE',['WAE'],NA],
-  ['Lançamento','Lançamento no Protheus',['Protheus'],JN,{apoio:EV}],
-  ['Baixa','Baixa no WAE',['WAE'],NA],
-  ['Baixa','Baixa no Protheus',['Protheus'],JN,{apoio:EV}],
-  ['Pagamento','Pagamento · todas as contas',['WAE','Protheus'],JN,{hora:'10:00',obs:'10h: todas as contas. Pagamento 1 dia antes do vencimento (D-1).'}],
-  ['Pagamento','Pagamento · WAE',['WAE'],JN,{hora:'14:30',obs:'A partir das 14:30: WAE.'}],
-  ['Pagamento','Pagamento dos polos',['WAE','Protheus'],JN,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'}],
-  ['Pagamento','Folha de pagamento',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'}],
-  ['Pagamento','Impostos (vencimento dia 20)',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:1,obs:'Atenção: confira as guias. Crie uma rotina para cada vencimento diferente.'}],
-  ['Conciliação','Conciliação bancária',['WAE','Protheus'],JN],
-  ['','Acompanhamento diário do Protheus',['Protheus'],JN,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a adaptação ao Protheus.'}]];
- let k=0;for(const [etapa,t,sis,rs,x] of M){if(await salvar('cronograma',null,{t,etapa,sis,rs,apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini,fim:'',ativo:true,criado:HJ,...(x||{})},false,false))k++}
- log(`Montou o cronograma de novembro com ${k} rotinas`);
+ return {NA:[nt].filter(Boolean),JN:[jf,ns].filter(Boolean)}}
+async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode montar o cronograma.');return}
+ if(D.cronograma.length){return organizarModelo()}
+ const faltam=[],M=modeloCron(await pessoasModelo(faltam)),hoje=HJ;let k=0;
+ for(const r of M){const x={...r,ini:r.ini<hoje?hoje:r.ini,criado:HJ};if(await salvar('cronograma',null,x,false,false))k++}
+ log(`Montou o cronograma do departamento com ${k} rotinas`);
  toast(faltam.length?`${k} rotinas criadas. Cadastre ${faltam.join(', ')} e defina nas rotinas.`:`${k} rotinas criadas. Ajuste o que precisar.`);
- if(FORM)fechar();S.cTab='dia';S.cDia='';ir('rotinas')}
+ if(FORM)fechar();S.cTab='rotinas';ir('rotinas')}
+/* atualiza as rotinas existentes no lugar (mantém o histórico de marcações), cria as que faltam e não apaga nada */
+async function organizarModelo(){if(!podeCron()){toast('Só quem cadastra pode organizar o cronograma.');return}
+ if(!S.confOrg){S.confOrg=true;toast('Clique de novo para confirmar. As rotinas são atualizadas sem apagar nada.');setTimeout(()=>S.confOrg=false,6000);return}
+ S.confOrg=false;const faltam=[],ids=await pessoasModelo(faltam),M=modeloCron(ids),usados=new Set(),quem=pessoa(S.perfil)?.n||quemSou(),agora=new Date().toISOString();let up=0,cr=0;
+ for(const sp of M){const nomes=[sp.t,...(MODELO_ANTIGO[sp.chave]||[])].map(norm);
+  const ant=D.cronograma.find(r=>!usados.has(r.id)&&r.chave===sp.chave)||D.cronograma.find(r=>!usados.has(r.id)&&!r.chave&&nomes.includes(norm(r.t)));
+  if(ant){usados.add(ant.id);const {id,...b}=ant;
+   if(await salvar('cronograma',id,{...b,...sp,rs:rsDe(ant).length?ant.rs:sp.rs,hora:ant.hora||sp.hora,apoio:ant.apoio||sp.apoio,ini:ant.ini&&ant.ini<sp.ini&&!sp.ini.startsWith('2026-12')?ant.ini:sp.ini,editadoPor:quem,editadoEm:agora},false,false))up++}
+  else if(await salvar('cronograma',null,{...sp,criado:HJ},false,false))cr++}
+ log(`Organizou o cronograma: ${up} rotinas atualizadas e ${cr} criadas`);
+ toast(`${up} rotinas atualizadas e ${cr} criadas.${faltam.length?` Cadastre ${faltam.join(', ')}.`:''}`);
+ if(FORM)fechar();S.cTab='rotinas';ir('rotinas')}
 
 function cronPainel(){if(!D.cronograma.length)return podeCron()?`<div class="panel"><div class="ph"><h2>Cronograma do departamento</h2></div>${vazio('Cronograma ainda não montado','Monte as rotinas de WAE e Protheus com os responsáveis de cada etapa.',null)}<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div></div>`:'';
  const ps=pessoasCron(),ant=atrasosCron().filter(o=>o.dia<HJ),hoje=D.cronograma.filter(r=>ocorre(r,HJ)).sort(ordR);
@@ -1367,6 +1425,54 @@ function cronPainel(){if(!D.cronograma.length)return podeCron()?`<div class="pan
  return `<div class="panel"><div class="ph"><h2>Cronograma de hoje</h2><button class="btn ghost" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button></div>
  <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Pessoa</th><th>Hoje</th><th>Concluídas</th><th>Em andamento</th><th>Atrasadas</th><th>De dias anteriores</th></tr></thead><tbody>${ps.map(p=>{const f=r=>rsDe(r).includes(p),c=contaDia(HJ,f),a=ant.filter(o=>f(o.r)).length;return `<tr><td style="text-align:left">${esc(nomeDe(p))}</td><td>${c.tot}</td><td>${c.ok}</td><td>${c.and?`<span class="tag ac">${c.and}</span>`:'0'}</td><td>${c.atr?`<span class="tag bad">${c.atr}</span>`:'0'}</td><td>${a?`<span class="tag bad">${a}</span>`:'0'}</td></tr>`}).join('')}</tbody></table></div>
  ${vivo.length||ant.length?`<p class="eyebrow" style="margin:14px 0 0">Em andamento e atrasadas</p>${vivo.map(r=>linOc(r,HJ)).join('')}${ant.slice(0,8).map(o=>linOc(o.r,o.dia,true)).join('')}${ant.length>8?`<p class="meta">E mais ${ant.length-8} no cronograma.</p>`:''}`:`<p class="meta" style="margin:10px 0 0">Nada em andamento ou atrasado agora.</p>`}</div>`}
+
+/* chamado → demanda do dia no cronograma (o e-mail separa, o chamado vira rotina de um dia) */
+function chParaCron(cid){const c=D.chamados.find(x=>x.id===cid);if(!c)return;FORM={tipo:'_chcron',ch:cid};const ck=(i,on,t)=>`<label class="ck"><input type="checkbox" id="${i}" ${on?'checked':''}> ${esc(t)}</label>`;
+ const dia=ehUtil(HJ)?HJ:proxUtil(HJ);
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Chamado ${esc(c.proto||'')}</p><h2 id="sheet-title">Levar para o cronograma</h2><p class="sub" style="font-size:13px">A demanda entra no dia escolhido, na etapa do processo, e é marcada como as outras rotinas.</p></div>
+ <div class="fgrid"><div class="full"><label class="lbl" for="cc_t">Descrição</label><input class="inp" id="cc_t" value="${esc(c.assunto||c.tipo||'')}"><p class="ferr" id="cce_t"></p></div>
+ <div><label class="lbl" for="cc_dia">Dia</label><input class="inp" id="cc_dia" type="date" value="${dia}"></div>
+ <div><label class="lbl" for="cc_et">Etapa</label><select class="inp" id="cc_et">${procs().map(e=>`<option>${esc(e)}</option>`).join('')}<option value="">Outras atividades</option></select></div>
+ <div><label class="lbl" for="cc_hora">Horário · opcional</label><input class="inp" id="cc_hora" type="time"></div>
+ <div class="full"><span class="lbl">Sistema</span><div class="cks">${sists().map((x,i)=>ck('cc_s_'+i,false,x)).join('')}</div></div>
+ <div class="full"><span class="lbl">Responsáveis</span><div class="cks">${colabs().map(p=>ck('cc_r_'+p.id,p.id===c.resp,p.n)).join('')}</div><p class="ferr" id="cce_r"></p></div></div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaChCron()">Levar para o cronograma</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+async function salvaChCron(){const c=D.chamados.find(x=>x.id===FORM.ch),t=val('cc_t'),dia=val('cc_dia'),rs=colabs().filter(p=>document.getElementById('cc_r_'+p.id)?.checked).map(p=>p.id);errEl('cce_t','');errEl('cce_r','');
+ if(!t||!dia){errEl('cce_t','Informe a descrição e o dia.');return}if(!rs.length){errEl('cce_r','Escolha ao menos um responsável.');return}
+ if(await salvar('cronograma',null,{t,etapa:val('cc_et'),sis:sists().filter((x,i)=>document.getElementById('cc_s_'+i)?.checked),rs,apoio:'',freq:'unica',data:dia,dias:[],n:1,antes:0,hora:val('cc_hora'),prio:'normal',obs:c?.desc?String(c.desc).slice(0,200):'',ini:'',fim:'',ativo:true,criado:HJ,chamado:c?.proto||'',chamadoId:c?.id||''},'Demanda incluída no cronograma',`Levou o chamado ${c?.proto||''} para o cronograma de ${fmt(dia)}`))fechar()}
+
+/* ---------- avisos no canto da tela (funcionam com o portal aberto, mesmo em outra aba) ---------- */
+const avOk=()=>'Notification' in window;
+const avPodePedir=()=>avOk()&&Notification.permission==='default';
+function ativarAvisos(){if(!avOk()){toast('Este navegador não mostra avisos na tela.');return}
+ Notification.requestPermission().then(r=>{toast(r==='granted'?'Avisos ativados. Eles aparecem no canto da tela.':'O navegador bloqueou os avisos. Libere em Configurações do site > Notificações.');render();if(r==='granted')checarAvisos()})}
+const AV_K=()=>'avisos_'+(ME.uid||'')+S.perfil+'_'+HJ;
+function avJa(){try{return JSON.parse(localStorage.getItem(AV_K())||'[]')}catch(e){return S._avJa||[]}}
+function avMarca(k){const l=avJa();l.push(k);try{localStorage.setItem(AV_K(),JSON.stringify(l.slice(-300)))}catch(e){S._avJa=l}}
+function avisosDevidos(){if(solic()||S.perfil==='pendente')return [];const mn=t=>{const [h,m]=String(t).split(':').map(Number);return h*60+(m||0)},ag=mn(agoraHM()),L=[];
+ const hoje=proxPrazos(30).filter(x=>x.d===HJ);if(hoje.length)L.push({k:'dia',t:`Hoje: ${hoje.length} ${hoje.length>1?'prazos':'prazo'}`,s:hoje.slice(0,3).map(x=>(x.h?x.h+' ':'')+x.t).join(' · '),ir:'painel'});
+ D.eventos.filter(e=>vejoEv(e)&&e.hora&&evOcorre(e,HJ)).forEach(e=>{const d=mn(e.hora)-ag;if(d<=15&&d>=-5)L.push({k:'ev_'+e.id,t:`${e.hora} · ${e.t}`,s:d>0?`Começa em ${d} min`:'Começando agora',ir:'calendario'})});
+ D.cronograma.filter(r=>vejoRot(r)&&r.hora&&ocorre(r,HJ)&&exDe(r.id,HJ)?.s!=='feita').forEach(r=>{const d=mn(r.hora)-ag;
+  if(d<=15&&d>0)L.push({k:'rt_'+r.id,t:`${r.hora} · ${r.t}`,s:`Em ${d} min · ${nomesRs(r)}`,ir:'rotinas'});else if(d<=0&&d>-180)L.push({k:'ra_'+r.id,t:`Atrasada: ${r.t}`,s:`Era às ${r.hora} · ${nomesRs(r)}`,ir:'rotinas'})});
+ const ant=atrasosCron(vejoRot).filter(o=>o.dia<HJ).length;if(ant)L.push({k:'ant',t:`${ant} ${ant>1?'rotinas de dias anteriores':'rotina de dia anterior'} em atraso`,s:'Veja em Cronograma',ir:'rotinas'});
+ const am=proxUtil(HJ);D.cronograma.filter(r=>r.prio==='atencao'&&vejoRot(r)&&ocorre(r,am)).forEach(r=>L.push({k:'at_'+r.id,t:`Atenção no próximo dia útil: ${r.t}`,s:r.obs||nomesRs(r),ir:'rotinas'}));
+ return L}
+function cantoAviso(a){let c=document.getElementById('avcanto');if(!c){c=document.createElement('div');c.id='avcanto';c.setAttribute('aria-live','polite');document.body.appendChild(c)}
+ const el=document.createElement('div');el.className='avc';el.innerHTML=`<button class="avx" aria-label="Fechar aviso">×</button><b>${esc(a.t)}</b>${a.s?`<span>${esc(a.s)}</span>`:''}`;
+ el.addEventListener('click',e=>{if(!e.target.classList.contains('avx'))ir(a.ir);el.remove()});c.appendChild(el);setTimeout(()=>el.remove(),20000)}
+function avisarCanto(a){avMarca(a.k);let so=false;
+ try{if(avOk()&&Notification.permission==='granted'){const n=new Notification('Prumo · '+a.t,{body:a.s||'',tag:'prumo-'+a.k});n.onclick=()=>{window.focus();ir(a.ir);n.close()};so=document.visibilityState!=='visible'}}catch(e){}
+ if(!so)cantoAviso(a)}
+function checarAvisos(){if(S.modo==='carregando'||!DB)return;try{const ja=avJa();avisosDevidos().filter(a=>!ja.includes(a.k)).slice(0,4).forEach(avisarCanto)}catch(e){}}
+
+/* chegada dos pedidos: a equipe marca à mão se o e-mail ou chamado chegou atrasado; o diretor vê por departamento */
+async function marcaChegada(id,v){const c=D.chamados.find(x=>x.id===id);if(!c)return;const nv=c.chegada===v?'':v;
+ if(await patch('chamados',id,{chegada:nv,chegadaPor:nv?(pessoa(S.perfil)?.n||quemSou()):'',chegadaEm:nv?new Date().toISOString():''},nv?(nv==='atrasado'?'Marcado: chegou atrasado':'Marcado: chegou no prazo'):'Marcação retirada',`${nv?`Marcou que o chamado ${c.proto} chegou ${nv==='atrasado'?'atrasado':'no prazo'}`:`Retirou a marcação de chegada do chamado ${c.proto}`} (${depNome(c.dep)})`))setTimeout(()=>{if(FORM?.tipo==='_det'&&FORM.id===id)detalheCh(id)},150)}
+function chegadaPainel(){if(!(dir()||pode('ver_tudo')||pode('chamados')))return '';const m=S.chM||MES_ATUAL,L=D.chamados.filter(c=>(c.aberto||c.recebidoEm||'').slice(0,7)===m);
+ const deps=[...new Set(L.map(c=>c.dep||''))].map(d=>{const l=L.filter(c=>(c.dep||'')===d),at=l.filter(c=>c.chegada==='atrasado').length,ok=l.filter(c=>c.chegada==='prazo').length;return {n:d?depNome(d):'Setor não definido',tot:l.length,at,ok,sem:l.length-at-ok,pct:at+ok?Math.round(at/(at+ok)*100):null}}).sort((a,b)=>b.at-a.at||b.tot-a.tot);
+ const nav=`<div class="seg"><button onclick="S.chM=addMes('${m}',-1);render()" aria-label="Mês anterior">‹</button><span>${mesNome(m)}</span><button onclick="S.chM=addMes('${m}',1);render()" aria-label="Próximo mês">›</button></div>`;
+ return `<div class="panel"><div class="ph"><h2>Pedidos recebidos por departamento</h2>${nav}</div>${deps.length?`<div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Departamento</th><th>Recebidos</th><th>No prazo</th><th>Chegaram atrasados</th><th>Sem marcação</th><th>% atrasados</th></tr></thead><tbody>${deps.map(d=>`<tr><td style="text-align:left">${esc(d.n)}</td><td>${d.tot}</td><td>${d.ok}</td><td>${d.at?`<span class="tag bad">${d.at}</span>`:'0'}</td><td>${d.sem?`<span class="meta">${d.sem}</span>`:'0'}</td><td>${d.pct===null?'—':`<span class="${d.pct>=30?'neg':d.pct===0?'pos':''}">${d.pct}%</span>`}</td></tr>`).join('')}</tbody></table></div>`:'<p class="meta" style="margin:0">Nenhum chamado ou e-mail recebido neste mês.</p>'}<p class="meta" style="margin:8px 0 0">A equipe marca em cada chamado se chegou no prazo ou atrasado.</p></div>`}
 
 /* ---------- prazos e compromissos: fixos (toda semana, todo mês) ou de uma vez ---------- */
 const TIPOS_EV=['Reunião','Obrigação','Fechamento','Outro'];
@@ -1657,7 +1763,7 @@ logs(){const q=(S.fLog||'').toLowerCase(),l=D.logs.filter(x=>!q||((x.acao||'')+'
  `<input class="inp" id="flog" placeholder="Filtrar por pessoa, chamado ou ação" value="${esc(S.fLog||'')}" oninput="S.fLog=this.value;document.getElementById('loglist').innerHTML=logRows()">
  <div class="panel" id="loglist">${logRows()}</div>`+note('Mostra as 300 ações mais recentes. O nome vem da conta de cada pessoa; ações feitas simulando outro perfil aparecem marcadas.')},
 alertas(){const A=alertas();
- return head('Central de notificações','Alertas',modOn('outros')?(dir()?'Atrasos do cronograma, rotinas e pendências que dependem de você.':'Alertas das rotinas sob sua responsabilidade.'):(dir()?'Rotinas do cronograma atrasadas e rotinas de atenção do departamento.':'Rotinas do cronograma sob sua responsabilidade.'))+
+ return (avPodePedir()?`<div class="banner"><span>Receba avisos no canto da tela do computador quando um prazo ou rotina estiver chegando.</span><button class="btn pri" onclick="ativarAvisos()">Ativar avisos</button></div>`:'')+head('Central de notificações','Alertas',modOn('outros')?(dir()?'Atrasos do cronograma, rotinas e pendências que dependem de você.':'Alertas das rotinas sob sua responsabilidade.'):(dir()?'Rotinas do cronograma atrasadas e rotinas de atenção do departamento.':'Rotinas do cronograma sob sua responsabilidade.'))+
  `<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma rotina do cronograma atrasar ou tiver prioridade Atenção, ela aparece aqui.')}</div>`+
  note('Os alertas são recalculados sozinhos todos os dias a partir dos prazos. O diretor vê tudo; cada pessoa vê o que está sob sua responsabilidade.')},
 
@@ -1683,7 +1789,7 @@ painel(){
  const atr=D.tarefas.filter(atrasada),pm=pendMsg(),dm=D.destaques.filter(d=>d.mes===MES_ATUAL);
  const prox=proxPrazos(6);
  if(!dir()&&!pode('ver_tudo')){const p=pessoa(S.perfil),mt=minhas(),r=resumoTri(S.perfil,S.tri);const meuF=r=>minhaRot(r),cm=contaDia(HJ,meuF),meus=D.cronograma.filter(r=>meuF(r)&&ocorre(r,HJ)).sort(ordR),meusAtr=atrasosCron(meuF).filter(o=>o.dia<HJ);
-  return head(hojeTxt(),`Bom dia, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+
+  return head(hojeTxt(),`Bom dia, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+andamento(S.pDia||HJ,'pDia')+
   `<div class="stats"><div class="stat"><p>Meu dia</p><strong>${cm.ok}/${cm.tot}</strong><small>${cm.atr+meusAtr.length?`<span class="neg">${cm.atr+meusAtr.length} em atraso</span>`:'rotinas concluídas'}</small></div><div class="stat"><p>Metas do trimestre</p><strong>${p?.m??0}%</strong></div><div class="stat"><p>Minhas demandas em aberto</p><strong>${D.chamados.filter(c=>c.resp===S.perfil&&c.st!=='Concluído').length}</strong></div><div class="stat"><p>Prazos cumpridos</p><strong>${r.pct===null?'—':r.pct+'%'}</strong></div></div>
   ${meusAtr.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${meusAtr.length}</span></div>${meusAtr.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:''}
   ${(()=>{const pp=proxPrazos(5,true);return `<div class="panel"><div class="ph"><h2>Próximos prazos</h2>${novo('evento','Novo prazo')}</div>${pp.length?pp.map(linPrazo).join(''):vazio('Sem prazos próximos','')}</div>`})()}
@@ -1693,14 +1799,14 @@ painel(){
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2></div>${dm.length?`<div class="hl">${dm.map(cardDest).join('')}</div>`:vazio('Nenhum destaque neste mês','')}</div>`+note('No perfil de colaborador você vê só as suas tarefas, as suas horas e o seu feedback.')}
  const ea=modOn('entregas')?D.entregas.filter(entAtrasada):[],porDep={};const cd=contaDia(HJ),cAtr=atrasosCron();ea.forEach(e=>porDep[depNome(e.dep)]=(porDep[depNome(e.dep)]||0)+1);
  const alertaTop=ea.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${ic('alertas').replace('aria-hidden','style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden')}Em atraso: ${Object.entries(porDep).map(([n,q])=>`${esc(n)} (${q})`).join(', ')}</span><button class="btn" onclick="ir('alertas')">Ver alertas</button></div>`:'';
- return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+
+ return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+andamento(S.pDia||HJ,'pDia')+
  `<div class="stats">
   <div class="stat"><p>Cronograma de hoje</p><strong>${cd.ok}/${cd.tot}</strong><small>${cd.tot?Math.round(cd.ok/cd.tot*100):0}% concluído</small></div>
   <div class="stat"><p>Em andamento</p><strong style="color:${cd.and?'var(--accent)':'var(--ink)'}">${cd.and}</strong><small>rotinas começadas</small></div>
   <div class="stat"><p>Rotinas atrasadas</p><strong style="color:${cAtr.length+atr.length?'var(--bad)':'var(--ink)'}">${cAtr.length+atr.length}</strong><small>${atr.length?`${atr.length} tarefas avulsas`:'cronograma'}</small></div>
   ${modOn('entregas')?`<div class="stat"><p>Entregas em atraso</p><strong style="color:${ea.length?'var(--bad)':'var(--ink)'}">${ea.length}</strong><small>${ea.length?[...new Set(ea.map(e=>depNome(e.dep)))].length+' departamentos':'outros departamentos'}</small></div>`:''}
   <div class="stat"><p>Demandas atrasadas</p><strong style="color:${D.chamados.filter(chAtrasado).length?'var(--bad)':'var(--ink)'}">${D.chamados.filter(chAtrasado).length}</strong><small>prazo de entrega vencido</small></div></div>
- ${cronPainel()}${modOn('fechamento')&&pode('fechamento')?fechResumo():''}${demResumo()}
+ ${cronPainel()}${chegadaPainel()}${modOn('fechamento')&&pode('fechamento')?fechResumo():''}${demResumo()}
  ${modOn('entregas')?`<div class="grid2">
   <div class="panel"><div class="ph"><h2>Entregas por departamento</h2><button class="btn ghost" onclick="ir('entregas')">Ver entregas</button></div>${painelDep()}</div>
   <div class="panel"><div class="ph"><h2>Atrasos de departamentos</h2><span>${ea.length}</span></div>
@@ -1732,8 +1838,8 @@ destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  (pode('feedbacks')?note('Os destaques do mês entram automaticamente no relatório do trimestre e podem virar uma mensagem de reconhecimento no WhatsApp.'):'')},
 
 rotinas(){const t=S.cTab||'dia',pc=podeEditRot();
- const btns=`${pc?`<button class="btn" onclick="editRot()">Nova rotina</button>`:''}${novo('tarefa','Tarefa avulsa')}<button class="btn" onclick="editEv()">Novo prazo</button>${podeAdmin()?`<button class="btn" onclick="cfgCron()">Ajustes</button>`:''}`;
- return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`${procs().join(' → ')}. Marque em andamento e concluída conforme o dia avança.`,btns)+cronAbas()+
+ const btns=`<button class="btn pri" onclick="outraAtiv()">Outra atividade</button>${pc?`<button class="btn" onclick="editRot()">Nova rotina fixa</button>`:''}<button class="btn" onclick="editEv()">Novo prazo</button>${podeAdmin()?`<button class="btn" onclick="cfgCron()">Ajustes</button>`:''}`;
+ return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`${procs().join(' → ')}. As rotinas do dia já vêm prontas: é só marcar em andamento e concluída. Use Outra atividade para o que for extra.`,btns)+cronAbas()+
  (t==='semana'?cronSemana():t==='quem'?cronQuem():t==='rotinas'?cronRotinas():t==='tri'?cronTri():cronDia())+
  (t==='dia'?note('Clique no quadrado para concluir e na etiqueta para marcar em andamento. O diretor vê na hora o que está em andamento, concluído ou atrasado.'):'')},
 
@@ -1871,12 +1977,12 @@ function marcarTema(){document.querySelectorAll('.temas button').forEach(b=>b.se
 marcarTema();
 
 /* ---------- continuar de onde parou: tela, filtros, rolagem e o que estava digitando ---------- */
-const EST_K=['cTab','cQuem','cSis','tela','fRem','fDepC','fCat','fResp','fBusca','rPer','rCat','rDep','rQuem','fDep','fLog','fFer','busca','mesDest','cal','iPer','fRemT','fbP'];
+const EST_K=['chM','cTab','cQuem','cSis','tela','fRem','fDepC','fCat','fResp','fBusca','rPer','rCat','rDep','rQuem','fDep','fLog','fFer','busca','mesDest','cal','iPer','fRemT','fbP'];
 S.scroll={};
 function salvarEstado(){if(S.modo==='carregando')return;const o={scroll:S.scroll,em:Date.now()};EST_K.forEach(k=>{if(S[k]!==undefined&&S[k]!==null)o[k]=S[k]});
  if(['fbedit','fbver'].includes(o.tela))o.tela=S.fbP?'fbpessoa':'feedbacks';LS.set('prumo_estado',o)}
 (function(){const o=LS.get('prumo_estado',null);
- if(o&&Date.now()-(o.em||0)<30*864e5){EST_K.forEach(k=>{if(o[k]!==undefined)S[k]=o[k]});S.scroll=o.scroll||{}}
+ if(o&&Date.now()-(o.em||0)<30*864e5){EST_K.forEach(k=>{if(o[k]!==undefined&&!(k==='tela'&&Date.now()-(o.em||0)>2*36e5))S[k]=o[k]});S.scroll=o.scroll||{}}
  const h=(location.hash||'').slice(1);if(/^[a-z]+$/.test(h)&&V[h])S.tela=h;
  if(S.tela==='fbpessoa'&&!S.fbP)S.tela='feedbacks';if(['fbedit','fbver'].includes(S.tela))S.tela='feedbacks';
  S.voltarScroll=true})();
@@ -1981,4 +2087,5 @@ render();
   first=false;later()},()=>{});
  iniciarAutoSync();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
+ setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);
 })();

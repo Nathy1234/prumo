@@ -184,6 +184,13 @@ O menu **Cronograma** junta rotinas, tarefas e o acompanhamento do dia numa tela
 - **Rotinas cadastradas**: criar, editar, pausar ou dar data final. Cada rotina tem etapa, sistema, responsáveis, apoio, horário, frequência (todo dia útil, dias da semana, Nº dia útil do mês, dia fixo com antecipação D-1 ou uma vez só) e prioridade **Atenção**, que avisa no dia anterior.
 - **Trimestre**: prazos cumpridos por pessoa e por etapa. Esses números entram em Equipe e metas e no feedback.
 
+- **Rotinas fixas já prontas**: a ordem do processo e o D-5 valem sempre. Em novembro o pagamento é D-2 (WAE e Protheus juntos, Protheus em teste); a partir de dezembro, D-1. Ninguém precisa cadastrar o que é feito todo dia: só **Outra atividade** para o que for extra.
+- **Andamento do departamento**: logo ao entrar, o Painel mostra etapa por etapa, separado por WAE e Protheus, o que foi concluído, por quem e a que horas. Clique numa etapa para abrir as rotinas.
+- **Chamado vira demanda do dia**: no chamado, **Levar para o cronograma** coloca a demanda no dia, na etapa e com os responsáveis. Quando o e-mail estiver ligado, o e-mail separado vira chamado e segue o mesmo caminho.
+- **Chegada dos pedidos**: em cada chamado a equipe marca se chegou **no prazo** ou **atrasado**. O diretor vê no Painel o resumo por departamento.
+- **Próximos prazos e avisos**: prazos fixos (toda semana, todo mês) ou de uma vez, para todos ou só para pessoas escolhidas. Aparecem no sino de notificações e, depois de clicar em **Ativar avisos no canto da tela**, como aviso do computador. Os avisos funcionam com o portal aberto, mesmo em outra aba.
+- **Para atualizar um cronograma antigo**: em **Cronograma > Rotinas cadastradas**, clique em **Organizar agora**. As rotinas são atualizadas no lugar, sem apagar nada e sem perder o que já foi marcado.
+
 O diretor vê no **Painel** o cronograma de hoje por pessoa, o que está em andamento e o que atrasou, e os **Alertas** saem das rotinas do cronograma.
 
 Em **Cronograma > Ajustes** (administrador) você muda as etapas e os sistemas, usa o modelo pronto **Montar o cronograma de novembro** e liga de volta o que ficou guardado para depois (**Fechamento D+N**, **Entregas dos departamentos**, alertas de **e-mails do Outlook** e **Outros alertas**: chamados, WhatsApp, troca bancária, acessos e backup). Guardar uma tela só a tira do menu: nenhum dado é apagado.
