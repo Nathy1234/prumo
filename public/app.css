@@ -332,3 +332,4 @@ table.andt.quem td{text-align:left}
 div.opc{cursor:default;flex-wrap:wrap}.opc.and{background:var(--accent-soft);border-color:var(--accent)}.opc.and .opc-ck{border-color:var(--accent);color:var(--accent)}
 .opc .opc-t small.emand{color:var(--accent)}
 .opc-b{display:flex;gap:6px;margin-left:auto}
+.stdot{border-radius:50%;width:20px;height:20px;font-size:11px}
