@@ -109,7 +109,7 @@ function alertas(){
    if(real()&&S.bkCarregado&&CFG.bkAuto!==false&&!D.backups.some(b=>b.id==='d-'+HJ)&&!S.bk)A.push({n:1,ic:'backup',c:'wa',t:'Backup de hoje ainda não foi feito',s:'Ele é criado em instantes, com o portal aberto',ir:'backup'})}
   /* por enquanto os alertas vêm só do cronograma; os outros voltam em Cronograma > Ajustes */
   if(!solic()&&S.perfil!=='pendente'){const am=proxUtil(HJ),hm=agoraHM();
-   D.eventos.filter(vejoEv).forEach(e=>[HJ,am].forEach(d=>{if(evOcorre(e,d)&&!(d===HJ&&e.hora&&e.hora<hm))A.push({n:1,ic:'evento',c:'wa',t:`${d===HJ?'Hoje':'Próximo dia útil ('+fmt(d)+')'}${e.hora?' às '+e.hora:''}: ${e.t}`,s:`${e.tipo||'Prazo'} · ${quemEv(e)}${e.obs?' · '+e.obs:''}`,ir:'calendario'})}))}
+   D.eventos.filter(paraMimEv).forEach(e=>[HJ,am].forEach(d=>{if(evOcorre(e,d)&&!(d===HJ&&e.hora&&e.hora<hm))A.push({n:1,ic:'evento',c:'wa',t:`${d===HJ?'Hoje':'Próximo dia útil ('+fmt(d)+')'}${e.hora?' às '+e.hora:''}: ${e.t}`,s:`${e.tipo||'Prazo'} · ${quemEv(e)}${e.obs?' · '+e.obs:''}`,ir:'calendario'})}))}
   return (modOn('outros')?A:A.filter(a=>['rotinas','evento'].includes(a.ic))).sort((a,b)=>b.n-a.n)}
 function resumoDep(){
   return D.departamentos.map(d=>{const l=D.entregas.filter(e=>e.dep===d.id),rec=l.filter(e=>e.recebido&&e.prazo);
@@ -469,7 +469,7 @@ function notifs(){
  return L.slice(0,30)}
 function lido(){if(S.prefs?.lido&&!S.sim)return S.prefs.lido;try{return localStorage.getItem('lido_'+(ME.uid||'')+S.perfil)||''}catch(e){return S['lido_'+S.perfil]||''}}
 function marcarLido(){const v=new Date().toISOString();try{localStorage.setItem('lido_'+(ME.uid||'')+S.perfil,v)}catch(e){S['lido_'+S.perfil]=v}if(DB&&ME.uid&&!S.sim){S.prefs={...(S.prefs||{}),lido:v};DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs).catch(()=>{})}}
-function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs(),lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph;
+function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs(),lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5,!dir()),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph;
  return `<div class="tb"><span class="meta">${esc(quemSou())}</span>${temaBox()}<div style="position:relative"><button class="btn bell" id="bellbtn" onclick="tgBell()" aria-label="Notificações" aria-expanded="${!!S.bell}">${ic('alertas').replace('aria-hidden','style="width:18px;height:18px" aria-hidden')}${novos?`<span class="dot">${novos}</span>`:''}</button>
  ${S.bell?`<div class="pop" role="dialog" aria-label="Notificações"><div class="ph" style="padding:12px 14px 4px"><h2>Notificações</h2><button class="btn ghost" onclick="ir('alertas')">Ver tudo</button></div>
  ${avPodePedir()?`<div style="padding:4px 14px 8px"><button class="btn pri" style="width:100%" onclick="ativarAvisos()">Ativar avisos no canto da tela</button></div>`:''}
@@ -1163,7 +1163,7 @@ const sists=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_P
 /* módulos guardados para depois: ficam fora do menu até o administrador ligar */
 const MODS=[['fechamento','Fechamento D+N','Etapas do fechamento do mês com prazo em dias úteis'],['entregas','Entregas dos departamentos','O que outras áreas precisam enviar e até quando'],['email','E-mails do Outlook','Alertas de e-mails para revisar e de problemas na leitura da caixa'],['outros','Outros alertas','Chamados, WhatsApp, troca de dados bancários, pedidos de acesso e backup. Desligado, os alertas vêm só do cronograma']];
 const modOn=k=>!!(CFG.modulos||{})[k];
-const FREQS=[['diaria','Todo dia útil'],['semanal','Em dias da semana'],['mensal_util','Todo mês, no Nº dia útil'],['mensal_dia','Todo mês, em um dia fixo'],['unica','Uma vez só']];
+const FREQS=[['avulsa','Quando acontecer (é só clicar quando fizer)'],['diaria','Todo dia útil'],['semanal','Em dias da semana'],['mensal_util','Todo mês, no Nº dia útil'],['mensal_dia','Todo mês, em um dia fixo'],['unica','Uma vez só']];
 const SEM=['dom','seg','ter','qua','qui','sex','sáb'];
 const addDia=(iso,n)=>{const d=new Date(iso+'T12:00');d.setDate(d.getDate()+n);return isoD(d)};
 function* diasDe(a,b){for(let d=a;d<=b;d=addDia(d,1))yield d}
@@ -1175,14 +1175,15 @@ const diaTxt=iso=>{const d=new Date(iso+'T12:00');return `${DIAS[d.getDay()]}, $
 /* dia fixo do mês; se não for dia útil, antecipa. "antes" antecipa mais N dias úteis (ex.: D-1) */
 function diaFixo(m,n,antes){const [y,mm]=m.split('-').map(Number),ult=new Date(y,mm,0).getDate(),d=new Date(y,mm-1,Math.min(Math.max(1,n),ult),12);
  while(!util(d))d.setDate(d.getDate()-1);let k=0;while(k<(+antes||0)){d.setDate(d.getDate()-1);if(util(d))k++}return isoD(d)}
-function ocorre(r,dia){if(r.ativo===false||(r.ini&&dia<r.ini)||(r.fim&&dia>r.fim))return false;
+function ocorre(r,dia){if(r.freq==='avulsa')return !!exDe(r.id,dia);
+ if(r.ativo===false||(r.ini&&dia<r.ini)||(r.fim&&dia>r.fim))return false;
  if(r.freq==='unica')return r.data===dia;
  if(!ehUtil(dia))return false;const m=dia.slice(0,7);
  if(r.freq==='semanal')return (r.dias||[]).map(Number).includes(new Date(dia+'T12:00').getDay());
  if(r.freq==='mensal_util')return dataDN(addMes(m,-1),+r.n||1)===dia;
  if(r.freq==='mensal_dia')return diaFixo(m,+r.n||1,r.antes)===dia||diaFixo(addMes(m,1),+r.n||1,r.antes)===dia;
  return true}
-function freqTxt(r){const h=r.hora?` · ${r.hora}`:'';
+function freqTxt(r){const h=r.hora?` · ${r.hora}`:'';if(r.freq==='avulsa')return 'Quando acontecer';
  if(r.freq==='unica')return `Em ${fmt(r.data)}${h}`;
  if(r.freq==='semanal')return `Toda ${(r.dias||[]).map(d=>SEM[d]).join(', ')||'—'}${h}`;
  if(r.freq==='mensal_util')return `${r.n||1}º dia útil do mês${h}`;
@@ -1194,7 +1195,7 @@ const rsDe=r=>(r.rs||[]).filter(Boolean);
 const nomesRs=r=>rsDe(r).map(nomeDe).join(' e ')||'Sem responsável';
 const minhaRot=r=>rsDe(r).includes(S.perfil);
 const vejoRot=r=>dir()||pode('ver_tudo')||minhaRot(r);
-const podeMarcar=r=>dir()||pode('ver_tudo')||minhaRot(r);
+const podeMarcar=r=>dir()||pode('ver_tudo')||minhaRot(r)||(r.freq==='avulsa'&&podeEditRot());
 const podeCron=()=>dir()||podeAdmin()||pode('cadastros');
 /* toda a equipe pode corrigir e cadastrar rotinas; excluir fica com quem cadastra */
 const podeEditRot=()=>dir()||podeAdmin()||(!solic()&&S.perfil!=='pendente');
@@ -1244,7 +1245,7 @@ function mvDia(k,n){let d=S[k]||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S[k]=d;ren
 /* painel de andamento: etapa por etapa, por sistema, com quem concluiu e a hora */
 function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:'',L=D.cronograma.filter(r=>ocorre(r,dia));
  const nav=semNav?'':`<div class="cronbar"><div class="seg"><button onclick="mvDia('${k}',-1)" aria-label="Dia útil anterior">‹</button><span>${dia===HJ?'Hoje, ':''}${diaTxt(dia)}</span><button onclick="mvDia('${k}',1)" aria-label="Próximo dia útil">›</button></div>${irData(dia,k)}${dia!==HJ?`<button class="btn" onclick="S.${k}='';render()">Hoje</button>`:''}</div>`;
- if(!L.length){const px=proxComRotina(dia,()=>true);return `<div class="panel and"><div class="ph"><h2>Andamento do departamento</h2></div>${nav}<p class="meta" style="margin:0 0 8px">Nenhuma rotina prevista neste dia.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
+ if(!L.length){const px=proxComRotina(dia,()=>true);return `<div class="panel and"><div class="ph"><h2>Andamento do departamento</h2></div>${nav}<p class="meta" style="margin:0 0 8px">Nenhuma rotina prevista neste dia${paraComecar().length&&dia<'2026-11-01'?': as rotinas do WAE estão programadas para começar em novembro. Use "Começar hoje" acima':''}.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
  const E=[...procs(),...(L.some(r=>!grp(r))?['']:[])],SS=sists().filter(x=>L.some(r=>(r.sis||[]).includes(x)));
  const cel=(g,x)=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x));if(!l.length)return '<td><span class="andn">—</span></td>';
   const xs=l.map(r=>({r,x:exDe(r.id,dia),st:stOc(r,dia)[0]})),ok=xs.filter(o=>o.x?.s==='feita'),an=xs.filter(o=>o.x?.s==='andamento'),bad=xs.filter(o=>o.st==='bad');
@@ -1263,13 +1264,25 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
  <div class="tbl-wrap"><table class="andt"><thead><tr><th>Sistema</th>${E.map(g=>`<th>${g?`${procs().indexOf(g)+1}. ${esc(g)}`:'Outras'}</th>`).join('')}</tr></thead><tbody>${SS.map(x=>`<tr><th scope="row">${esc(x)}${emTeste(x)?'<small>em teste</small>':''}</th>${E.map(g=>cel(g,x)).join('')}</tr>`).join('')}</tbody></table></div>
  <p class="meta" style="margin:8px 0 0">Clique numa etapa para ver as rotinas e marcar.</p></div>`}
 function proxComRotina(dia,f){let d=dia;for(let i=0;i<120;i++){d=addDia(d,1);if(D.cronograma.some(r=>ocorre(r,d)&&f(r)))return d}return ''}
+const avulsasDia=dia=>D.cronograma.filter(r=>r.freq==='avulsa'&&r.ativo!==false&&(!r.ini||dia>=r.ini)&&(!r.fim||dia<=r.fim)).sort(ordR);
+const fazerHoje=(rid,dia)=>ocSet(rid,dia,'feita');
+function quickAvulsas(dia){const L=avulsasDia(dia),pend=L.filter(r=>exDe(r.id,dia)?.s!=='feita');if(dia>HJ||(!L.length&&!podeEditRot()))return '';
+ return `<div class="panel"><div class="ph"><h2>Aconteceu hoje?</h2><span>clique no que foi feito</span></div><div class="cks">${pend.map(r=>`<button class="btn" onclick="fazerHoje('${r.id}','${dia}')" title="${esc(r.obs||'')}">✓ ${esc(r.t)}</button>`).join('')}${podeEditRot()?`<button class="btn ghost" onclick="editRot('',{freq:'avulsa',etapa:'',ini:'',rs:[],sis:[]})">+ Nova opção</button>`:''}</div>${L.length&&!pend.length?'<p class="meta" style="margin:8px 0 0">Tudo o que estava na lista já foi registrado neste dia.</p>':''}<p class="meta" style="margin:8px 0 0">Fica registrado com nome e hora. Para desfazer, clique no quadrado da atividade na lista abaixo.</p></div>`}
+/* rotinas que valem sempre e foram programadas para começar depois: antecipa para hoje (só WAE; o Protheus começa em novembro) */
+const paraComecar=()=>D.cronograma.filter(r=>r.freq!=='unica'&&r.freq!=='avulsa'&&!r.fim&&r.ini&&r.ini>HJ&&r.ini<='2026-11-01'&&(r.sis||[]).includes('WAE'));
+async function comecarHoje(){const L=paraComecar();if(!L.length)return;
+ if(!S.confCom){S.confCom=true;toast(`Clique de novo para começar hoje ${L.length} rotinas do WAE.`);setTimeout(()=>S.confCom=false,6000);return}S.confCom=false;
+ let k=0;for(const r of L){const {id,...b}=r;if(await salvar('cronograma',id,{...b,ini:HJ},false,false))k++}
+ if(!D.cronograma.some(r=>r.chave==='repasse-polos'||norm(r.t)===norm('Repasse de polos'))){await salvar('cronograma',null,{chave:'repasse-polos',etapa:'Pagamento',t:'Repasse de polos',sis:['WAE'],rs:[],apoio:'',freq:'avulsa',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:'',fim:'',ativo:true,criado:HJ},false,false)}
+ log(`Começou o cronograma hoje com ${k} rotinas do WAE`);toast(`${k} rotinas começam hoje. É só clicar no que foi feito.`);S.cDia='';S.pDia='';render()}
+const comecarBtn=()=>paraComecar().length&&podeEditRot()?`<div class="banner"><span>As rotinas do WAE que valem sempre estão programadas para começar só em ${fmt(paraComecar()[0].ini)}. Comece hoje para registrar o que já fazem no dia a dia.</span><button class="btn pri" onclick="comecarHoje()">Começar hoje</button></div>`:'';
 function cDia(n){let d=S.cDia||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S.cDia=d;render()}
 function cronDia(){const dia=S.cDia||HJ,f=filtroCron(),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
  const nav2=`<div class="seg"><button onclick="cDia(-1)" aria-label="Dia útil anterior">‹</button><span>${diaTxt(dia)}</span><button onclick="cDia(1)" aria-label="Próximo dia útil">›</button></div>${irData(dia)}${dia!==HJ?`<button class="btn" onclick="S.cDia='';render()">Hoje</button>`:''}`;
  const ant=dia===HJ?atrasosCron(f).filter(o=>o.dia<HJ).sort((a,b)=>a.dia<b.dia?-1:1):[];
  const grupos=[...procs(),''].map(g=>[g,L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g)]).filter(([,l])=>l.length);
  const tav=D.tarefas.filter(t=>(!S.cQuem||t.r===S.cQuem)&&(t.prazo===dia||(dia===HJ&&atrasada(t)))&&(dir()||pode('ver_tudo')||t.r===S.perfil));
- return `<div class="cronbar">${nav2}</div>${andamento(dia,'cDia',true)}${cronFiltros()}`+
+ return `<div class="cronbar">${nav2}</div>${comecarBtn()}${andamento(dia,'cDia',true)}${quickAvulsas(dia)}${cronFiltros()}`+
  `<div class="stats"><div class="stat"><p>Previstas</p><strong>${c.tot}</strong><small>${dia===HJ?'hoje':fmt(dia)}</small></div><div class="stat"><p>Concluídas</p><strong style="color:${c.tot&&c.ok===c.tot?'var(--ok)':'var(--ink)'}">${c.ok}</strong><small>${c.tot?Math.round(c.ok/c.tot*100):0}%</small></div><div class="stat"><p>Em andamento</p><strong style="color:${c.and?'var(--accent)':'var(--ink)'}">${c.and}</strong><small>começadas</small></div><div class="stat"><p>Atrasadas</p><strong style="color:${c.atr+ant.length?'var(--bad)':'var(--ink)'}">${c.atr+ant.length}</strong><small>${ant.length?`${ant.length} de dias anteriores`:'passaram do horário'}</small></div></div>`+
  (()=>{const E=D.eventos.filter(e=>vejoEv(e)&&evOcorre(e,dia)&&(!S.cQuem||e.quem!=='pessoas'||(e.ps||[]).includes(S.cQuem))).sort((a,b)=>(a.hora||'99').localeCompare(b.hora||'99'));
   return E.length?`<div class="panel"><div class="ph"><h2>Compromissos do dia</h2><span>${E.length}</span></div>${E.map(e=>`<div class="row"><span class="meta" style="width:44px">${esc(e.hora||'')}</span><div class="t"><b>${esc(e.t)}</b><span>${esc(quemEv(e))}${e.obs?' · '+esc(e.obs):''}</span></div><span class="tag ${corEv(e)}">${esc(e.tipo||'Outro')}</span>${podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')">Editar</button>`:''}</div>`).join('')}</div>`:''})()+
@@ -1291,12 +1304,13 @@ function cronQuem(){const vig=D.cronograma.filter(r=>r.ativo!==false&&(!r.fim||r
  (ap.length?note(`Apoio: ${ap.map(esc).join(', ')}.`):'')}
 function cronRotinas(){const pc=podeEditRot(),L=[...D.cronograma].sort(ordR);
  const lin=r=>`<div class="row"><div class="t"><b>${esc(r.t)}</b><span>${esc(r.etapa||'Outras atividades')} · ${esc(freqTxt(r))} · ${esc((r.sis||[]).map(sisTxt).join(', ')||'Sem sistema')} · ${esc(nomesRs(r))}${r.apoio?' · apoio: '+esc(r.apoio):''}</span>${r.obs?`<span>${esc(r.obs)}</span>`:''}${r.editadoPor?`<span>Editada por ${esc(r.editadoPor)} em ${fmt((r.editadoEm||'').slice(0,10))} às ${hmDe(r.editadoEm)}</span>`:''}</div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${r.ativo===false?'<span class="tag ne">Pausada</span>':r.fim&&r.fim<HJ?'<span class="tag ne">Encerrada</span>':r.ini&&r.ini>HJ?`<span class="tag ac">Começa em ${fmt(r.ini)}</span>`:''}${pc?`<button class="btn ghost" onclick="editRot('${r.id}')">Editar</button>`:''}</div>`;
- const per=[...new Set(L.filter(r=>r.fim&&r.freq!=='unica').map(r=>(r.ini||'')+'|'+r.fim))].sort((a,b)=>a.split('|')[1].localeCompare(b.split('|')[1]));
- const blocos=[['Valem sempre','A ordem do processo e o D-5 valem todos os dias.',L.filter(r=>!r.fim&&r.freq!=='unica')],
-  ...per.map(k=>{const [a,b]=k.split('|');return [`Período especial: ${a?fmt(a)+' a ':'até '}${fmt(b)}`,'Valem só neste período. Depois saem sozinhas do cronograma.',L.filter(r=>r.fim&&r.freq!=='unica'&&(r.ini||'')+'|'+r.fim===k)]}),
+ const per=[...new Set(L.filter(r=>r.fim&&r.freq!=='unica'&&r.freq!=='avulsa').map(r=>(r.ini||'')+'|'+r.fim))].sort((a,b)=>a.split('|')[1].localeCompare(b.split('|')[1]));
+ const blocos=[['Valem sempre','A ordem do processo e o D-5 valem todos os dias.',L.filter(r=>!r.fim&&r.freq!=='unica'&&r.freq!=='avulsa')],
+  ['Quando acontecer','Não aparecem sozinhas: é só clicar em "Aconteceu hoje?" quando fizer.',L.filter(r=>r.freq==='avulsa')],
+  ...per.filter(()=>true).map(k=>{const [a,b]=k.split('|');return [`Período especial: ${a?fmt(a)+' a ':'até '}${fmt(b)}`,'Valem só neste período. Depois saem sozinhas do cronograma.',L.filter(r=>r.fim&&r.freq!=='unica'&&r.freq!=='avulsa'&&(r.ini||'')+'|'+r.fim===k)]}),
   ['Demandas de um dia só','Inclui as que vieram de chamados.',L.filter(r=>r.freq==='unica')]].filter(b=>b[2].length);
  const etp=l=>{let ult=null;return l.map(r=>{const g=r.etapa||'Outras atividades',h=g!==ult?`<p class="eyebrow" style="margin:14px 0 2px">${esc(g)}</p>`:'';ult=g;return h+lin(r)}).join('')};
- return (orgPendente()?`<div class="banner"><span>Há uma versão mais organizada do cronograma: D-5 sempre, pagamento D-2 só em novembro e D-1 a partir de dezembro. As rotinas atuais são atualizadas sem perder o que já foi marcado.</span><button class="btn pri" onclick="organizarModelo()">Organizar agora</button></div>`:'')+
+ return comecarBtn()+(orgPendente()?`<div class="banner"><span>Há uma versão mais organizada do cronograma: D-5 sempre, pagamento D-2 só em novembro e D-1 a partir de dezembro. As rotinas atuais são atualizadas sem perder o que já foi marcado.</span><button class="btn pri" onclick="organizarModelo()">Organizar agora</button></div>`:'')+
  (L.length?blocos.map(([t,d,l])=>`<div class="panel"><div class="ph"><h2>${t}</h2><span>${l.length} ${l.length>1?'rotinas':'rotina'}</span></div><p class="meta" style="margin:0">${d}</p>${etp(l)}</div>`).join(''):`<div class="panel">${vazio('Nenhuma rotina cadastrada','Use o modelo pronto ou cadastre cada rotina com etapa, sistema, responsáveis e horário.',null)}${podeCron()?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" onclick="editRot()">Nova rotina</button><button class="btn pri" onclick="montarModelo()">Montar o cronograma</button></div>':''}</div>`)+
  note('Pausar ou dar data final a uma rotina mantém o histórico. Ao excluir, os registros de dias já feitos deixam de contar.')}
 function cronTri(){const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
@@ -1341,7 +1355,7 @@ async function salvaRot(){['rte_t','rte_r','rte_freq'].forEach(e=>errEl(e,''));
  const sis=SS.filter((s,i)=>document.getElementById('rt_s_'+i)?.checked),rs=colabs().filter(p=>document.getElementById('rt_r_'+p.id)?.checked).map(p=>p.id);
  const dias=[1,2,3,4,5].filter(d=>document.getElementById('rt_d_'+d)?.checked),n=Math.round(+val('rt_n')||0),antes=Math.max(0,Math.round(+val('rt_antes')||0)),data=val('rt_data'),ini=val('rt_ini'),fim=val('rt_fim');let ok=true;
  if(!t){errEl('rte_t','Descreva a rotina.');ok=false}
- if(!rs.length){errEl('rte_r','Escolha ao menos um responsável.');ok=false}
+ if(!rs.length&&freq!=='avulsa'){errEl('rte_r','Escolha ao menos um responsável.');ok=false}
  if(freq==='semanal'&&!dias.length){errEl('rte_freq','Escolha ao menos um dia da semana.');ok=false}
  if(freq==='mensal_util'&&!(n>=1&&n<=23)){errEl('rte_freq','Use um dia útil de 1 a 23.');ok=false}
  if(freq==='mensal_dia'&&!(n>=1&&n<=31)){errEl('rte_freq','Use um dia de 1 a 31.');ok=false}
@@ -1390,6 +1404,7 @@ function modeloCron({NA,JN}){const EV='Evandro (Protheus)',N0='2026-11-01',N1='2
   r('imp-nov','Pagamento','Impostos do dia 20 (D-2 em novembro)',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:2,fim:N1,obs:'Atenção: confira as guias. Em novembro, pagar 2 dias úteis antes.'}),
   r('imp','Pagamento','Impostos do dia 20 (D-1)',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:1,ini:DZ,obs:'Atenção: confira as guias. Crie uma rotina para cada vencimento diferente.'}),
   r('concil','Conciliação','Conciliação bancária',['WAE','Protheus'],JN),
+  r('repasse-polos','Pagamento','Repasse de polos',['WAE'],[],{freq:'avulsa',ini:''}),
   r('acomp','','Acompanhamento diário do Protheus',['Protheus'],JN,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a implantação do Protheus.'})]}
 /* títulos da primeira versão do modelo, para atualizar no lugar */
 const MODELO_ANTIGO={ident:['Identificar as contas que vencem em 5 dias úteis (D-5)','Identificar as contas que vencem no próximo dia útil'],'pag-nov':['Pagamento · todas as contas'],'imp-nov':['Impostos (vencimento dia 20)']};
@@ -1479,8 +1494,8 @@ const AV_K=()=>'avisos_'+(ME.uid||'')+S.perfil+'_'+HJ;
 function avJa(){try{return JSON.parse(localStorage.getItem(AV_K())||'[]')}catch(e){return S._avJa||[]}}
 function avMarca(k){const l=avJa();l.push(k);try{localStorage.setItem(AV_K(),JSON.stringify(l.slice(-300)))}catch(e){S._avJa=l}}
 function avisosDevidos(){if(solic()||S.perfil==='pendente')return [];const mn=t=>{const [h,m]=String(t).split(':').map(Number);return h*60+(m||0)},ag=mn(agoraHM()),L=[];
- const hoje=proxPrazos(30).filter(x=>x.d===HJ);if(hoje.length)L.push({k:'dia',t:`Hoje: ${hoje.length} ${hoje.length>1?'prazos':'prazo'}`,s:hoje.slice(0,3).map(x=>(x.h?x.h+' ':'')+x.t).join(' · '),ir:'painel'});
- D.eventos.filter(e=>vejoEv(e)&&e.hora&&evOcorre(e,HJ)).forEach(e=>{const d=mn(e.hora)-ag;if(d<=15&&d>=-5)L.push({k:'ev_'+e.id,t:`${e.hora} · ${e.t}`,s:d>0?`Começa em ${d} min`:'Começando agora',ir:'calendario'})});
+ const hoje=proxPrazos(30,true).filter(x=>x.d===HJ);if(hoje.length)L.push({k:'dia',t:`Hoje: ${hoje.length} ${hoje.length>1?'prazos':'prazo'}`,s:hoje.slice(0,3).map(x=>(x.h?x.h+' ':'')+x.t).join(' · '),ir:'painel'});
+ D.eventos.filter(e=>paraMimEv(e)&&e.hora&&evOcorre(e,HJ)).forEach(e=>{const d=mn(e.hora)-ag;if(d<=15&&d>=-5)L.push({k:'ev_'+e.id,t:`${e.hora} · ${e.t}`,s:d>0?`Começa em ${d} min`:'Começando agora',ir:'calendario'})});
  D.cronograma.filter(r=>vejoRot(r)&&r.hora&&ocorre(r,HJ)&&exDe(r.id,HJ)?.s!=='feita').forEach(r=>{const d=mn(r.hora)-ag;
   if(d<=15&&d>0)L.push({k:'rt_'+r.id,t:`${r.hora} · ${r.t}`,s:`Em ${d} min · ${nomesRs(r)}`,ir:'rotinas'});else if(d<=0&&d>-180)L.push({k:'ra_'+r.id,t:`Atrasada: ${r.t}`,s:`Era às ${r.hora} · ${nomesRs(r)}`,ir:'rotinas'})});
  const ant=atrasosCron(vejoRot).filter(o=>o.dia<HJ).length;if(ant)L.push({k:'ant',t:`${ant} ${ant>1?'rotinas de dias anteriores':'rotina de dia anterior'} em atraso`,s:'Veja em Cronograma',ir:'rotinas'});
@@ -1512,13 +1527,17 @@ function evOcorre(e,dia){const r=e.rep||'unica';if(r==='unica')return e.data===d
  if(r==='mensal'){const [y,m]=dia.split('-').map(Number),ult=new Date(y,m,0).getDate();return +dia.slice(8,10)===Math.min(+e.n||1,ult)}
  return false}
 /* o diretor vê tudo; "só pessoas escolhidas" aparece para elas e para quem criou */
-const vejoEv=e=>dir()||e.quem!=='pessoas'||(e.ps||[]).includes(S.perfil)||(!!e.criadoPor&&e.criadoPor===S.perfil);
+const souCriador=e=>real()&&!S.sim&&e.criadoUid?e.criadoUid===ME.uid:(!!e.criadoPor&&e.criadoPor===S.perfil);
+/* "Só para mim": só quem criou vê. "Pessoas escolhidas": elas, quem criou e o diretor. "Todos": todo mundo */
+const vejoEv=e=>e.quem==='eu'?souCriador(e):(dir()||e.quem!=='pessoas'||(e.ps||[]).includes(S.perfil)||souCriador(e));
+/* avisos e alertas: só o que é para a própria pessoa (o diretor não recebe aviso do compromisso dos outros) */
+const paraMimEv=e=>e.quem==='eu'?souCriador(e):(e.quem!=='pessoas'||(e.ps||[]).includes(S.perfil)||souCriador(e));
 const proxEv=(e,de,ate)=>{for(const d of diasDe(de,ate))if(evOcorre(e,d))return d;return ''};
 function evTxt(e){const h=e.hora?` às ${e.hora}`:'',r=e.rep||'unica';
  return r==='semanal'?`Toda ${(e.dias||[]).map(d=>SEM[d]).join(', ')}${h}`:r==='mensal'?`Todo dia ${e.n||1}${h}`:`${fmt(e.data)}${h}`}
-const quemEv=e=>e.quem==='pessoas'?((e.ps||[]).map(nomeDe).join(', ')||'Só quem criou'):'Todos';
+const quemEv=e=>e.quem==='eu'?`Só para ${e.criadoNome||'quem criou'}`:e.quem==='pessoas'?((e.ps||[]).map(nomeDe).join(', ')||'Só quem criou'):'Todos';
 function proxPrazos(n,soMeus){const ate=addDia(HJ,60);
- const ev=D.eventos.filter(vejoEv).map(e=>{const d=proxEv(e,HJ,ate);return d?{d,t:e.t,g:e.tipo||'Outro',c:corEv(e),h:e.hora||'',fixo:(e.rep||'unica')!=='unica',quem:quemEv(e),id:e.id}:null}).filter(Boolean);
+ const ev=D.eventos.filter(soMeus?paraMimEv:vejoEv).map(e=>{const d=proxEv(e,HJ,ate);return d?{d,t:e.t,g:e.tipo||'Outro',c:corEv(e),h:e.hora||'',fixo:(e.rep||'unica')!=='unica',quem:quemEv(e),id:e.id}:null}).filter(Boolean);
  const ta=D.tarefas.filter(x=>x.s!=='feita'&&x.prazo>=HJ&&(!soMeus||x.r===S.perfil)).map(x=>({d:x.prazo,t:x.t,g:x.a||'Tarefa',c:'ne',h:'',quem:nomeDe(x.r)}));
  return [...ev,...ta].sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:(a.h||'99').localeCompare(b.h||'99')).slice(0,n)}
 function linPrazo(e){return `<div class="row"><span class="meta" style="width:44px">${e.d===HJ?'Hoje':fmt(e.d)}</span><div class="t"><b>${esc(e.t)}</b><span>${[e.h,e.fixo?'fixo':'',e.quem==='Todos'?'':'para '+e.quem].filter(Boolean).map(esc).join(' · ')}</span></div><span class="tag ${e.c}">${esc(e.g)}</span>${e.id&&podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')" aria-label="Editar ${esc(e.t)}">Editar</button>`:''}</div>`}
@@ -1534,7 +1553,7 @@ function editEv(id){const e=id?D.eventos.find(x=>x.id===id):{tipo:'Reunião',rep
  <div><label class="lbl" for="ev_data" id="evl_data">Data</label><input class="inp" id="ev_data" type="date" value="${esc(e.data||'')}"></div>
  <div><label class="lbl" for="ev_hora">Horário · opcional</label><input class="inp" id="ev_hora" type="time" value="${esc(e.hora||'')}"></div>
  <div id="evw_fim"><label class="lbl" for="ev_fim">Até · opcional</label><input class="inp" id="ev_fim" type="date" value="${esc(e.fim||'')}"><p class="meta" style="margin:4px 0 0">Vazio: continua valendo.</p></div>
- <div class="full"><span class="lbl">Quem vê</span><div class="cks"><label class="ck"><input type="radio" name="ev_quem" id="ev_q_todos" value="todos" ${e.quem!=='pessoas'?'checked':''} onchange="evVis()"> Todos</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_ps" value="pessoas" ${e.quem==='pessoas'?'checked':''} onchange="evVis()"> Só pessoas escolhidas</label></div><p class="meta" style="margin:4px 0 0">O diretor sempre vê todos os prazos.</p></div>
+ <div class="full"><span class="lbl">Quem vê</span><div class="cks"><label class="ck"><input type="radio" name="ev_quem" id="ev_q_todos" value="todos" ${e.quem!=='pessoas'?'checked':''} onchange="evVis()"> Todos</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_ps" value="pessoas" ${e.quem==='pessoas'?'checked':''} onchange="evVis()"> Pessoas escolhidas</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_eu" value="eu" ${e.quem==='eu'?'checked':''} onchange="evVis()"> Só para mim</label></div><p class="meta" style="margin:4px 0 0">Pessoas escolhidas: aparece para elas, para quem criou e para o diretor. Só para mim: ninguém mais vê.</p></div>
  <div class="full" id="evw_ps"><span class="lbl">Pessoas</span><div class="cks">${colabs().map(p=>ck('ev_p_'+p.id,(e.ps||[]).includes(p.id),p.n)).join('')}</div><p class="ferr" id="eve_ps"></p></div>
  <div class="full"><label class="lbl" for="ev_obs">Observação · opcional</label><input class="inp" id="ev_obs" value="${esc(e.obs||'')}" placeholder="Sala 2 ou link do Teams"></div><p class="ferr full" id="eve_rep"></p></div>
  <div class="foot"><div>${id&&podeEditRot()?`<button class="btn danger" id="bdel" onclick="delEv()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaEv()">${id?'Salvar alterações':'Registrar'}</button></div></div>`;
@@ -1543,7 +1562,7 @@ function evVis(){const r=val('ev_rep'),sh=(i,on)=>{const x=document.getElementBy
  sh('evw_dias',r==='semanal');sh('evw_n',r==='mensal');sh('evw_fim',r!=='unica');sh('evw_ps',document.getElementById('ev_q_ps')?.checked);
  const l=document.getElementById('evl_data');if(l)l.textContent=r==='unica'?'Data':'Começa em'}
 async function salvaEv(){['eve_t','eve_ps','eve_rep'].forEach(x=>errEl(x,''));
- const t=val('ev_t'),rep=val('ev_rep'),quem=document.getElementById('ev_q_ps').checked?'pessoas':'todos',ps=colabs().filter(p=>document.getElementById('ev_p_'+p.id)?.checked).map(p=>p.id);
+ const t=val('ev_t'),rep=val('ev_rep'),quem=document.getElementById('ev_q_eu').checked?'eu':document.getElementById('ev_q_ps').checked?'pessoas':'todos',ps=colabs().filter(p=>document.getElementById('ev_p_'+p.id)?.checked).map(p=>p.id);
  const dias=[1,2,3,4,5,6].filter(d=>document.getElementById('ev_d_'+d)?.checked),n=Math.round(+val('ev_n')||0),data=val('ev_data')||(rep==='unica'?'':HJ),fim=rep==='unica'?'':val('ev_fim');let ok=true;
  if(!t){errEl('eve_t','Descreva o prazo ou compromisso.');ok=false}
  if(rep==='unica'&&!data){errEl('eve_rep','Informe a data.');ok=false}
@@ -1551,7 +1570,7 @@ async function salvaEv(){['eve_t','eve_ps','eve_rep'].forEach(x=>errEl(x,''));
  if(rep==='mensal'&&!(n>=1&&n<=31)){errEl('eve_rep','Use um dia de 1 a 31.');ok=false}
  if(fim&&fim<data){errEl('eve_rep','A data final é antes do início.');ok=false}
  if(quem==='pessoas'&&!ps.length){errEl('eve_ps','Escolha ao menos uma pessoa.');ok=false}
- if(!ok)return;const ant=FORM.id?D.eventos.find(x=>x.id===FORM.id):null,{id:_,...b}=ant||{criado:HJ,criadoPor:S.perfil,criadoNome:pessoa(S.perfil)?.n||quemSou()};
+ if(!ok)return;const ant=FORM.id?D.eventos.find(x=>x.id===FORM.id):null,{id:_,...b}=ant||{criado:HJ,criadoPor:S.perfil,criadoUid:ME.uid||null,criadoNome:pessoa(S.perfil)?.n||ME.nome||quemSou()};
  if(await salvar('eventos',FORM.id||null,{...b,t,tipo:val('ev_tipo'),rep,data,dias,n,hora:val('ev_hora'),fim,quem,ps:quem==='pessoas'?ps:[],obs:val('ev_obs')},ant?'Alterações salvas':'Registrado',`${ant?'Alterou':'Registrou'} o prazo "${t}" (${rep==='unica'?fmt(data):REP_EV.find(x=>x[0]===rep)[1].toLowerCase()})`))fechar()}
 async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
  const e=D.eventos.find(x=>x.id===FORM.id);try{await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
@@ -1817,7 +1836,7 @@ painel(){
  const atr=D.tarefas.filter(atrasada),pm=pendMsg(),dm=D.destaques.filter(d=>d.mes===MES_ATUAL);
  const prox=proxPrazos(6);
  if(!dir()&&!pode('ver_tudo')){const p=pessoa(S.perfil),mt=minhas(),r=resumoTri(S.perfil,S.tri);const meuF=r=>minhaRot(r),cm=contaDia(HJ,meuF),meus=D.cronograma.filter(r=>meuF(r)&&ocorre(r,HJ)).sort(ordR),meusAtr=atrasosCron(meuF).filter(o=>o.dia<HJ);
-  return head(hojeTxt(),`Bom dia, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+andamento(S.pDia||HJ,'pDia')+
+  return head(hojeTxt(),`Bom dia, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+comecarBtn()+andamento(S.pDia||HJ,'pDia')+quickAvulsas(HJ)+
   `<div class="stats"><div class="stat"><p>Meu dia</p><strong>${cm.ok}/${cm.tot}</strong><small>${cm.atr+meusAtr.length?`<span class="neg">${cm.atr+meusAtr.length} em atraso</span>`:'rotinas concluídas'}</small></div><div class="stat"><p>Metas do trimestre</p><strong>${p?.m??0}%</strong></div><div class="stat"><p>Minhas demandas em aberto</p><strong>${D.chamados.filter(c=>c.resp===S.perfil&&c.st!=='Concluído').length}</strong></div><div class="stat"><p>Prazos cumpridos</p><strong>${r.pct===null?'—':r.pct+'%'}</strong></div></div>
   ${meusAtr.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${meusAtr.length}</span></div>${meusAtr.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:''}
   ${(()=>{const pp=proxPrazos(5,true);return `<div class="panel"><div class="ph"><h2>Próximos prazos</h2>${novo('evento','Novo prazo')}</div>${pp.length?pp.map(linPrazo).join(''):vazio('Sem prazos próximos','')}</div>`})()}
@@ -1827,7 +1846,7 @@ painel(){
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2></div>${dm.length?`<div class="hl">${dm.map(cardDest).join('')}</div>`:vazio('Nenhum destaque neste mês','')}</div>`+note('No perfil de colaborador você vê só as suas tarefas, as suas horas e o seu feedback.')}
  const ea=modOn('entregas')?D.entregas.filter(entAtrasada):[],porDep={};const cd=contaDia(HJ),cAtr=atrasosCron();ea.forEach(e=>porDep[depNome(e.dep)]=(porDep[depNome(e.dep)]||0)+1);
  const alertaTop=ea.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${ic('alertas').replace('aria-hidden','style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden')}Em atraso: ${Object.entries(porDep).map(([n,q])=>`${esc(n)} (${q})`).join(', ')}</span><button class="btn" onclick="ir('alertas')">Ver alertas</button></div>`:'';
- return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+andamento(S.pDia||HJ,'pDia')+
+ return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+comecarBtn()+andamento(S.pDia||HJ,'pDia')+
  `<div class="stats">
   <div class="stat"><p>Cronograma de hoje</p><strong>${cd.ok}/${cd.tot}</strong><small>${cd.tot?Math.round(cd.ok/cd.tot*100):0}% concluído</small></div>
   <div class="stat"><p>Em andamento</p><strong style="color:${cd.and?'var(--accent)':'var(--ink)'}">${cd.and}</strong><small>rotinas começadas</small></div>
