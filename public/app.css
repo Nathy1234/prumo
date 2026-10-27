@@ -270,3 +270,4 @@ table.wkt th.hj{color:var(--accent)}
 @media (max-width:640px){.row.oc{flex-wrap:wrap}.row.oc .t{flex-basis:calc(100% - 90px)}}
 .inp.cdata{width:auto;min-width:0;padding:6px 10px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.nd{background:transparent;color:var(--ink-3);border:1px dashed var(--line)}.cel.nd{border-style:dashed;cursor:pointer}
