@@ -186,7 +186,7 @@ O menu **Cronograma** junta rotinas, tarefas e o acompanhamento do dia numa tela
 
 O diretor vê no **Painel** o cronograma de hoje por pessoa, o que está em andamento e o que atrasou, e os **Alertas** saem das rotinas do cronograma.
 
-Em **Cronograma > Ajustes** (administrador) você muda as etapas e os sistemas, usa o modelo pronto **Montar o cronograma de novembro** e liga de volta as telas guardadas para depois (**Fechamento D+N**, **Entregas dos departamentos** e alertas de **e-mails do Outlook**). Guardar uma tela só a tira do menu: nenhum dado é apagado.
+Em **Cronograma > Ajustes** (administrador) você muda as etapas e os sistemas, usa o modelo pronto **Montar o cronograma de novembro** e liga de volta o que ficou guardado para depois (**Fechamento D+N**, **Entregas dos departamentos**, alertas de **e-mails do Outlook** e **Outros alertas**: chamados, WhatsApp, troca bancária, acessos e backup). Guardar uma tela só a tira do menu: nenhum dado é apagado.
 
 ## Demandas por e-mail e chamados
 

@@ -107,7 +107,8 @@ function alertas(){
   if(modOn('email')&&pode('email')){const n=D.emails.filter(e=>e.st==='triagem').length;if(n)A.push({n:2,ic:'triagem',c:'wa',t:`${n} ${n>1?'e-mails aguardam':'e-mail aguarda'} triagem`,s:'Confirme se viraram entregas recebidas ou chamados',ir:'triagem'});if(S.syncErr&&S.syncErr.code!=='sem_mcp')A.push({n:2,ic:'triagem',c:'bad',t:'Leitura do Outlook com problema',s:msgErro(S.syncErr),ir:'triagem'})}
   if(podeAdmin()){const n=D.pedidos.filter(p=>!acessoDe(p.id)).length;if(n)A.push({n:2,ic:'usuarios',c:'wa',t:`${n} ${n>1?'pedidos':'pedido'} de acesso aguardando`,s:'Revise em Usuários e permissões',ir:'usuarios'});
    if(real()&&S.bkCarregado&&CFG.bkAuto!==false&&!D.backups.some(b=>b.id==='d-'+HJ)&&!S.bk)A.push({n:1,ic:'backup',c:'wa',t:'Backup de hoje ainda não foi feito',s:'Ele é criado em instantes, com o portal aberto',ir:'backup'})}
-  return A.sort((a,b)=>b.n-a.n)}
+  /* por enquanto os alertas vêm só do cronograma; os outros voltam em Cronograma > Ajustes */
+  return (modOn('outros')?A:A.filter(a=>a.ic==='rotinas')).sort((a,b)=>b.n-a.n)}
 function resumoDep(){
   return D.departamentos.map(d=>{const l=D.entregas.filter(e=>e.dep===d.id),rec=l.filter(e=>e.recebido&&e.prazo);
    return {d,pend:l.filter(e=>!e.recebido).length,atr:l.filter(entAtrasada).length,pont:rec.length?Math.round(rec.filter(e=>e.recebido<=e.prazo).length/rec.length*100):null,tot:l.length}}).sort((a,b)=>b.atr-a.atr||a.d.n.localeCompare(b.d.n))}
@@ -1145,7 +1146,7 @@ const SIS_PAD=['WAE','Protheus'];
 const procs=()=>Array.isArray(CFG.cronEtapas)&&CFG.cronEtapas.length?CFG.cronEtapas:PROC_PAD;
 const sists=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_PAD;
 /* módulos guardados para depois: ficam fora do menu até o administrador ligar */
-const MODS=[['fechamento','Fechamento D+N','Etapas do fechamento do mês com prazo em dias úteis'],['entregas','Entregas dos departamentos','O que outras áreas precisam enviar e até quando'],['email','E-mails do Outlook','Alertas de e-mails para revisar e de problemas na leitura da caixa']];
+const MODS=[['fechamento','Fechamento D+N','Etapas do fechamento do mês com prazo em dias úteis'],['entregas','Entregas dos departamentos','O que outras áreas precisam enviar e até quando'],['email','E-mails do Outlook','Alertas de e-mails para revisar e de problemas na leitura da caixa'],['outros','Outros alertas','Chamados, WhatsApp, troca de dados bancários, pedidos de acesso e backup. Desligado, os alertas vêm só do cronograma']];
 const modOn=k=>!!(CFG.modulos||{})[k];
 const FREQS=[['diaria','Todo dia útil'],['semanal','Em dias da semana'],['mensal_util','Todo mês, no Nº dia útil'],['mensal_dia','Todo mês, em um dia fixo'],['unica','Uma vez só']];
 const SEM=['dom','seg','ter','qua','qui','sex','sáb'];
@@ -1304,7 +1305,7 @@ function cfgCron(){FORM={tipo:'_cfgcron',listas:{et:[...procs()],sis:[...sists()
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">Ajustes</h2><p class="sub" style="font-size:13px">Etapas do processo, sistemas usados e quais telas antigas ficam no menu.</p></div>
  <div class="fgrid one"><div><span class="lbl">Etapas do processo (na ordem em que acontecem)</span>${chipsEd('et','Ex.: Aprovação')}</div>
  <div><span class="lbl">Sistemas</span>${chipsEd('sis','Ex.: Internet banking')}</div>
- <div><span class="lbl">Telas guardadas para depois</span>${MODS.map(([k,n,d])=>`<label class="perm"><input type="checkbox" id="md_${k}" ${modOn(k)?'checked':''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>
+ <div><span class="lbl">Guardados para depois (ligue quando quiser usar)</span>${MODS.map(([k,n,d])=>`<label class="perm"><input type="checkbox" id="md_${k}" ${modOn(k)?'checked':''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>
  <div><span class="lbl">Modelo pronto</span><button class="btn" type="button" onclick="montarModelo()">Montar o cronograma de novembro</button><p class="meta" style="margin:4px 0 0">Cria as rotinas de WAE e Protheus com Natalia, Jeferson e Natasha. Depois é só ajustar.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgCron()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
@@ -1588,8 +1589,8 @@ logs(){const q=(S.fLog||'').toLowerCase(),l=D.logs.filter(x=>!q||((x.acao||'')+'
  `<input class="inp" id="flog" placeholder="Filtrar por pessoa, chamado ou ação" value="${esc(S.fLog||'')}" oninput="S.fLog=this.value;document.getElementById('loglist').innerHTML=logRows()">
  <div class="panel" id="loglist">${logRows()}</div>`+note('Mostra as 300 ações mais recentes. O nome vem da conta de cada pessoa; ações feitas simulando outro perfil aparecem marcadas.')},
 alertas(){const A=alertas();
- return head('Central de notificações','Alertas',dir()?'Atrasos de departamentos, rotinas e pendências que dependem de você.':'Alertas das entregas e rotinas sob sua responsabilidade.')+
- `<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma entrega ou rotina atrasar, ela aparece aqui.')}</div>`+
+ return head('Central de notificações','Alertas',modOn('outros')?(dir()?'Atrasos do cronograma, rotinas e pendências que dependem de você.':'Alertas das rotinas sob sua responsabilidade.'):(dir()?'Rotinas do cronograma atrasadas e rotinas de atenção do departamento.':'Rotinas do cronograma sob sua responsabilidade.'))+
+ `<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma rotina do cronograma atrasar ou tiver prioridade Atenção, ela aparece aqui.')}</div>`+
  note('Os alertas são recalculados sozinhos todos os dias a partir dos prazos. O diretor vê tudo; cada pessoa vê o que está sob sua responsabilidade.')},
 
 entregas(){const deps=D.departamentos,l=minhasEnt().filter(e=>!S.fDep||e.dep===S.fDep).sort((a,b)=>(!!a.recebido)-(!!b.recebido)||((a.prazo||'')<(b.prazo||'')?-1:1));
