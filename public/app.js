@@ -1232,34 +1232,56 @@ async function ocSet(rid,dia,s){const r=D.cronograma.find(x=>x.id===rid);if(!r)r
 let _ftA=null,_ftM=new Map();
 function feitosDe(rid,dia){if(_ftA!==D.feitos){_ftA=D.feitos;_ftM=new Map();D.feitos.forEach(f=>{const k=f.dia+'_'+f.rot;if(!_ftM.has(k))_ftM.set(k,[]);_ftM.get(k).push(f)})}
  const l=_ftM.get(dia+'_'+rid);if(l&&l.length)return [...l].sort((a,b)=>(a.em||'').localeCompare(b.em||''));
- const x=exDe(rid,dia);return x?.s==='feita'?[{pid:x.por,nome:x.porNome,hora:x.hora,feitoEm:x.concl,legado:true}]:[]}
+ const x=exDe(rid,dia);return x?.s==='feita'?[{pid:x.por,nome:x.porNome,hora:x.hora,feitoEm:x.concl,ini:x.ini,st:'feita',legado:true}]:[]}
 const pkey=()=>S.perfil==='dir'?'dir'+(real()&&!S.sim&&ME.uid?ME.uid.slice(0,12):''):S.perfil;
-const euFizEsse=(rid,dia)=>feitosDe(rid,dia).some(f=>f.legado?f.pid===S.perfil:f.id===`${dia}_${rid}_${pkey()}`);
-async function euFiz(rid,dia){const r=D.cronograma.find(x=>x.id===rid);if(!r)return;
+/* cada pessoa: Iniciar (data e hora de início) e Finalizar (data e hora de término) */
+const stF=f=>f?(f.st||'feita'):'';
+const meuF=(rid,dia)=>feitosDe(rid,dia).find(f=>f.legado?f.pid===S.perfil:f.id===`${dia}_${rid}_${pkey()}`);
+const euFizEsse=(rid,dia)=>stF(meuF(rid,dia))==='feita';
+const dtH=iso=>iso?`${fmt(iso.slice(0,10))} ${hmDe(iso)}`:'';
+function txtPessoa(f){const ini=f.ini?dtH(f.ini):'',fim=f.fim?dtH(f.fim):(f.feitoEm?`${fmt(f.feitoEm)}${f.hora?' '+f.hora:''}`:'');
+ return stF(f)==='feita'?`${f.nome||'—'}: ${ini&&ini!==fim?`iniciou ${ini} · `:''}finalizou ${fim}`:`${f.nome||'—'}: iniciou ${ini} · em andamento`}
+/* mantém o resumo da rotina no dia (usado pelo painel e pelos prazos) */
+async function syncEx(rid,dia,lista){const fe=lista.filter(f=>stF(f)==='feita').sort((a,b)=>(a.fim||a.em||'').localeCompare(b.fim||b.em||'')),an=lista.filter(f=>stF(f)==='andamento');
+ const x=exDe(rid,dia),eid=dia+'_'+rid;
+ if(!fe.length&&!an.length){if(x)await DB.collection('execucoes').doc(eid).delete();return}
+ const p0=fe[0]||an[0],ini=lista.map(f=>f.ini).filter(Boolean).sort()[0]||new Date().toISOString();
+ const doc={rot:rid,dia,s:fe.length?'feita':'andamento',ini,por:p0.pid,porNome:p0.nome,em:new Date().toISOString(),concl:fe.length?(fe[0].feitoEm||HJ):'',hora:fe.length?(fe[0].hora||''):''};
+ if(x&&x.s===doc.s&&x.por===doc.por&&x.concl===doc.concl&&x.ini===doc.ini)return;
+ await DB.collection('execucoes').doc(eid).set(doc)}
+async function marcaEu(rid,dia,acao){const r=D.cronograma.find(x=>x.id===rid);if(!r)return;
  if(!podeMarcar(r)){toast('Sem permissão para marcar.');return}if(dia>HJ){toast('Esse dia ainda não chegou.');return}
- const pk=pkey(),id=`${dia}_${rid}_${pk}`,meu=D.feitos.find(f=>f.id===id),x=exDe(rid,dia),nome=pessoa(S.perfil)?.n||ME.nome||quemSou(),agora=new Date().toISOString(),eid=dia+'_'+rid;
- const legadoMeu=!meu&&!D.feitos.some(f=>f.rot===rid&&f.dia===dia)&&x?.s==='feita'&&x.por===S.perfil;
- if(meu||legadoMeu){try{if(meu)await DB.collection('feitos').doc(id).delete();
-   const resto=D.feitos.filter(f=>f.rot===rid&&f.dia===dia&&f.id!==id).sort((a,b)=>(a.em||'').localeCompare(b.em||''));
-   if(!resto.length){if(x)await DB.collection('execucoes').doc(eid).delete()}
-   else if(x&&x.por===S.perfil){const {id:_,...b}=x;await DB.collection('execucoes').doc(eid).set({...b,por:resto[0].pid,porNome:resto[0].nome,hora:resto[0].hora,concl:resto[0].feitoEm||x.concl})}
-   log(`Desmarcou que fez "${r.t}" de ${fmt(dia)}`);toast('Desmarcado')}catch(e){toast('Não foi possível desmarcar.')}return}
- const atraso=HJ>dia;
- if(!await salvar('feitos',id,{rot:rid,dia,pid:S.perfil,uid:ME.uid||null,nome,hora:agoraHM(),em:agora,feitoEm:HJ},atraso?'Marcado como feito (com atraso)':'Marcado: você fez',`Marcou que fez "${r.t}" de ${fmt(dia)}${atraso?' (com atraso)':''}`))return;
- if(x?.s!=='feita'){const {id:_,...b}=x||{};await salvar('execucoes',eid,{...b,rot:rid,dia,s:'feita',ini:x?.ini||agora,por:S.perfil,porNome:nome,em:agora,concl:HJ,hora:agoraHM()},false,false)}}
-function ocFeita(rid,dia){ocSet(rid,dia,exDe(rid,dia)?.s==='feita'?null:'feita')}
-function ocAnd(rid,dia){const x=exDe(rid,dia);if(x?.s==='feita')return;ocSet(rid,dia,x?.s==='andamento'?null:'andamento')}
-function linOc(r,dia,comDia,semSis){const x=exDe(r.id,dia),st=stOc(r,dia),done=x?.s==='feita',pm=podeMarcar(r)&&dia<=HJ,eu=euFizEsse(r.id,dia),FT=feitosDe(r.id,dia);
+ const pk=pkey(),id=`${dia}_${rid}_${pk}`,x=exDe(rid,dia),nome=pessoa(S.perfil)?.n||ME.nome||quemSou(),agora=new Date().toISOString();
+ let doDia=D.feitos.filter(f=>f.rot===rid&&f.dia===dia);
+ /* registro antigo (sem a marcação por pessoa): vira um registro da pessoa que tinha feito */
+ if(!doDia.length&&x?.s==='feita'&&x.por){const lid=`${dia}_${rid}_${x.por==='dir'?'dir':x.por}`,leg={rot:rid,dia,pid:x.por,nome:x.porNome,st:'feita',ini:x.ini||'',fim:'',hora:x.hora||'',feitoEm:x.concl||dia,em:x.em||agora};
+  try{await DB.collection('feitos').doc(lid).set(leg);doDia=[{...leg,id:lid}]}catch(e){}}
+ const meu=doDia.find(f=>f.id===id)||(x?.por===S.perfil?doDia.find(f=>f.pid===S.perfil):null),mid=meu?.id||id,outros=doDia.filter(f=>f.id!==mid);
+ if(acao==='desfazer'){if(!meu)return;try{await DB.collection('feitos').doc(mid).delete();await syncEx(rid,dia,outros);log(`Desfez a marcação de "${r.t}" de ${fmt(dia)}`);toast('Desfeito')}catch(e){toast('Não foi possível desfazer.')}return}
+ const {id:_,...b}=meu||{};
+ const doc=acao==='ini'?{...b,rot:rid,dia,pid:S.perfil,uid:ME.uid||null,nome,st:'andamento',ini:b.ini||agora,fim:'',hora:'',feitoEm:'',em:b.em||agora}
+  :{...b,rot:rid,dia,pid:S.perfil,uid:ME.uid||null,nome,st:'feita',ini:b.ini||agora,fim:agora,hora:agoraHM(),feitoEm:HJ,em:b.em||agora};
+ const atraso=acao==='fim'&&HJ>dia;
+ if(!await salvar('feitos',mid,doc,acao==='ini'?'Iniciado':atraso?'Finalizado (depois do dia previsto)':'Finalizado',`${acao==='ini'?'Iniciou':'Finalizou'} "${r.t}" de ${fmt(dia)}${atraso?' (com atraso)':''}`))return;
+ await syncEx(rid,dia,[...outros,doc])}
+/* atalho (semana e outras atividades): finaliza ou desfaz o seu */
+function euFiz(rid,dia){return marcaEu(rid,dia,euFizEsse(rid,dia)?'desfazer':'fim')}
+function ocFeita(rid,dia){return euFiz(rid,dia)}
+function linOc(r,dia,comDia,semSis){const x=exDe(r.id,dia),st=stOc(r,dia),done=x?.s==='feita',pm=podeMarcar(r)&&dia<=HJ,FT=feitosDe(r.id,dia),meu=meuF(r.id,dia),ms=stF(meu);
  const info=[semSis?'':(r.sis||[]).map(sisTxt).join(' · '),nomesRs(r),r.apoio?'apoio: '+r.apoio:''].filter(Boolean).map(esc).join(' · ');
- return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}"><button class="chkbtn ${eu?'eu':done?'outros':''}" ${pm?'':'disabled'} onclick="euFiz('${r.id}','${dia}')" aria-pressed="${eu}" aria-label="${eu?'Desmarcar que eu fiz':'Marcar que eu fiz'}: ${esc(r.t)}" title="${!pm?'':eu?'Você marcou que fez. Clique para desmarcar':done?'Feito por outra pessoa. Clique se você também fez':'Clique se você fez'}">${eu||done?'✓':''}</button>
+ const ind=done?'<span class="stdot ok" title="Finalizada">✓</span>':FT.some(f=>stF(f)==='andamento')?'<span class="stdot ac" title="Em andamento">●</span>':st[0]==='bad'?'<span class="stdot bad" title="Atrasada">!</span>':'<span class="stdot" aria-hidden="true"></span>';
+ const acoes=!pm?'':ms==='feita'?`<button class="lnk desf" onclick="marcaEu('${r.id}','${dia}','desfazer')">desfazer</button>`
+  :ms==='andamento'?`<button class="btn sm pri" onclick="marcaEu('${r.id}','${dia}','fim')">✓ Finalizar</button><button class="lnk desf" onclick="marcaEu('${r.id}','${dia}','desfazer')">desfazer</button>`
+  :`<button class="btn sm" onclick="marcaEu('${r.id}','${dia}','ini')">Iniciar</button><button class="btn sm pri" onclick="marcaEu('${r.id}','${dia}','fim')">✓ Finalizar</button>`;
+ return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}">${ind}
  <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
- ${done?`<span class="pos">Feito por ${FT.map(f=>`${esc(f.nome||'—')}${f.feitoEm&&f.feitoEm!==dia?` em ${fmt(f.feitoEm)}`:''}${f.hora?' às '+esc(f.hora):''}`).join(', ')}</span>`:x?.s==='andamento'?`<span style="color:var(--accent)">Em andamento com ${esc(x.porNome||'—')} desde ${hmDe(x.ini)}</span>`:''}
- ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}${r.freq!=='unica'||itensDe(r.id,dia).length?linItens(r,dia):''}</div>${r.chamado?`<span class="tag ac" title="Veio do chamado">${esc(r.chamado)}</span>`:''}${r.fim&&r.freq!=='unica'?`<span class="tag ne">só até ${fmt(r.fim)}</span>`:''}${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}
- <button class="tag ${st[0]}" ${pm&&!done?'':'disabled'} onclick="ocAnd('${r.id}','${dia}')" title="${pm&&!done?(x?.s==='andamento'?'Voltar para a fazer':'Marcar em andamento'):''}">${st[1]}</button>${podeEditRot()?`<button class="btn ghost" onclick="editRot('${r.id}')" aria-label="Editar ${esc(r.t)}">Editar</button>`:''}</div>`}
+ ${FT.map(f=>`<span class="${stF(f)==='feita'?'pos':'emand'}">${stF(f)==='feita'?'✓':'●'} ${esc(txtPessoa(f))}</span>`).join('')}
+ ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}${r.freq!=='unica'||itensDe(r.id,dia).length?linItens(r,dia):''}</div>${r.chamado?`<span class="tag ac" title="Veio do chamado">${esc(r.chamado)}</span>`:''}${r.fim&&r.freq!=='unica'?`<span class="tag ne">só até ${fmt(r.fim)}</span>`:''}${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${st[0]==='bad'&&!done?`<span class="tag bad">${st[1]}</span>`:''}
+ <div class="oc-acoes">${acoes}</div>${podeEditRot()?`<button class="btn ghost sm" onclick="editRot('${r.id}')" aria-label="Editar ${esc(r.t)}">Editar</button>`:''}</div>`}
 const filtroCron=()=>r=>(!S.cQuem||rsDe(r).includes(S.cQuem))&&(!S.cSis||(r.sis||[]).includes(S.cSis));
 const pessoasCron=()=>[...new Set(D.cronograma.flatMap(rsDe))].filter(pessoa).sort((a,b)=>nomeDe(a).localeCompare(nomeDe(b)));
-function cronFiltros(){const b=(on,txt,js)=>`<button class="chip ${on?'on':''}" onclick="${js};render();salvarEstado()">${esc(txt)}</button>`;
- return `<div class="filtros cronf">${b(!S.cQuem,'Todas as pessoas',"S.cQuem=''")}${pessoasCron().map(p=>b(S.cQuem===p,nomeDe(p)+(p===S.perfil?' (você)':''),`S.cQuem='${p}'`)).join('')}<span class="sep"></span>${b(!S.cSis,'Todos os sistemas',"S.cSis=''")}${sists().map((s,i)=>b(S.cSis===s,s,`S.cSis=sists()[${i}]`)).join('')}</div>`}
+function cronFiltros(semSis){const b=(on,txt,js)=>`<button class="chip ${on?'on':''}" onclick="${js};render();salvarEstado()">${esc(txt)}</button>`;
+ return `<div class="filtros cronf">${b(!S.cQuem,'Todas as pessoas',"S.cQuem=''")}${pessoasCron().map(p=>b(S.cQuem===p,nomeDe(p)+(p===S.perfil?' (você)':''),`S.cQuem='${p}'`)).join('')}${semSis?'':`<span class="sep"></span>${b(!S.cSis,'Todos os sistemas',"S.cSis=''")}${sists().map((s,i)=>b(S.cSis===s,s,`S.cSis=sists()[${i}]`)).join('')}`}</div>`}
 function cronAbas(){const t=S.cTab||'dia';return `<div class="tabs big" role="tablist" aria-label="Cronograma">${[['dia','Dia'],['semana','Semana'],['quem','Quem faz o quê'],['rotinas','Rotinas cadastradas'],['tri','Trimestre']].map(([k,l])=>`<button role="tab" aria-selected="${t===k}" class="${t===k?'on':''}" onclick="S.cTab='${k}';render();salvarEstado()">${l}</button>`).join('')}</div>`}
 const irData=(v,k='cDia')=>`<label class="sr-only" for="c_data_${k}">Escolher o dia</label><input class="inp cdata" id="c_data_${k}" type="date" data-nodraft="1" value="${v}" onchange="if(this.value){S.${k}=this.value;render()}" title="Escolher o dia">`;
 function mvDia(k,n){let d=S[k]||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S[k]=d;render()}
@@ -1272,7 +1294,7 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
   const xs=l.map(r=>({r,x:exDe(r.id,dia),st:stOc(r,dia)[0]})),ok=xs.filter(o=>o.x?.s==='feita'),an=xs.filter(o=>o.x?.s==='andamento'),bad=xs.filter(o=>o.st==='bad');
   const cls=ok.length===l.length?(ok.some(o=>o.st==='wa')?'wa':'ok'):bad.length?'bad':an.length||ok.length?'ac':'ne';
   const lab=ok.length===l.length?(cls==='wa'?'Concluído com atraso':'Concluído'):bad.length?'Atrasado':ok.length?`${ok.length} de ${l.length} concluídas`:an.length?'Em andamento':'A fazer';
-  const feitoPor=[...new Set(ok.flatMap(o=>feitosDe(o.r.id,dia)).map(f=>`✓ ${f.nome||'—'}${f.hora?' · '+f.hora:''}`))],emAnd=[...new Set(an.map(o=>`● ${o.x.porNome||'—'} desde ${hmDe(o.x.ini)}`))];
+  const todosF=l.flatMap(r=>feitosDe(r.id,dia)),feitoPor=[...new Set(todosF.filter(f=>stF(f)==='feita').map(f=>`✓ ${f.nome||'—'}${f.hora?' · '+f.hora:''}`))],emAnd=[...new Set(todosF.filter(f=>stF(f)==='andamento').map(f=>`● ${f.nome||'—'} iniciou ${hmDe(f.ini)}`))];
   const resp=ok.length===l.length?[]:[`Responsável: ${[...new Set(xs.filter(o=>o.x?.s!=='feita').flatMap(o=>rsDe(o.r)))].map(nomeDe).join(', ')}`];
   const tit=xs.map(o=>`${o.r.t}: ${o.x?.s==='feita'?`concluída por ${o.x.porNome||'—'} ${o.x.hora||''}`:o.x?.s==='andamento'?`em andamento com ${o.x.porNome||'—'}`:stOc(o.r,dia)[1]}`).join('\n');
   const its=l.flatMap(r=>itensDe(r.id,dia)),itTxt=its.length?[`${its.filter(i=>i.feito).length} de ${its.length} itens feitos`]:[];
@@ -1287,16 +1309,16 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
  <p class="meta" style="margin:8px 0 0">Clique numa etapa para ver as rotinas e marcar. Cada pessoa marca o que ela fez.</p></div>`}
 function quemFezDia(dia,L,E){const grp=r=>procs().includes(r.etapa)?r.etapa:'',P=new Map();
  colabs().forEach(p=>P.set(p.id,{n:p.n,c:{}}));
- L.forEach(r=>feitosDe(r.id,dia).forEach(f=>{const k=f.pid&&P.has(f.pid)?f.pid:([...P.entries()].find(([,v])=>norm(v.n)===norm(f.nome))?.[0]||f.pid||f.nome);if(!P.has(k))P.set(k,{n:f.nome||'—',c:{}});const o=P.get(k).c;(o[grp(r)]=o[grp(r)]||[]).push(`${r.t}${f.hora?' · '+f.hora:''}`)}));
+ L.forEach(r=>feitosDe(r.id,dia).forEach(f=>{const em=stF(f)==='andamento';const k=f.pid&&P.has(f.pid)?f.pid:([...P.entries()].find(([,v])=>norm(v.n)===norm(f.nome))?.[0]||f.pid||f.nome);if(!P.has(k))P.set(k,{n:f.nome||'—',c:{}});const o=P.get(k).c;(o[grp(r)]=o[grp(r)]||[]).push(em?`● ${r.t} · iniciou ${hmDe(f.ini)}`:`✓ ${r.t}${f.hora?' · '+f.hora:''}`)}));
  const rows=[...P.values()].filter(x=>Object.keys(x.c).length||colabs().some(p=>p.n===x.n));if(!rows.length)return '';
- return `<p class="eyebrow" style="margin:16px 0 6px">Quem fez o quê no dia</p><div class="tbl-wrap"><table class="andt quem"><thead><tr><th>Pessoa</th>${E.map(g=>`<th>${g?esc(g):'Outras'}</th>`).join('')}</tr></thead><tbody>${rows.map(x=>`<tr><th scope="row">${esc(x.n)}</th>${E.map(g=>`<td>${(x.c[g]||[]).length?`<div class="qf">${x.c[g].map(t=>`<span>✓ ${esc(t)}</span>`).join('')}</div>`:'<span class="andn" style="padding:6px 0">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
+ return `<p class="eyebrow" style="margin:16px 0 6px">Quem fez o quê no dia</p><div class="tbl-wrap"><table class="andt quem"><thead><tr><th>Pessoa</th>${E.map(g=>`<th>${g?esc(g):'Outras'}</th>`).join('')}</tr></thead><tbody>${rows.map(x=>`<tr><th scope="row">${esc(x.n)}</th>${E.map(g=>`<td>${(x.c[g]||[]).length?`<div class="qf">${x.c[g].map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:'<span class="andn" style="padding:6px 0">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
 function proxComRotina(dia,f){let d=dia;for(let i=0;i<120;i++){d=addDia(d,1);if(D.cronograma.some(r=>ocorre(r,d)&&f(r)))return d}return ''}
 const avulsasDia=dia=>D.cronograma.filter(r=>r.freq==='avulsa'&&r.ativo!==false&&(!r.ini||dia>=r.ini)&&(!r.fim||dia<=r.fim)).sort(ordR);
 const fazerHoje=(rid,dia)=>euFiz(rid,dia);
 const SUGESTOES_OPC=['Repasse de polos','Adiantamento a fornecedor','Reembolso de despesas','Transferência entre contas','Pagamento urgente','Estorno ou devolução'];
 function outrasOpcoes(dia){const L=avulsasDia(dia),pm=podeEditRot()&&dia<=HJ,tem=new Set(D.cronograma.filter(r=>r.freq==='avulsa').map(r=>norm(r.t)));
  const sug=podeEditRot()?SUGESTOES_OPC.filter(t=>!tem.has(norm(t))):[];
- const chip=r=>{const ft=feitosDe(r.id,dia),eu=euFizEsse(r.id,dia),feito=ft.length>0;
+ const chip=r=>{const ft=feitosDe(r.id,dia).filter(f=>stF(f)==='feita'),eu=euFizEsse(r.id,dia),feito=ft.length>0;
   return `<button class="opc ${eu?'eu':feito?'on':''}" ${pm?'':'disabled'} onclick="euFiz('${r.id}','${dia}')" aria-pressed="${eu}" title="${eu?'Você marcou. Clique para desfazer':feito?'Clique se você também fez':'Clique se você fez'}"><span class="opc-ck">${feito?'✓':''}</span><span class="opc-t">${esc(r.t)}${ft.length?`<small>${ft.map(f=>esc(f.nome||'—')+(f.hora?' '+esc(f.hora):'')).join(', ')}</small>`:''}</span></button>`};
  return `<div class="qd-opc"><div class="opcs">${L.map(chip).join('')||'<span class="meta">Nenhuma opção ainda.</span>'}${podeEditRot()?`<button class="opc add" onclick="novaOpcao()">+ Nova opção</button>`:''}</div>${sug.length&&L.length<4?`<p class="meta" style="margin:8px 0 4px">Sugestões, clique para incluir na lista:</p><div class="opcs">${sug.map((t,i)=>`<button class="opc sug" onclick="addSugestao(${SUGESTOES_OPC.indexOf(t)})">+ ${esc(t)}</button>`).join('')}</div>`:''}</div>`}
 function novaOpcao(){FORM={tipo:'_opc'};
@@ -1320,21 +1342,23 @@ async function comecarHoje(){const L=paraComecar();if(!L.length)return;
  if(!D.cronograma.some(r=>r.chave==='repasse-polos'||norm(r.t)===norm('Repasse de polos'))){await salvar('cronograma',null,{chave:'repasse-polos',etapa:'Pagamento',t:'Repasse de polos',sis:['WAE'],rs:[],apoio:'',freq:'avulsa',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:'',fim:'',ativo:true,criado:HJ},false,false)}
  log(`Começou o cronograma hoje com ${k} rotinas do WAE`);toast(`${k} rotinas começam hoje. É só clicar no que foi feito.`);S.cDia='';S.pDia='';render()}
 const comecarBtn=()=>paraComecar().length&&podeEditRot()?`<div class="banner"><span>As rotinas do WAE que valem sempre estão programadas para começar só em ${fmt(paraComecar()[0].ini)}. Comece hoje para registrar o que já fazem no dia a dia.</span><button class="btn pri" onclick="comecarHoje()">${S.confCom?'Confirmar: começar hoje':'Começar hoje'}</button></div>`:'';
-function quadroDia(dia,f){const grp=r=>procs().includes(r.etapa)?r.etapa:'',SS=sists().filter(x=>!S.cSis||x===S.cSis),L=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(!S.cQuem||rsDe(r).includes(S.cQuem)||feitosDe(r.id,dia).some(x=>x.pid===S.cQuem)));
+const sisAtual=()=>sists().includes(S.cSis)?S.cSis:sists()[0];
+function quadroDia(dia,f){const grp=r=>procs().includes(r.etapa)?r.etapa:'',SS=[sisAtual()],L=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(!S.cQuem||rsDe(r).includes(S.cQuem)||feitosDe(r.id,dia).some(x=>x.pid===S.cQuem)));
  const G=[...procs(),''];
  const comeca=x=>{const l=D.cronograma.filter(r=>(r.sis||[]).includes(x)&&r.freq!=='avulsa'&&r.freq!=='unica'&&r.ativo!==false&&r.ini&&r.ini>dia).map(iniEf).filter(d=>d>dia).sort();return l[0]||''};
  const cab=SS.map(x=>{const l=L.filter(r=>(r.sis||[]).includes(x)),k=l.filter(r=>exDe(r.id,dia)?.s==='feita').length,c=comeca(x);return `<div class="qd-h"><b>${esc(x)}</b>${emTeste(x)?'<small class="tag wa">em teste</small>':''}<span class="meta">${l.length?`${k} de ${l.length} feitas`:c?`começa em ${fmt(c)}`:'nada previsto'}</span>${!l.length&&c&&dia===HJ&&x==='WAE'&&paraComecar().length&&podeEditRot()?`<button class="btn pri qd-start" onclick="comecarHoje()">${S.confCom?'Confirmar: começar hoje':'Começar hoje'}</button>`:''}</div>`}).join('');
- return `<div class="qd" style="--n:${SS.length}"><div class="qd-cab"><span></span>${cab}</div>${G.map(g=>{const i=procs().indexOf(g);
+ const sw=`<div class="sisw" role="tablist" aria-label="Sistema">${sists().map((x,i)=>{const l=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(r.sis||[]).includes(x)),k=l.filter(r=>exDe(r.id,dia)?.s==='feita').length,c=comeca(x);return `<button role="tab" aria-selected="${x===SS[0]}" class="${x===SS[0]?'on':''}" onclick="S.cSis=sists()[${i}];render();salvarEstado()"><b>${esc(x)}</b>${emTeste(x)?'<small class="tag wa">em teste</small>':''}<span>${l.length?`${k} de ${l.length} finalizadas`:c?`começa em ${fmt(c)}`:'nada previsto'}</span></button>`}).join('')}</div>`;
+ return `${sw}<div class="qd" style="--n:1">${G.map(g=>{const i=procs().indexOf(g);
   const temCols=L.some(r=>grp(r)===g);
   return `<div class="qd-row ${g?'':'outras'}"><h3>${i>=0?`<span class="meta">${i+1}.</span> `:''}${esc(g||'Outras atividades')}${g?'':'<small>Clique no que fez</small>'}</h3>${g||temCols?SS.map(x=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x)).sort(ordR);
    return `<div class="qd-col"><p class="qd-sis">${esc(x)}</p>${l.length?l.map(r=>linOc(r,dia,false,true)).join(''):'<p class="meta qd-vazio">—</p>'}</div>`}).join(''):''}${g?'':outrasOpcoes(dia)}</div>`}).join('')}</div>`}
 function cDia(n){let d=S.cDia||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S.cDia=d;render()}
-function cronDia(){const dia=S.cDia||HJ,f=filtroCron(),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
+function cronDia(){const dia=S.cDia||HJ,f0=filtroCron(),f=r=>f0(r)&&(r.sis||[]).includes(sisAtual()),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
  const nav2=`<div class="seg"><button onclick="cDia(-1)" aria-label="Dia útil anterior">‹</button><span>${diaTxt(dia)}</span><button onclick="cDia(1)" aria-label="Próximo dia útil">›</button></div>${irData(dia)}${dia!==HJ?`<button class="btn" onclick="S.cDia='';render()">Hoje</button>`:''}`;
  const ant=dia===HJ?atrasosCron(f).filter(o=>o.dia<HJ).sort((a,b)=>a.dia<b.dia?-1:1):[];
  const grupos=[...procs(),''].map(g=>[g,L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g)]).filter(([,l])=>l.length);
  const tav=D.tarefas.filter(t=>(!S.cQuem||t.r===S.cQuem)&&(t.prazo===dia||(dia===HJ&&atrasada(t)))&&(dir()||pode('ver_tudo')||t.r===S.perfil));
- return `<div class="cronbar">${nav2}</div>${comecarBtn()}${andamento(dia,'cDia',true)}${cronFiltros()}`+
+ return `<div class="cronbar">${nav2}</div>${comecarBtn()}${andamento(dia,'cDia',true)}${cronFiltros(true)}`+
  `<div class="stats"><div class="stat"><p>Previstas</p><strong>${c.tot}</strong><small>${dia===HJ?'hoje':fmt(dia)}</small></div><div class="stat"><p>Concluídas</p><strong style="color:${c.tot&&c.ok===c.tot?'var(--ok)':'var(--ink)'}">${c.ok}</strong><small>${c.tot?Math.round(c.ok/c.tot*100):0}%</small></div><div class="stat"><p>Em andamento</p><strong style="color:${c.and?'var(--accent)':'var(--ink)'}">${c.and}</strong><small>começadas</small></div><div class="stat"><p>Atrasadas</p><strong style="color:${c.atr+ant.length?'var(--bad)':'var(--ink)'}">${c.atr+ant.length}</strong><small>${ant.length?`${ant.length} de dias anteriores`:'passaram do horário'}</small></div></div>`+
  (()=>{const E=D.eventos.filter(e=>vejoEv(e)&&evOcorre(e,dia)&&(!S.cQuem||e.quem!=='pessoas'||(e.ps||[]).includes(S.cQuem))).sort((a,b)=>(a.hora||'99').localeCompare(b.hora||'99'));
   return E.length?`<div class="panel"><div class="ph"><h2>Compromissos do dia</h2><span>${E.length}</span></div>${E.map(e=>`<div class="row"><span class="meta" style="width:44px">${esc(e.hora||'')}</span><div class="t"><b>${esc(e.t)}</b><span>${esc(quemEv(e))}${e.obs?' · '+esc(e.obs):''}</span></div><span class="tag ${corEv(e)}">${esc(e.tipo||'Outro')}</span>${podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')">Editar</button>`:''}</div>`).join('')}</div>`:''})()+
