@@ -5,6 +5,7 @@ painel:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" widt
 destaques:'<path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
 rotinas:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/>',
 calendario:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+metas:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
 equipe:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14.5A5 5 0 0 1 21.5 20"/>',
 ponto:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>',
 whats:'<path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 10c.5 2 2 3.5 4 4l1-1 2 1"/>',
@@ -52,7 +53,7 @@ const fimTri=t=>{const m=mesesTri(t)[2];const [y,mm]=m.split('-').map(Number);re
 const diasAte=iso=>Math.round((new Date(iso+'T12:00')-new Date(HJ+'T12:00'))/864e5);
 const hrs=n=>{const v=Math.round((+n||0)*10)/10;return `${String(v).replace('.',',')} h`};
 
-const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes','cronitens','feitos'];
+const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes','cronitens','feitos','metas'];
 const D={logs:[],backups:[]};COLS.forEach(c=>D[c]=[]);
 let CFG={};
 const S={tela:'painel',perfil:'dir',modo:'carregando',sim:'',online:null,mesDest:MES_ATUAL,tri:triDe(MESES_ATUAL_FIX()),cal:MES_ATUAL,busca:'',limpar:false,loaded:0};
@@ -461,7 +462,7 @@ function proxEtapa(c){return c.st==='Aberto'?'Em análise':c.st==='Em análise'?
 /* ---------- logs e notificações ---------- */
 const fmtHora=s=>s?`${s.slice(8,10)}/${s.slice(5,7)} ${new Date(s).toTimeString().slice(0,5)}`:'';
 function log(acao,extra){if(!DB)return;DB.collection('logs').add({em:new Date().toISOString(),quem:quemSou(),perfil:S.perfil,uid:ME.uid||null,sim:!!(real()&&S.sim),acao,...(extra||{})}).catch(()=>{})}
-const NOMES={feitos:'marcação de quem fez',cronitens:'item de rotina',cronograma:'rotina do cronograma',execucoes:'marcação do cronograma',remetentes:'remetente',assuntos:'assunto',verificacoes:'troca de dados bancários',etapas:'etapa do fechamento',fechamentos:'fechamento',feedbacks:'feedback',observacoes:'observação',modelos:'modelo de e-mail',frases:'frase sugerida',acessos:'acesso',pedidos:'pedido de acesso',emails:'e-mail',categorias:'categoria',ferramentas:'ferramenta',equipe:'colaborador',tarefas:'rotina',mensagens:'mensagem',chamados:'chamado',sugestoes:'sugestão',destaques:'destaque',ponto:'lançamento de horas',eventos:'prazo',procedimentos:'procedimento',departamentos:'departamento',entregas:'entrega'};
+const NOMES={metas:'meta ou item a fazer',feitos:'marcação de quem fez',cronitens:'item de rotina',cronograma:'rotina do cronograma',execucoes:'marcação do cronograma',remetentes:'remetente',assuntos:'assunto',verificacoes:'troca de dados bancários',etapas:'etapa do fechamento',fechamentos:'fechamento',feedbacks:'feedback',observacoes:'observação',modelos:'modelo de e-mail',frases:'frase sugerida',acessos:'acesso',pedidos:'pedido de acesso',emails:'e-mail',categorias:'categoria',ferramentas:'ferramenta',equipe:'colaborador',tarefas:'rotina',mensagens:'mensagem',chamados:'chamado',sugestoes:'sugestão',destaques:'destaque',ponto:'lançamento de horas',eventos:'prazo',procedimentos:'procedimento',departamentos:'departamento',entregas:'entrega'};
 const tituloDe=d=>d.t||d.item||d.n||d.assunto||(d.pessoa&&d.mes?`${nomeDe(d.pessoa)} · ${mesCurto(d.mes)}`:'')||(d.txt||'').slice(0,40);
 function notifs(){
  const ms=solic()?D.chamados.filter(c=>c.dep===solDep()).map(c=>c.proto):[];
@@ -1628,6 +1629,51 @@ function chegadaPainel(){if(!(dir()||pode('ver_tudo')||pode('chamados')))return 
  const nav=`<div class="seg"><button onclick="S.chM=addMes('${m}',-1);render()" aria-label="Mês anterior">‹</button><span>${mesNome(m)}</span><button onclick="S.chM=addMes('${m}',1);render()" aria-label="Próximo mês">›</button></div>`;
  return `<div class="panel"><div class="ph"><h2>Pedidos recebidos por departamento</h2>${nav}</div>${deps.length?`<div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Departamento</th><th>Recebidos</th><th>No prazo</th><th>Chegaram atrasados</th><th>Sem marcação</th><th>% atrasados</th></tr></thead><tbody>${deps.map(d=>`<tr><td style="text-align:left">${esc(d.n)}</td><td>${d.tot}</td><td>${d.ok}</td><td>${d.at?`<span class="tag bad">${d.at}</span>`:'0'}</td><td>${d.sem?`<span class="meta">${d.sem}</span>`:'0'}</td><td>${d.pct===null?'—':`<span class="${d.pct>=30?'neg':d.pct===0?'pos':''}">${d.pct}%</span>`}</td></tr>`).join('')}</tbody></table></div>`:'<p class="meta" style="margin:0">Nenhum chamado ou e-mail recebido neste mês.</p>'}<p class="meta" style="margin:8px 0 0">A equipe marca em cada chamado se chegou no prazo ou atrasado.</p></div>`}
 
+/* ---------- metas e a fazer do mês: departamento e cada pessoa ---------- */
+const ST_META=[['afazer','A fazer','ne'],['andamento','Em andamento','ac'],['feito','Feito','ok']];
+const stMeta=k=>ST_META.find(x=>x[0]===k)||ST_META[0];
+const podeMeta=dono=>dono==='dep'?podeEditRot():(dir()||podeAdmin()||dono===S.perfil);
+const itensMeta=(mes,dono)=>D.metas.filter(x=>x.tipo!=='nota'&&x.mes===mes&&x.dono===dono).sort((a,b)=>(ST_META.findIndex(s=>s[0]===a.st)===2)-(ST_META.findIndex(s=>s[0]===b.st)===2)||(a.prazo||'9').localeCompare(b.prazo||'9')||(a.em||'').localeCompare(b.em||''));
+const notaMeta=(mes,dono)=>D.metas.find(x=>x.id===`${mes}_${dono}_nota`);
+const quemNome=()=>pessoa(S.perfil)?.n||ME.nome||quemSou();
+async function addMeta(mes,dono){const k=`${mes}_${dono}`.replace(/[^\w-]/g,''),t=val('mt_t_'+k),meta=val('mt_m_'+k),prazo=val('mt_p_'+k);
+ if(!podeMeta(dono)){toast('Cada pessoa edita só a sua lista.');return}if(!t){toast('Escreva o que precisa fazer.');document.getElementById('mt_t_'+k)?.focus();return}
+ try{document.activeElement?.blur()}catch(e){}
+ if(await salvar('metas',null,{tipo:'item',mes,dono,t,meta,prazo,st:'afazer',em:new Date().toISOString(),criadoPor:quemNome()},'Incluído',`Incluiu "${t}" nas metas de ${mesCurto(mes)} (${dono==='dep'?'departamento':nomeDe(dono)})`)){
+  setTimeout(()=>document.getElementById('mt_t_'+k)?.focus(),350)}}
+async function stMetaCiclo(id){const x=D.metas.find(y=>y.id===id);if(!x)return;if(!podeMeta(x.dono)){toast('Cada pessoa edita só a sua lista.');return}
+ const i=ST_META.findIndex(s=>s[0]===(x.st||'afazer')),nv=ST_META[(i+1)%3][0];
+ await patch('metas',id,{st:nv,feitoEm:nv==='feito'?HJ:'',feitoPor:nv==='feito'?quemNome():'',iniEm:nv==='andamento'?(x.iniEm||HJ):x.iniEm||''},stMeta(nv)[1],`Marcou "${x.t}" como ${stMeta(nv)[1].toLowerCase()} (${mesCurto(x.mes)})`)}
+async function salvaNota(mes,dono,el){if(!podeMeta(dono))return;const v=el.value.trim(),id=`${mes}_${dono}_nota`,ant=notaMeta(mes,dono);if((ant?.texto||'')===v)return;
+ await salvar('metas',id,{tipo:'nota',mes,dono,texto:v,em:new Date().toISOString(),por:quemNome()},'Meta do mês salva',`Alterou a meta de ${mesCurto(mes)} (${dono==='dep'?'departamento':nomeDe(dono)})`)}
+function editMeta(id){const x=D.metas.find(y=>y.id===id);if(!x||!podeMeta(x.dono))return;FORM={tipo:'_meta',id,del:false};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${x.dono==='dep'?'Departamento':esc(nomeDe(x.dono))} · ${esc(mesNome(x.mes))}</p><h2 id="sheet-title">Editar</h2></div>
+ <div class="fgrid"><div class="full"><label class="lbl" for="me_t">O que precisa fazer</label><input class="inp" id="me_t" value="${esc(x.t)}"><p class="ferr" id="mee_t"></p></div>
+ <div class="full"><label class="lbl" for="me_m">Meta · opcional</label><input class="inp" id="me_m" value="${esc(x.meta||'')}" placeholder="100 lançamentos, zerar pendências"></div>
+ <div><label class="lbl" for="me_p">Prazo · opcional</label><input class="inp" id="me_p" type="date" value="${esc(x.prazo||'')}"></div>
+ <div><label class="lbl" for="me_st">Situação</label><select class="inp" id="me_st">${ST_META.map(([k,l])=>`<option value="${k}" ${k===(x.st||'afazer')?'selected':''}>${l}</option>`).join('')}</select></div>
+ <div class="full"><label class="lbl" for="me_o">Observação · opcional</label><textarea class="inp" id="me_o" style="min-height:60px">${esc(x.obs||'')}</textarea></div></div>
+ <div class="foot"><div><button class="btn danger" id="bdel" onclick="delMeta()">Excluir</button></div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaMeta()">Salvar</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+async function salvaMeta(){const x=D.metas.find(y=>y.id===FORM.id);if(!x)return;const t=val('me_t');errEl('mee_t','');if(!t){errEl('mee_t','Escreva o que precisa fazer.');return}
+ const st=val('me_st');if(await patch('metas',x.id,{t,meta:val('me_m'),prazo:val('me_p'),obs:val('me_o'),st,feitoEm:st==='feito'?(x.feitoEm||HJ):'',feitoPor:st==='feito'?(x.feitoPor||quemNome()):''},'Salvo',`Alterou "${t}" nas metas de ${mesCurto(x.mes)}`))fechar()}
+async function delMeta(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
+ const x=D.metas.find(y=>y.id===FORM.id);try{await DB.collection('metas').doc(FORM.id).delete();log(`Excluiu "${x?.t||''}" das metas de ${mesCurto(x?.mes||MES_ATUAL)}`);toast('Excluído');fechar()}catch(e){toast('Não foi possível excluir.')}}
+async function levarPendentes(mes,dono){if(!podeMeta(dono))return;const L=itensMeta(mes,dono).filter(x=>x.st!=='feito'),prox=addMes(mes,1);if(!L.length){toast('Nada pendente para levar.');return}
+ const key='lp_'+mes+dono;if(S.confLP!==key){S.confLP=key;toast(`Clique de novo para copiar ${L.length} ${L.length>1?'itens pendentes':'item pendente'} para ${mesNome(prox)}.`);setTimeout(()=>{if(S.confLP===key)S.confLP=null},5000);return}S.confLP=null;
+ let k=0;for(const x of L){if(D.metas.some(y=>y.mes===prox&&y.dono===dono&&y.origem===x.id))continue;const {id,...b}=x;if(await salvar('metas',null,{...b,mes:prox,st:x.st==='andamento'?'andamento':'afazer',origem:id,em:new Date().toISOString()},false,false))k++}
+ log(`Levou ${k} itens pendentes de ${mesCurto(mes)} para ${mesCurto(prox)} (${dono==='dep'?'departamento':nomeDe(dono)})`);toast(`${k} ${k>1?'itens copiados':'item copiado'} para ${mesNome(prox)}`)}
+function cardMeta(mes,dono,titulo){const L=itensMeta(mes,dono),f=L.filter(x=>x.st==='feito').length,pm=podeMeta(dono),nota=notaMeta(mes,dono),k=`${mes}_${dono}`.replace(/[^\w-]/g,'');
+ return `<div class="panel mcard ${dono==='dep'?'dep':''}"><div class="ph"><h2>${titulo}</h2><span>${L.length?`${f} de ${L.length} feitos`:'nada ainda'}</span></div>
+ ${L.length?`<div class="bar" style="margin:4px 0 10px"><i style="width:${f/L.length*100}%"></i></div>`:''}
+ <label class="lbl" for="mn_${k}">Meta do mês</label>${pm?`<textarea class="inp mnota" id="mn_${k}" data-nodraft="1" placeholder="${dono==='dep'?'O que o departamento precisa alcançar neste mês':'O que você quer alcançar neste mês'}" onblur="salvaNota('${mes}','${dono}',this)">${esc(nota?.texto||'')}</textarea>`:`<p class="mnota-ro">${nota?.texto?esc(nota.texto):'<span class="meta">Sem meta escrita.</span>'}</p>`}
+ <div class="mlist">${L.map(x=>{const s=stMeta(x.st);return `<div class="mitem ${x.st==='feito'?'done':''}"><button class="tag ${s[2]}" ${pm?'':'disabled'} onclick="stMetaCiclo('${x.id}')" title="${pm?'Clique para mudar a situação':''}">${s[1]}</button><div class="t"><b>${esc(x.t)}</b>${x.meta||x.prazo||x.obs?`<span>${[x.meta?'Meta: '+x.meta:'',x.prazo?'até '+fmt(x.prazo)+(x.st!=='feito'&&x.prazo<HJ?' (passou)':''):'',x.obs||''].filter(Boolean).map(esc).join(' · ')}</span>`:''}${x.st==='feito'&&x.feitoPor?`<span class="pos">Feito por ${esc(x.feitoPor)} em ${fmt(x.feitoEm)}</span>`:''}</div>${pm?`<button class="btn ghost sm" onclick="editMeta('${x.id}')" aria-label="Editar ${esc(x.t)}">Editar</button>`:''}</div>`}).join('')||'<p class="meta" style="margin:8px 0">Nenhum item.</p>'}</div>
+ ${pm?`<div class="madd"><input class="inp" id="mt_t_${k}" data-nodraft="1" placeholder="O que precisa fazer" onkeydown="if(event.key==='Enter')addMeta('${mes}','${dono}')"><input class="inp" id="mt_m_${k}" data-nodraft="1" placeholder="Meta (opcional)" onkeydown="if(event.key==='Enter')addMeta('${mes}','${dono}')"><input class="inp" id="mt_p_${k}" data-nodraft="1" type="date" title="Prazo (opcional)" aria-label="Prazo (opcional)"><button class="btn pri" onclick="addMeta('${mes}','${dono}')">Adicionar</button></div>
+ ${L.some(x=>x.st!=='feito')?`<button class="lnk" style="margin-top:8px" onclick="levarPendentes('${mes}','${dono}')">${S.confLP==='lp_'+mes+dono?'Confirmar: copiar pendentes':'Levar pendentes para '+mesNome(addMes(mes,1))}</button>`:''}`:'<p class="meta" style="margin:8px 0 0">Só a própria pessoa edita esta lista.</p>'}</div>`}
+function resumoMetas(mes){const ps=colabs(),lin=(n,d)=>{const L=itensMeta(mes,d),f=L.filter(x=>x.st==='feito').length,a=L.filter(x=>x.st==='andamento').length,atr=L.filter(x=>x.st!=='feito'&&x.prazo&&x.prazo<HJ).length;return `<tr><td style="text-align:left">${esc(n)}</td><td>${L.length}</td><td>${f}</td><td>${a?`<span class="tag ac">${a}</span>`:'0'}</td><td>${atr?`<span class="tag bad">${atr}</span>`:'0'}</td><td>${L.length?Math.round(f/L.length*100)+'%':'—'}</td></tr>`};
+ if(!D.metas.some(x=>x.mes===mes))return '';
+ return `<div class="panel"><div class="ph"><h2>Metas de ${mesNome(mes)}</h2><button class="btn ghost" onclick="S.mM='${mes}';ir('metas')">Abrir metas</button></div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Quem</th><th>Itens</th><th>Feitos</th><th>Em andamento</th><th>Prazo passou</th><th>%</th></tr></thead><tbody>${lin('Departamento','dep')}${ps.map(p=>lin(p.n,p.id)).join('')}</tbody></table></div></div>`}
+
 /* ---------- prazos e compromissos: fixos (toda semana, todo mês) ou de uma vez ---------- */
 const TIPOS_EV=['Reunião','Obrigação','Fechamento','Outro'];
 const REP_EV=[['unica','Uma vez só'],['semanal','Toda semana'],['mensal','Todo mês']];
@@ -1687,7 +1733,7 @@ async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FOR
  const e=D.eventos.find(x=>x.id===FORM.id);try{await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
 
 /* ---------- telas ---------- */
-const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['rotinas','Cronograma'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['chamados','Chamados'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
+const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['chamados','Chamados'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
 const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
 const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
@@ -1952,6 +1998,7 @@ painel(){
   ${meusAtr.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${meusAtr.length}</span></div>${meusAtr.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:''}
   ${(()=>{const pp=proxPrazos(5,true);return `<div class="panel"><div class="ph"><h2>Próximos prazos</h2>${novo('evento','Novo prazo')}</div>${pp.length?pp.map(linPrazo).join(''):vazio('Sem prazos próximos','')}</div>`})()}
   <div class="panel"><div class="ph"><h2>Meu dia</h2><span>${cm.ok} de ${cm.tot} concluídas</span></div>${meus.length?meus.map(r=>linOc(r,HJ)).join(''):vazio('Nenhuma rotina sua hoje','')}</div>
+  ${(()=>{const L=itensMeta(MES_ATUAL,S.perfil).filter(x=>x.st!=='feito');return L.length?`<div class="panel"><div class="ph"><h2>Minhas metas de ${MESES[+MES_ATUAL.slice(5)-1]}</h2><button class="btn ghost" onclick="S.mM='';ir('metas')">Abrir</button></div>${L.slice(0,6).map(x=>{const s=stMeta(x.st);return `<div class="row"><div class="t"><b>${esc(x.t)}</b>${x.meta||x.prazo?`<span>${[x.meta,x.prazo?'até '+fmt(x.prazo):''].filter(Boolean).map(esc).join(' · ')}</span>`:''}</div><button class="tag ${s[2]}" onclick="stMetaCiclo('${x.id}')">${s[1]}</button></div>`}).join('')}</div>`:''})()}
   ${mt.filter(x=>x.s!=='feita').length?`<div class="panel"><div class="ph"><h2>Minhas tarefas avulsas</h2><span>${mt.filter(x=>x.s!=='feita').length} abertas</span></div>${mt.filter(x=>x.s!=='feita').map(linTar).join('')}</div>`:''}
   ${modOn('entregas')?`<div class="panel"><div class="ph"><h2>Entregas de departamentos sob sua responsabilidade</h2><span>${minhasEnt().filter(entAtrasada).length} em atraso</span></div>${minhasEnt().filter(e=>!e.recebido).length?minhasEnt().filter(e=>!e.recebido).map(linEnt).join(''):vazio('Nenhuma entrega pendente','')}</div>`:''}
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2></div>${dm.length?`<div class="hl">${dm.map(cardDest).join('')}</div>`:vazio('Nenhum destaque neste mês','')}</div>`+note('No perfil de colaborador você vê só as suas tarefas, as suas horas e o seu feedback.')}
@@ -1964,7 +2011,7 @@ painel(){
   <div class="stat"><p>Rotinas atrasadas</p><strong style="color:${cAtr.length+atr.length?'var(--bad)':'var(--ink)'}">${cAtr.length+atr.length}</strong><small>${atr.length?`${atr.length} tarefas avulsas`:'cronograma'}</small></div>
   ${modOn('entregas')?`<div class="stat"><p>Entregas em atraso</p><strong style="color:${ea.length?'var(--bad)':'var(--ink)'}">${ea.length}</strong><small>${ea.length?[...new Set(ea.map(e=>depNome(e.dep)))].length+' departamentos':'outros departamentos'}</small></div>`:''}
   <div class="stat"><p>Demandas atrasadas</p><strong style="color:${D.chamados.filter(chAtrasado).length?'var(--bad)':'var(--ink)'}">${D.chamados.filter(chAtrasado).length}</strong><small>prazo de entrega vencido</small></div></div>
- ${cronPainel()}${chegadaPainel()}${modOn('fechamento')&&pode('fechamento')?fechResumo():''}${demResumo()}
+ ${cronPainel()}${resumoMetas(MES_ATUAL)}${chegadaPainel()}${modOn('fechamento')&&pode('fechamento')?fechResumo():''}${demResumo()}
  ${modOn('entregas')?`<div class="grid2">
   <div class="panel"><div class="ph"><h2>Entregas por departamento</h2><button class="btn ghost" onclick="ir('entregas')">Ver entregas</button></div>${painelDep()}</div>
   <div class="panel"><div class="ph"><h2>Atrasos de departamentos</h2><span>${ea.length}</span></div>
@@ -1995,6 +2042,11 @@ destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  (l.length?`<div class="hl">${l.map(cardDest).join('')}</div>`:`<div class="panel">${vazio(`Nenhum destaque em ${mesNome(S.mesDest)}`,'Registre o que a equipe conquistou no mês.',pode('feedbacks')?'destaque':null,'Registrar destaque')}</div>`)+
  (pode('feedbacks')?note('Os destaques do mês entram automaticamente no relatório do trimestre e podem virar uma mensagem de reconhecimento no WhatsApp.'):'')},
 
+metas(){const mes=S.mM||MES_ATUAL,ps=colabs(),eu=ps.find(p=>p.id===S.perfil),outros=ps.filter(p=>p.id!==S.perfil);
+ const nav=`<div class="seg"><button onclick="S.mM=addMes('${mes}',-1);render();salvarEstado()" aria-label="Mês anterior">‹</button><span>${mesNome(mes)}</span><button onclick="S.mM=addMes('${mes}',1);render();salvarEstado()" aria-label="Próximo mês">›</button></div>${mes!==MES_ATUAL?`<button class="btn" onclick="S.mM='';render()">Mês atual</button>`:''}`;
+ return head('Planejamento do mês','Metas e <em>a fazer</em>','Escolha o mês, escreva a meta e o que precisa ser feito. Cada pessoa edita a sua lista; o departamento é de todos.',nav)+
+ `<div class="mgrid">${cardMeta(mes,'dep','Departamento')}${eu?cardMeta(mes,eu.id,`${esc(eu.n)} <span class="meta">(você)</span>`):''}${outros.map(p=>cardMeta(mes,p.id,esc(p.n))).join('')}</div>`+
+ note('Clique na situação para passar de A fazer para Em andamento e Feito. Use "Levar pendentes" para copiar o que ficou para o mês seguinte.')},
 rotinas(){const t=S.cTab||'dia',pc=podeEditRot();
  const btns=`${pc?`<button class="btn" onclick="editRot()">Nova rotina fixa</button>`:''}<button class="btn" onclick="editEv()">Novo prazo</button>${podeAdmin()?`<button class="btn" onclick="cfgCron()">Ajustes</button>`:''}`;
  return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`${procs().join(' → ')}. As rotinas do dia já vêm prontas: cada pessoa clica no que fez.`,btns)+cronAbas()+
@@ -2135,7 +2187,7 @@ function marcarTema(){document.querySelectorAll('.temas button').forEach(b=>b.se
 marcarTema();
 
 /* ---------- continuar de onde parou: tela, filtros, rolagem e o que estava digitando ---------- */
-const EST_K=['chM','cTab','cQuem','cSis','tela','fRem','fDepC','fCat','fResp','fBusca','rPer','rCat','rDep','rQuem','fDep','fLog','fFer','busca','mesDest','cal','iPer','fRemT','fbP'];
+const EST_K=['mM','chM','cTab','cQuem','cSis','tela','fRem','fDepC','fCat','fResp','fBusca','rPer','rCat','rDep','rQuem','fDep','fLog','fFer','busca','mesDest','cal','iPer','fRemT','fbP'];
 S.scroll={};
 function salvarEstado(){if(S.modo==='carregando')return;const o={scroll:S.scroll,em:Date.now()};EST_K.forEach(k=>{if(S[k]!==undefined&&S[k]!==null)o[k]=S[k]});
  if(['fbedit','fbver'].includes(o.tela))o.tela=S.fbP?'fbpessoa':'feedbacks';LS.set('prumo_estado',o)}

@@ -200,6 +200,10 @@ O diretor vê no **Painel** o cronograma de hoje por pessoa, o que está em anda
 
 Em **Cronograma > Ajustes** (administrador) você muda as etapas e os sistemas, usa o modelo pronto **Montar o cronograma de novembro** e liga de volta o que ficou guardado para depois (**Fechamento D+N**, **Entregas dos departamentos**, alertas de **e-mails do Outlook** e **Outros alertas**: chamados, WhatsApp, troca bancária, acessos e backup). Guardar uma tela só a tira do menu: nenhum dado é apagado.
 
+## Metas e a fazer
+
+No menu **Metas e a fazer**, escolha o mês. O cartão **Departamento** tem a meta geral do mês e a lista do que o departamento precisa fazer (toda a equipe edita). Cada pessoa tem o próprio cartão, com a meta do mês e os itens a fazer, e **só ela edita** (o diretor e a administradora editam todos). Cada item tem meta e prazo opcionais e a situação **A fazer → Em andamento → Feito** (clique na etiqueta). **Levar pendentes** copia o que ficou para o mês seguinte. O diretor vê o resumo no Painel.
+
 ## Demandas por e-mail e chamados
 
 - **E-mails recebidos**: o portal lê a caixa de entrada (a sua ou a caixa compartilhada do financeiro, em **Configurar**) e agrupa por remetente. Tudo o que chega do João fica no grupo do João. Escolha o **setor** dele uma vez e isso vale para os próximos e-mails. Em **Mais opções** você define um assunto padrão ou manda **ignorar** propagandas e avisos automáticos.

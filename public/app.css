@@ -337,3 +337,14 @@ div.opc{cursor:default;flex-wrap:wrap}.opc.and{background:var(--accent-soft);bor
 .row.oc.done b{text-decoration:none;font-weight:500}
 .row.oc.done{opacity:1}
 .lnk.hr{font-size:11.5px;color:var(--ink-3);margin-left:4px}
+/* metas e a fazer */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+.mcard.dep{grid-column:1/-1;border-color:var(--accent)}
+.mnota{min-height:56px;margin:4px 0 10px}.mnota-ro{margin:4px 0 10px;white-space:pre-wrap;font-size:13.5px}
+.mlist{display:flex;flex-direction:column}
+.mitem{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line-soft)}
+.mitem .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.mitem .t b{font-weight:500;overflow-wrap:anywhere}.mitem .t span{font-size:12px;color:var(--ink-3)}
+.mitem.done .t b{color:var(--ink-3)}
+.mitem .tag{flex:none;min-width:96px;text-align:center}
+.madd{display:grid;grid-template-columns:2fr 1.3fr auto auto;gap:6px;margin-top:10px}
+@media (max-width:640px){.mgrid{grid-template-columns:1fr}.madd{grid-template-columns:1fr 1fr}.madd .inp:first-child{grid-column:1/-1}}
