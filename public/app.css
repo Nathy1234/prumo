@@ -327,3 +327,8 @@ table.andt.quem td{text-align:left}
 .sisw button.on{border-color:var(--accent);background:var(--accent-soft)}.sisw button.on span{color:var(--accent-ink)}
 .qd .qd-row{grid-template-columns:150px minmax(0,1fr)}
 @media (max-width:640px){.row.oc{flex-wrap:wrap}.oc-acoes{width:100%;justify-content:flex-start;padding-left:32px}}
+.btn.mk.on-ac{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.mk.on-ok{background:var(--ok);border-color:var(--ok);color:#fff;font-weight:600}
+div.opc{cursor:default;flex-wrap:wrap}.opc.and{background:var(--accent-soft);border-color:var(--accent)}.opc.and .opc-ck{border-color:var(--accent);color:var(--accent)}
+.opc .opc-t small.emand{color:var(--accent)}
+.opc-b{display:flex;gap:6px;margin-left:auto}

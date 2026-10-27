@@ -1265,14 +1265,14 @@ async function marcaEu(rid,dia,acao){const r=D.cronograma.find(x=>x.id===rid);if
  if(!await salvar('feitos',mid,doc,acao==='ini'?'Iniciado':atraso?'Finalizado (depois do dia previsto)':'Finalizado',`${acao==='ini'?'Iniciou':'Finalizou'} "${r.t}" de ${fmt(dia)}${atraso?' (com atraso)':''}`))return;
  await syncEx(rid,dia,[...outros,doc])}
 /* atalho (semana e outras atividades): finaliza ou desfaz o seu */
+function opcMarca(rid,dia,acao){const ms=stF(meuF(rid,dia));return marcaEu(rid,dia,(acao==='ini'&&ms==='andamento')||(acao==='fim'&&ms==='feita')?'desfazer':acao)}
+function botoesMarca(rid,dia,ms){return `<button class="btn sm mk ${ms==='andamento'?'on-ac':''}" aria-pressed="${ms==='andamento'}" onclick="opcMarca('${rid}','${dia}','ini')" title="${ms==='andamento'?'Clique para desfazer':'Guarda a data e a hora de início'}">${ms==='andamento'?'● ':''}Em andamento</button><button class="btn sm mk ${ms==='feita'?'on-ok':''}" aria-pressed="${ms==='feita'}" onclick="opcMarca('${rid}','${dia}','fim')" title="${ms==='feita'?'Clique para desfazer':'Guarda a data e a hora de término'}">✓ Finalizado</button>`}
 function euFiz(rid,dia){return marcaEu(rid,dia,euFizEsse(rid,dia)?'desfazer':'fim')}
 function ocFeita(rid,dia){return euFiz(rid,dia)}
 function linOc(r,dia,comDia,semSis){const x=exDe(r.id,dia),st=stOc(r,dia),done=x?.s==='feita',pm=podeMarcar(r)&&dia<=HJ,FT=feitosDe(r.id,dia),meu=meuF(r.id,dia),ms=stF(meu);
  const info=[semSis?'':(r.sis||[]).map(sisTxt).join(' · '),nomesRs(r),r.apoio?'apoio: '+r.apoio:''].filter(Boolean).map(esc).join(' · ');
  const ind=done?'<span class="stdot ok" title="Finalizada">✓</span>':FT.some(f=>stF(f)==='andamento')?'<span class="stdot ac" title="Em andamento">●</span>':st[0]==='bad'?'<span class="stdot bad" title="Atrasada">!</span>':'<span class="stdot" aria-hidden="true"></span>';
- const acoes=!pm?'':ms==='feita'?`<button class="lnk desf" onclick="marcaEu('${r.id}','${dia}','desfazer')">desfazer</button>`
-  :ms==='andamento'?`<button class="btn sm pri" onclick="marcaEu('${r.id}','${dia}','fim')">✓ Finalizar</button><button class="lnk desf" onclick="marcaEu('${r.id}','${dia}','desfazer')">desfazer</button>`
-  :`<button class="btn sm" onclick="marcaEu('${r.id}','${dia}','ini')">Iniciar</button><button class="btn sm pri" onclick="marcaEu('${r.id}','${dia}','fim')">✓ Finalizar</button>`;
+ const acoes=pm?botoesMarca(r.id,dia,ms):'';
  return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}">${ind}
  <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
  ${FT.map(f=>`<span class="${stF(f)==='feita'?'pos':'emand'}">${stF(f)==='feita'?'✓':'●'} ${esc(txtPessoa(f))}</span>`).join('')}
@@ -1318,8 +1318,8 @@ const fazerHoje=(rid,dia)=>euFiz(rid,dia);
 const SUGESTOES_OPC=['Repasse de polos','Adiantamento a fornecedor','Reembolso de despesas','Transferência entre contas','Pagamento urgente','Estorno ou devolução'];
 function outrasOpcoes(dia){const L=avulsasDia(dia),pm=podeEditRot()&&dia<=HJ,tem=new Set(D.cronograma.filter(r=>r.freq==='avulsa').map(r=>norm(r.t)));
  const sug=podeEditRot()?SUGESTOES_OPC.filter(t=>!tem.has(norm(t))):[];
- const chip=r=>{const ft=feitosDe(r.id,dia).filter(f=>stF(f)==='feita'),eu=euFizEsse(r.id,dia),feito=ft.length>0;
-  return `<button class="opc ${eu?'eu':feito?'on':''}" ${pm?'':'disabled'} onclick="euFiz('${r.id}','${dia}')" aria-pressed="${eu}" title="${eu?'Você marcou. Clique para desfazer':feito?'Clique se você também fez':'Clique se você fez'}"><span class="opc-ck">${feito?'✓':''}</span><span class="opc-t">${esc(r.t)}${ft.length?`<small>${ft.map(f=>esc(f.nome||'—')+(f.hora?' '+esc(f.hora):'')).join(', ')}</small>`:''}</span></button>`};
+ const chip=r=>{const ft=feitosDe(r.id,dia),fe=ft.some(f=>stF(f)==='feita'),an=ft.some(f=>stF(f)==='andamento'),ms=stF(meuF(r.id,dia));
+  return `<div class="opc ${fe?'on':an?'and':''}"><span class="opc-ck">${fe?'✓':an?'●':''}</span><span class="opc-t">${esc(r.t)}${ft.map(f=>`<small class="${stF(f)==='feita'?'':'emand'}">${esc(stF(f)==='feita'?`✓ ${f.nome||'—'}${f.hora?' '+f.hora:''}`:`● ${f.nome||'—'} desde ${hmDe(f.ini)}`)}</small>`).join('')}</span>${pm?`<span class="opc-b">${botoesMarca(r.id,dia,ms)}</span>`:''}</div>`};
  return `<div class="qd-opc"><div class="opcs">${L.map(chip).join('')||'<span class="meta">Nenhuma opção ainda.</span>'}${podeEditRot()?`<button class="opc add" onclick="novaOpcao()">+ Nova opção</button>`:''}</div>${sug.length&&L.length<4?`<p class="meta" style="margin:8px 0 4px">Sugestões, clique para incluir na lista:</p><div class="opcs">${sug.map((t,i)=>`<button class="opc sug" onclick="addSugestao(${SUGESTOES_OPC.indexOf(t)})">+ ${esc(t)}</button>`).join('')}</div>`:''}</div>`}
 function novaOpcao(){FORM={tipo:'_opc'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Outras atividades</p><h2 id="sheet-title">Nova opção</h2><p class="sub" style="font-size:13px">Escreva só uma vez. Depois ela aparece para todos como botão: é só clicar quando fizer.</p></div>
