@@ -43,5 +43,10 @@ insert into public.docs (path, col, id, data) values
   ('etapas/et08', 'etapas', 'et08', '{"t": "Fechamento do razão", "dn": 4, "a": "Contabilidade", "resp": "", "deps": ["et01", "et04", "et06", "et05"]}'::jsonb),
   ('etapas/et09', 'etapas', 'et09', '{"t": "Balancete e análise de variações", "dn": 5, "a": "Controladoria", "resp": "", "deps": ["et08"]}'::jsonb),
   ('etapas/et10', 'etapas', 'et10', '{"t": "Relatório para a diretoria", "dn": 5, "a": "Controladoria", "resp": "", "deps": ["et09"]}'::jsonb),
+  ('assuntos/a-pagamentos', 'assuntos', 'a-pagamentos', '{"n": "Pagamentos", "palavras": "pagamento, pagar, boleto, fatura, duplicata, vencimento, cobranca", "dias": 3, "subs": ["Boleto", "Fornecedor", "Impostos e guias", "Urgente"]}'::jsonb),
+  ('assuntos/a-notas', 'assuntos', 'a-notas', '{"n": "Notas fiscais", "palavras": "nota fiscal, nf, nfe, nfse, danfe, xml", "dias": 2, "subs": ["NF de serviço", "NF de produto", "Cancelamento ou correção"]}'::jsonb),
+  ('assuntos/a-reembolsos', 'assuntos', 'a-reembolsos', '{"n": "Reembolsos e adiantamentos", "palavras": "reembolso, adiantamento, despesa, viagem, prestacao de contas", "dias": 5, "subs": ["Reembolso", "Adiantamento", "Prestação de contas"]}'::jsonb),
+  ('assuntos/a-cadastro', 'assuntos', 'a-cadastro', '{"n": "Cadastro de fornecedor", "palavras": "cadastro, fornecedor, dados bancarios, conta bancaria", "dias": 3, "subs": ["Novo fornecedor", "Alteração de dados"]}'::jsonb),
+  ('assuntos/a-duvidas', 'assuntos', 'a-duvidas', '{"n": "Dúvidas e outros", "palavras": "duvida, informacao, solicitacao", "dias": 3, "subs": []}'::jsonb),
   ('config/estrutura', 'config', 'estrutura', '{"diasMin": 3, "mapeados": 0, "meta": 25, "emailModo": "triagem", "emailIntervalo": 15, "bkAuto": true, "bkReter": 30, "bkEmail": "", "bkEnviar": false, "metaDN": 5, "feriados": "02/11/2026, 20/11/2026, 25/12/2026, 01/01/2027"}'::jsonb)
 on conflict (path) do nothing;

@@ -38,7 +38,7 @@
       <div class="brand"><div class="mark">P</div><div><b>Prumo</b><span>Financeiro e Contábil</span></div></div>
       <h1 id="lg_t">${t}</h1>
       ${msg ? `<p class="msg ${erro ? 'erro' : ''}">${esc(msg)}</p>` : ''}
-      ${CFG.microsoft && (modo === 'entrar' || modo === 'criar') ? `<button class="btn ms" id="lg_ms" type="button"><svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>Entrar com a conta Microsoft da empresa</button><div class="ou">ou com e-mail e senha</div>` : ''}
+      ${msAtivo && (modo === 'entrar' || modo === 'criar') ? `<button class="btn ms" id="lg_ms" type="button"><svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>Entrar com a conta Microsoft da empresa</button><div class="ou">ou com e-mail e senha</div>` : ''}
       <form id="lg_f" novalidate>
         ${modo === 'criar' ? '<div><label class="lbl" for="lg_nome">Nome completo</label><input class="inp" id="lg_nome" autocomplete="name" required></div>' : ''}
         ${modo !== 'nova' ? '<div><label class="lbl" for="lg_email">E-mail</label><input class="inp" id="lg_email" type="email" autocomplete="email" required></div>' : ''}
@@ -99,6 +99,15 @@
   }
   window.portalReconectarMicrosoft = entrarMicrosoft;
 
+  // Descobre sozinho se a conexão com a Microsoft já foi ligada no Supabase.
+  let msAtivo = !!CFG.microsoft, msChecado = null;
+  function checarMicrosoft() {
+    if (!msChecado) msChecado = fetch(CFG.supabaseUrl + '/auth/v1/settings', { headers: { apikey: CFG.supabaseAnonKey } })
+      .then(r => r.json()).then(j => { msAtivo = msAtivo || !!j?.external?.azure; return msAtivo; }).catch(() => msAtivo);
+    return msChecado;
+  }
+  window.portalMicrosoftAtivo = () => checarMicrosoft();
+
   /* ------------------------------------------------------------------
      Supabase
      ------------------------------------------------------------------ */
@@ -122,7 +131,7 @@
       try { sessionStorage.setItem('ms_token', JSON.stringify({ t: sessao.provider_token, exp: Date.now() + 55 * 60e3 })); } catch (e) {}
     }
     if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && sessao && !logado) aposLogin(sessao);
-    if (ev === 'INITIAL_SESSION' && !sessao) telaLogin('entrar');
+    if (ev === 'INITIAL_SESSION' && !sessao) checarMicrosoft().then(() => { if (!logado) telaLogin('entrar'); });
   });
 
   async function aposLogin(sessao) {
@@ -135,15 +144,16 @@
     const perfil = ac?.data?.ativo === false ? '' : ac?.data?.perfil;
     const admin = perfil === 'diretor' || perfil === 'admin';
     document.getElementById('login')?.remove();
+    await checarMicrosoft();
     botaoSair(nome);
     liberar({ db: criarDb(u.id), user: criarUser(u, nome, admin), mcp: criarMcp(), downloads: criarDownloads() });
   }
   function botaoSair() {
     const aside = document.querySelector('aside'); if (!aside || document.getElementById('sairbox')) return;
     const box = document.createElement('div'); box.id = 'sairbox';
-    box.innerHTML = '<button class="btn" type="button" id="btn_sair">Sair</button>' + (CFG.microsoft ? '<button class="btn ghost" type="button" id="btn_ms" title="Use se a leitura do Outlook pedir para reconectar">Reconectar Outlook</button>' : '');
+    box.innerHTML = '<button class="btn" type="button" id="btn_sair">Sair</button>' + (msAtivo ? '<button class="btn ghost" type="button" id="btn_ms" title="Use se a leitura do Outlook pedir para conectar de novo">Conectar e-mail</button>' : '');
     aside.insertBefore(box, aside.querySelector('.secure'));
-    document.getElementById('btn_sair').onclick = async () => { try { sessionStorage.removeItem('ms_token'); } catch (e) {} await sb.auth.signOut(); };
+    document.getElementById('btn_sair').onclick = async () => { try { sessionStorage.removeItem('ms_token'); localStorage.removeItem('prumo_rasc'); } catch (e) {} await sb.auth.signOut(); };
     const bm = document.getElementById('btn_ms'); if (bm) bm.onclick = entrarMicrosoft;
   }
 
@@ -333,15 +343,16 @@
       const { data } = await sb.auth.getSession();
       return data?.session?.provider_token || null;
     }
-    async function graph(metodo, url, corpo) {
+    async function graph(metodo, url, corpo, extras) {
       const t = await token();
-      if (!t) throw { code: CFG.microsoft ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' };
+      if (!t) throw { code: msAtivo ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' };
       let r;
       try {
-        r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: corpo ? JSON.stringify(corpo) : undefined });
+        r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(extras || {}) }, body: corpo ? JSON.stringify(corpo) : undefined });
       } catch (e) { throw { code: 'server_unavailable', retryable: true, message: 'O Outlook não respondeu.' }; }
       if (r.status === 401) { try { sessionStorage.removeItem('ms_token'); } catch (e) {} throw { code: 'needs_reauth', message: 'A conexão com o Outlook expirou.' }; }
       if (r.status === 403) throw { code: 'blocked_by_policy', message: 'Sem permissão no Outlook.' };
+      if (r.status === 404) throw { code: 'not_found', message: 'E-mail não encontrado nesta caixa.' };
       if (r.status === 429 || r.status >= 500) throw { code: 'server_unavailable', retryable: true, message: 'O Outlook está ocupado.' };
       if (!r.ok) { let m = ''; try { m = (await r.json()).error?.message; } catch (e) {} throw { code: 'tool_error', message: m || 'Erro ' + r.status }; }
       return r.status === 202 || r.status === 204 ? {} : r.json();
@@ -349,22 +360,32 @@
     const aspas = s => String(s || '').replace(/'/g, "''");
     const ferramentas = {
       async outlook_email_search(i) {
-        const base = i.mailboxOwnerEmail ? `/users/${encodeURIComponent(i.mailboxOwnerEmail)}/messages` : '/me/messages';
+        const dono = i.mailboxOwnerEmail ? `/users/${encodeURIComponent(i.mailboxOwnerEmail)}` : '/me';
+        const base = dono + (i.folderId ? `/mailFolders/${encodeURIComponent(i.folderId)}/messages` : ({ inbox: '/mailFolders/inbox/messages', sentitems: '/mailFolders/sentitems/messages' }[i.folder] || '/messages'));
         const filtros = [];
         if (i.sender) filtros.push(`from/emailAddress/address eq '${aspas(i.sender)}'`);
         if (i.afterDateTime) filtros.push(`receivedDateTime ge ${new Date(i.afterDateTime).toISOString()}`);
         const top = Math.min(25, +i.limit || 10), skip = +i.offset || 0;
-        const qs = new URLSearchParams({ $select: 'id,internetMessageId,subject,from,receivedDateTime,bodyPreview,hasAttachments,webLink', $top: String(top) });
+        const qs = new URLSearchParams({ $select: 'id,internetMessageId,subject,from,toRecipients,ccRecipients,receivedDateTime,bodyPreview,hasAttachments,webLink', $top: String(top) });
         if (filtros.length) qs.set('$filter', filtros.join(' and '));
+        if (!i.sender) qs.set('$orderby', 'receivedDateTime desc');
         if (skip) qs.set('$skip', String(skip));
-        const r = await graph('GET', base + '?' + qs.toString());
-        const value = (r.value || []).map(m => ({ id: m.id, internetMessageId: m.internetMessageId, subject: m.subject, sender: m.from?.emailAddress?.address || '', senderName: m.from?.emailAddress?.name || '', receivedDateTime: m.receivedDateTime, summary: m.bodyPreview || '', hasAttachments: !!m.hasAttachments, webLink: m.webLink }));
+        const r = await graph('GET', base + '?' + qs.toString(), null, { Prefer: 'IdType="ImmutableId"' });
+        const value = (r.value || []).map(m => ({ id: m.id, internetMessageId: m.internetMessageId, subject: m.subject, sender: m.from?.emailAddress?.address || '', senderName: m.from?.emailAddress?.name || '', to: (m.toRecipients || []).concat(m.ccRecipients || []).map(a => ({ address: a.emailAddress?.address || '', name: a.emailAddress?.name || '' })).filter(a => a.address), receivedDateTime: m.receivedDateTime, summary: m.bodyPreview || '', hasAttachments: !!m.hasAttachments, webLink: m.webLink }));
         return { value, ...(r['@odata.nextLink'] ? { nextOffset: skip + value.length } : {}) };
       },
       async outlook_send_mail(i) {
         const end = l => (l || []).map(a => ({ emailAddress: { address: a } }));
         await graph('POST', '/me/sendMail', { message: { subject: i.subject, body: { contentType: i.bodyType === 'html' ? 'HTML' : 'Text', content: i.body }, toRecipients: end(i.to), ccRecipients: end(i.cc), bccRecipients: end(i.bcc) }, saveToSentItems: true });
         return { ok: true };
+      },
+      // Lê um e-mail inteiro para abrir dentro do portal. Pede o corpo em
+      // texto puro: nada de HTML ou scripts do remetente chega à tela.
+      async outlook_get_message(i) {
+        const base = i.mailboxOwnerEmail ? `/users/${encodeURIComponent(i.mailboxOwnerEmail)}/messages/` : '/me/messages/';
+        const m = await graph('GET', base + encodeURIComponent(i.id) + '?$select=subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,webLink&$expand=attachments($select=name,size)', null, { Prefer: 'outlook.body-content-type="text", IdType="ImmutableId"' });
+        const end = l => (l || []).map(a => a.emailAddress?.address || '').filter(Boolean);
+        return { subject: m.subject || '', sender: m.from?.emailAddress?.address || '', senderName: m.from?.emailAddress?.name || '', to: end(m.toRecipients), cc: end(m.ccRecipients), receivedDateTime: m.receivedDateTime, body: m.body?.content || '', hasAttachments: !!m.hasAttachments, attachments: (m.attachments || []).map(a => ({ name: a.name, size: a.size })), webLink: m.webLink };
       },
       async get_me() {
         const r = await graph('GET', '/me?$select=displayName,mail,userPrincipalName,id');

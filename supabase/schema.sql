@@ -228,7 +228,8 @@ language plpgsql security definer set search_path = public as $$
 declare
   v_cols text[] := array['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto',
     'eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias',
-    'ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos'];
+    'ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos',
+    'assuntos','remetentes','cronograma','execucoes'];
   v_dia  text := to_char((now() at time zone 'America/Sao_Paulo')::date, 'YYYY-MM-DD');
   v_id   text := 'd-' || v_dia;
   v_cfg  jsonb;

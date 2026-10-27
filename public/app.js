@@ -30,7 +30,8 @@ fechamento:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8
 bancos:'<path d="M3 10 12 4l9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
 indicadores:'<path d="M4 20V12M10 20V6M16 20v-9M22 20H2"/><circle cx="16" cy="6" r="2"/>',
 feedbacks:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/>',
-dep:'<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M10 21v-4h4v4"/>'};
+dep:'<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M10 21v-4h4v4"/>',
+realizadas:'<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.5 9.5"/>'};
 const ic=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]||I.info}</svg>`;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -47,12 +48,11 @@ const triDe=m=>{const [y,mm]=m.split('-').map(Number);return {ano:y,q:Math.floor
 const mesesTri=t=>[0,1,2].map(i=>`${t.ano}-${pad((t.q-1)*3+1+i)}`);
 const pagTri=t=>addMes(mesesTri(t)[2],2);
 const faseTri=t=>{const ms=mesesTri(t),pg=pagTri(t);if(MES_ATUAL<ms[0])return ['ne','Ainda não começou'];if(MES_ATUAL<=ms[2])return ['ac','Em apuração'];if(MES_ATUAL<pg)return ['wa','Em fechamento'];if(MES_ATUAL===pg)return ['bad','Pagamento neste mês'];return ['ok','Pago']};
-const faltTri=t=>colabs().reduce((a,p)=>a+mesesTri(t).filter(m=>m<MES_ATUAL&&!D.ponto.some(x=>x.pessoa===p.id&&x.mes===m)).length,0);
 const fimTri=t=>{const m=mesesTri(t)[2];const [y,mm]=m.split('-').map(Number);return isoD(new Date(y,mm,0))};
 const diasAte=iso=>Math.round((new Date(iso+'T12:00')-new Date(HJ+'T12:00'))/864e5);
 const hrs=n=>{const v=Math.round((+n||0)*10)/10;return `${String(v).replace('.',',')} h`};
 
-const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos'];
+const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes'];
 const D={logs:[],backups:[]};COLS.forEach(c=>D[c]=[]);
 let CFG={};
 const S={tela:'painel',perfil:'dir',modo:'carregando',sim:'',online:null,mesDest:MES_ATUAL,tri:triDe(MESES_ATUAL_FIX()),cal:MES_ATUAL,busca:'',limpar:false,loaded:0};
@@ -90,20 +90,21 @@ const entAtrasada=e=>!e.recebido&&e.prazo&&e.prazo<HJ;
 const minhasEnt=()=>dir()||pode('ver_tudo')||pode('entregas')?D.entregas:D.entregas.filter(e=>e.resp===S.perfil);
 function alertas(){
   const A=[];
-  minhasEnt().filter(e=>!e.recebido&&e.prazo).forEach(e=>{const d=diasAte(e.prazo);if(d<=1)A.push({n:d<0?3:2,ic:'entregas',c:d<0?'bad':'wa',t:d<0?`${depNome(e.dep)} está em atraso`:`${depNome(e.dep)}: entrega ${d===0?'vence hoje':'vence amanhã'}`,s:`${e.item} · prazo ${fmt(e.prazo)}${d<0?` · ${-d} ${d<-1?'dias':'dia'} de atraso`:''} · responsável: ${nomeDe(e.resp)}`,ir:'entregas',id:e.id})});
-  minhas().filter(atrasada).forEach(t=>A.push({n:2,ic:'rotinas',c:'bad',t:'Rotina interna em atraso',s:`${t.t} · ${nomeDe(t.r)} · venceu ${fmt(t.prazo)}`,ir:'rotinas'}));
+  if(modOn('entregas'))minhasEnt().filter(e=>!e.recebido&&e.prazo).forEach(e=>{const d=diasAte(e.prazo);if(d<=1)A.push({n:d<0?3:2,ic:'entregas',c:d<0?'bad':'wa',t:d<0?`${depNome(e.dep)} está em atraso`:`${depNome(e.dep)}: entrega ${d===0?'vence hoje':'vence amanhã'}`,s:`${e.item} · prazo ${fmt(e.prazo)}${d<0?` · ${-d} ${d<-1?'dias':'dia'} de atraso`:''} · responsável: ${nomeDe(e.resp)}`,ir:'entregas',id:e.id})});
+  minhas().filter(atrasada).forEach(t=>A.push({n:2,ic:'rotinas',c:'bad',t:'Tarefa avulsa em atraso',s:`${t.t} · ${nomeDe(t.r)} · venceu ${fmt(t.prazo)}`,ir:'rotinas'}));
+  if(!solic()){const g={};atrasosCron(vejoRot).forEach(o=>(g[o.r.id]=g[o.r.id]||{r:o.r,d:[]}).d.push(o.dia));
+   Object.values(g).forEach(({r,d})=>A.push({n:3,ic:'rotinas',c:'bad',t:`${r.etapa?r.etapa+': ':''}${r.t} em atraso`,s:`${d.length>1?`${d.length} dias pendentes desde ${fmt(d[0])}`:d[0]===HJ?`Hoje${r.hora?`, era às ${r.hora}`:''}`:`Pendente desde ${fmt(d[0])}`}${exDe(r.id,d[d.length-1])?.s==='andamento'?' · em andamento':''} · ${nomesRs(r)}`,ir:'rotinas'}));
+   const am=proxUtil(HJ);D.cronograma.filter(r=>r.prio==='atencao'&&vejoRot(r)).forEach(r=>[HJ,am].forEach(d=>{if(ocorre(r,d)&&exDe(r.id,d)?.s!=='feita'&&stOc(r,d)[0]!=='bad')A.push({n:2,ic:'rotinas',c:'wa',t:`Atenção: ${r.t} ${d===HJ?'hoje':'no próximo dia útil ('+fmt(d)+')'}`,s:`${r.obs||freqTxt(r)} · ${nomesRs(r)}`,ir:'rotinas'})}))}
   if(solic()){D.chamados.filter(c=>c.dep===solDep()&&c.st==='Pendência com solicitante').forEach(c=>A.push({n:3,ic:'chamados',c:'bad',t:`Chamado ${c.proto} precisa de correção`,s:c.pend,ir:'meus'}));return A}
   D.chamados.filter(c=>pode('chamados')&&c.venc&&!['Programado','Concluído'].includes(c.st)&&diasAte(c.venc)<=1&&(dir()||c.resp===S.perfil||!c.resp)).forEach(c=>{const d=diasAte(c.venc);A.push({n:3,ic:'chamados',c:'bad',t:d<0?`Chamado ${c.proto} venceu sem pagamento programado`:`Chamado ${c.proto} vence ${d===0?'hoje':'amanhã'}`,s:`${depNome(c.dep)} · ${c.assunto}`,ir:'chamados'})});
+  if(pode('chamados'))D.chamados.filter(c=>c.prazo&&c.st!=='Concluído'&&diasAte(c.prazo)<=0&&(dir()||pode('ver_tudo')||c.resp===S.perfil)).forEach(c=>{const d=diasAte(c.prazo);A.push({n:d<0?3:2,ic:'chamados',c:d<0?'bad':'wa',t:d<0?`Demanda ${c.proto} atrasada`:`Demanda ${c.proto} vence hoje`,s:`${c.assunto} · ${respNome(c.resp)}${d<0?` · ${-d} ${d<-1?'dias':'dia'} de atraso`:''}`,ir:'chamados'})});
   if(pode('chamados'))D.chamados.filter(c=>c.fora&&c.st==='Aberto').forEach(c=>A.push({n:2,ic:'chamados',c:'wa',t:`Chamado fora do prazo da política: ${depNome(c.dep)}`,s:`${c.proto} · ${c.assunto} · vence ${fmt(c.venc)}`,ir:'chamados'}));
   pode('chamados')&&D.chamados.filter(c=>c.st==='Aberto'&&!c.resp&&!c.fora).length&&A.push({n:1,ic:'chamados',c:'wa',t:`${D.chamados.filter(c=>c.st==='Aberto'&&!c.resp).length} chamados aguardam um responsável`,s:'Assuma na tela de chamados',ir:'chamados'});
-  {const pm=pode('whats')?pendMsg():0;if(pm)A.push({n:1,ic:'whats',c:'wa',t:`${pm} ${pm>1?'mensagens aguardam':'mensagem aguarda'} sua aprovação`,s:'WhatsApp da diretoria',ir:'whats'});
-   if(pode('ponto'))for(let k=1;k<=2;k++){let {ano,q}=triDe(MES_ATUAL);q-=k;while(q<1){q+=4;ano--}const t={ano,q},pg=pagTri(t),f=faltTri(t);
-    if(MES_ATUAL>=addMes(pg,-1)&&MES_ATUAL<=pg&&f)A.push({n:3,ic:'ponto',c:'bad',t:`Faltam ${f} lançamentos de horas do ${q}º tri ${ano}`,s:`Pagamento em ${mesNome(pg)}. Lance tudo antes de fechar a folha.`,ir:'ponto'})}
-   if(pode('ponto')){const t=triDe(MES_ATUAL),f=faltTri(t);if(f)A.push({n:1,ic:'ponto',c:'wa',t:`${f} ${f>1?'meses sem horas lançadas':'mês sem horas lançadas'} no ${t.q}º trimestre`,s:`Trimestre em apuração · pagamento em ${mesNome(pagTri(t))}`,ir:'ponto'})}}
+  {const pm=pode('whats')?pendMsg():0;if(pm)A.push({n:1,ic:'whats',c:'wa',t:`${pm} ${pm>1?'mensagens aguardam':'mensagem aguarda'} sua aprovação`,s:'WhatsApp da diretoria',ir:'whats'});}
   if(pode('antifraude')){D.verificacoes.filter(v=>v.st==='aprovacao'&&!mesmaPessoa(v.verUid,v.verPerf)).forEach(v=>A.push({n:3,ic:'bancos',c:'bad',t:`Troca de dados bancários aguardando sua aprovação: ${v.forn}`,s:`Conferida por ${v.verPapel||''}. Os pagamentos estão travados.`,ir:'bancos'}));D.verificacoes.filter(v=>v.st==='verificacao').forEach(v=>A.push({n:2,ic:'bancos',c:'wa',t:`Troca de dados bancários para conferir: ${v.forn}`,s:`Recebido por ${String(v.origem||'').toLowerCase()} em ${fmt(v.recebido)}`,ir:'bancos'}))}
   if(dir())D.verificacoes.filter(v=>v.st==='recusada'&&diasAte((v.fimEm||'').slice(0,10))>=-7).forEach(v=>A.push({n:3,ic:'bancos',c:'bad',t:`Possível golpe: troca de conta de ${v.forn} recusada`,s:v.motivo||'',ir:'bancos'}));
-  if(pode('fechamento')){const c=compPadrao();D.etapas.filter(e=>atrasoF(c,e)&&(dir()||pode('ver_tudo')||e.resp===S.perfil)).forEach(e=>A.push({n:3,ic:'fechamento',c:'bad',t:`Etapa do fechamento atrasada: ${e.t}`,s:`Prazo D+${e.dn} (${fmt(dataDN(c,+e.dn||1))}) · ${nomeDe(e.resp)}`,ir:'fechamento'}))}
-  if(pode('email')){const n=D.emails.filter(e=>e.st==='triagem').length;if(n)A.push({n:2,ic:'triagem',c:'wa',t:`${n} ${n>1?'e-mails aguardam':'e-mail aguarda'} triagem`,s:'Confirme se viraram entregas recebidas ou chamados',ir:'triagem'});if(S.syncErr&&S.syncErr.code!=='sem_mcp')A.push({n:2,ic:'triagem',c:'bad',t:'Leitura do Outlook com problema',s:msgErro(S.syncErr),ir:'triagem'})}
+  if(modOn('fechamento')&&pode('fechamento')){const c=compPadrao();D.etapas.filter(e=>atrasoF(c,e)&&(dir()||pode('ver_tudo')||e.resp===S.perfil)).forEach(e=>A.push({n:3,ic:'fechamento',c:'bad',t:`Etapa do fechamento atrasada: ${e.t}`,s:`Prazo D+${e.dn} (${fmt(dataDN(c,+e.dn||1))}) · ${nomeDe(e.resp)}`,ir:'fechamento'}))}
+  if(modOn('email')&&pode('email')){const n=D.emails.filter(e=>e.st==='triagem').length;if(n)A.push({n:2,ic:'triagem',c:'wa',t:`${n} ${n>1?'e-mails aguardam':'e-mail aguarda'} triagem`,s:'Confirme se viraram entregas recebidas ou chamados',ir:'triagem'});if(S.syncErr&&S.syncErr.code!=='sem_mcp')A.push({n:2,ic:'triagem',c:'bad',t:'Leitura do Outlook com problema',s:msgErro(S.syncErr),ir:'triagem'})}
   if(podeAdmin()){const n=D.pedidos.filter(p=>!acessoDe(p.id)).length;if(n)A.push({n:2,ic:'usuarios',c:'wa',t:`${n} ${n>1?'pedidos':'pedido'} de acesso aguardando`,s:'Revise em Usuários e permissões',ir:'usuarios'});
    if(real()&&S.bkCarregado&&CFG.bkAuto!==false&&!D.backups.some(b=>b.id==='d-'+HJ)&&!S.bk)A.push({n:1,ic:'backup',c:'wa',t:'Backup de hoje ainda não foi feito',s:'Ele é criado em instantes, com o portal aberto',ir:'backup'})}
   return A.sort((a,b)=>b.n-a.n)}
@@ -112,11 +113,10 @@ function resumoDep(){
    return {d,pend:l.filter(e=>!e.recebido).length,atr:l.filter(entAtrasada).length,pont:rec.length?Math.round(rec.filter(e=>e.recebido<=e.prazo).length/rec.length*100):null,tot:l.length}}).sort((a,b)=>b.atr-a.atr||a.d.n.localeCompare(b.d.n))}
 function resumoTri(pid,t){
   const ms=mesesTri(t),ini=ms[0]+'-01',fim=fimTri(t);
-  const lp=D.ponto.filter(p=>p.pessoa===pid&&ms.includes(p.mes));
-  const sum=k=>lp.reduce((a,p)=>a+(+p[k]||0),0);
   const tt=D.tarefas.filter(x=>x.r===pid&&x.prazo&&x.prazo>=ini&&x.prazo<=fim&&(x.s==='feita'||x.prazo<HJ));
   const ok=tt.filter(x=>x.s==='feita'&&(!x.concluida||x.concluida<=x.prazo)).length;
-  return {extras:sum('extras'),falt:sum('faltantes'),atrasos:sum('atrasos'),faltas:sum('faltas'),meses:lp.length,prazosOk:ok,prazosTot:tt.length,pct:tt.length?Math.round(ok/tt.length*100):null}}
+  const rc=resumoCron(r=>rsDe(r).includes(pid),ini,fim),o2=ok+rc.ok,t2=tt.length+rc.prev;
+  return {prazosOk:o2,prazosTot:t2,pct:t2?Math.round(o2/t2*100):null}}
 
 /* ---------- feedbacks ---------- */
 const TIPOS_FB=['Mensal','Trimestral','Semanal','Avulso'];
@@ -136,8 +136,6 @@ const F={
   campos:[['t','Descrição','text','full'],['a','Área','select',AREAS],['r','Responsável','pessoa'],['prazo','Prazo','date'],['s','Status','select',[['aberta','A fazer'],['andamento','Em andamento'],['feita','Concluída']]]]},
  destaque:{col:'destaques',nome:'Destaque do mês',desc:'Conquistas, reconhecimentos e metas batidas que o diretor deve ver.',ic:'destaques',perm:'feedbacks',
   campos:[['t','Título','text','full'],['tipo','Tipo','select',['Conquista','Reconhecimento','Meta batida','Melhoria implantada']],['mes','Mês','month'],['pessoa','Colaborador','pessoa?'],['desc','Descrição','textarea','full']]},
- ponto:{col:'ponto',nome:'Ponto e horas do mês',desc:'Horas extras, horas faltantes, atrasos e faltas. Somam no fechamento do trimestre.',ic:'ponto',perm:'ponto',
-  campos:[['pessoa','Colaborador','pessoa'],['mes','Mês de referência','month'],['extras','Horas extras','number'],['faltantes','Horas faltantes','number'],['atrasos','Atrasos (ocorrências)','number'],['faltas','Faltas (dias)','number'],['obs','Observação','text?','full']]},
  evento:{col:'eventos',nome:'Prazo ou compromisso',desc:'Obrigações, reuniões e fechamentos que aparecem no calendário com alerta.',ic:'evento',
   campos:[['t','Descrição','text','full'],['tipo','Tipo','select',['Obrigação','Fechamento','Reunião','Outro']],['data','Data','date']]},
  pessoa:{col:'equipe',nome:'Colaborador',desc:'Cadastro da equipe, metas do trimestre e situação do feedback.',ic:'pessoa',perm:'cadastros',
@@ -160,14 +158,14 @@ const F={
 let FORM=null;
 function abrir(tipo,id){
   const f=F[tipo],col=D[f.col],doc=id?col.find(x=>x.id===id):null;
-  const def={mes:tipo==='destaque'?S.mesDest:MES_ATUAL,s:'aberta',f:'Pendente',r:dir()?'':S.perfil,resp:dir()?'':S.perfil,rec:'Mensal',cat:S.novaCat||'',pessoa:dir()?'':S.perfil,a:tipo==='sugestao'?(dir()?'':S.perfil):'',extras:0,faltantes:0,atrasos:0,faltas:0};
+  const def={mes:tipo==='destaque'?S.mesDest:MES_ATUAL,s:'aberta',f:'Pendente',r:dir()?'':S.perfil,resp:dir()?'':S.perfil,rec:'Mensal',cat:S.novaCat||'',pessoa:dir()?'':S.perfil,a:tipo==='sugestao'?(dir()?'':S.perfil):''};
   const v=doc||{};FORM={tipo,id,del:false};
   const campo=([k,l,tp,x])=>{
     const opt=tp.endsWith('?'),t=tp.replace('?',''),val=v[k]??(id?'':def[k]??''),full=x==='full'?'full':'';
     let inp;
     if(t==='select'){inp=`<select class="inp" id="f_${k}">${x.map?x.map(o=>{const [ov,ol]=Array.isArray(o)?o:[o,o];return `<option value="${esc(ov)}" ${ov==val?'selected':''}>${esc(ol)}</option>`}).join(''):''}</select>`}
     else if(t==='cat'){inp=`<select class="inp" id="f_${k}">${!val?'<option value="">Selecione</option>':''}${D.categorias.map(c=>`<option value="${esc(c.id)}" ${c.id===val?'selected':''}>${esc(c.n)}</option>`).join('')}</select>${D.categorias.length?'':'<p class="ferr" style="color:var(--ink-3)">Crie uma categoria primeiro.</p>'}`}
-    else if(t==='pessoa'){const ps=(dir()||pode('ver_tudo')||pode('ponto')||pode('feedbacks'))?colabs():D.equipe.filter(p=>p.id===S.perfil);inp=`<select class="inp" id="f_${k}">${opt||!val?'<option value="">'+(opt?'Nenhum':'Selecione')+'</option>':''}${ps.map(p=>`<option value="${esc(p.id)}" ${p.id===val?'selected':''}>${esc(p.n)}</option>`).join('')}</select>`}
+    else if(t==='pessoa'){const ps=(dir()||pode('ver_tudo')||pode('feedbacks'))?colabs():D.equipe.filter(p=>p.id===S.perfil);inp=`<select class="inp" id="f_${k}">${opt||!val?'<option value="">'+(opt?'Nenhum':'Selecione')+'</option>':''}${ps.map(p=>`<option value="${esc(p.id)}" ${p.id===val?'selected':''}>${esc(p.n)}</option>`).join('')}</select>`}
     else if(t==='dep'){inp=`<select class="inp" id="f_${k}">${!val?'<option value="">Selecione</option>':''}${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===val?'selected':''}>${esc(d.n)}</option>`).join('')}</select>${D.departamentos.length?'':'<p class="ferr" style="color:var(--ink-3)">Cadastre um departamento primeiro.</p>'}`}
     else if(t==='textarea')inp=`<textarea class="inp" id="f_${k}">${esc(val)}</textarea>`;
     else inp=`<input class="inp" id="f_${k}" type="${t==='number'?'number':t}" ${t==='number'?'min="0" step="0.5"':''} value="${esc(val)}">`;
@@ -179,7 +177,7 @@ function abrir(tipo,id){
   document.getElementById('fm').addEventListener('submit',e=>{e.preventDefault();enviar()});
   document.querySelectorAll('#fm .inp').forEach(el=>el.addEventListener('input',()=>{const e=document.getElementById('e_'+el.id.slice(2));if(e)e.textContent=''}));
   setTimeout(()=>document.querySelector('#fm .inp')?.focus(),30)}
-function fechar(){document.getElementById('ov').hidden=true;FORM=null}
+function fechar(){if(FORM&&FORM.gravou){const k=chaveSheet();if(k)limparRascunho(k)}document.getElementById('ov').hidden=true;FORM=null;if(history.state&&history.state.sheet){S.pulaPop=true;history.back()}}
 document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')fechar()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FORM)fechar()});
 
@@ -203,7 +201,6 @@ async function enviar(){
   if(FORM.tipo==='mensagem'&&!ant)data.s='aguarda';
   if(FORM.tipo==='sugestao'&&!ant)data.v=1;
   let id=FORM.id;
-  if(FORM.tipo==='ponto')id=`${data.pessoa}_${data.mes}`;
   if(await salvar(f.col,id,data,ant?'Alterações salvas':'Registrado'))fechar()}
 
 async function salvar(col,id,data,msg,lg){
@@ -217,7 +214,9 @@ async function excluir(){
   try{const c=F[FORM.tipo].col,x=D[c].find(y=>y.id===FORM.id);await DB.collection(c).doc(FORM.id).delete();log(`Excluiu ${NOMES[c]}: ${x?tituloDe(x):''}`);toast('Registro excluído');fechar()}catch(e){toast('Não foi possível excluir.')}}
 
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('show'),2200)}
-function ir(t){if(!sairEditorOk(()=>ir(t)))return;S.tela=t;S.fbForce=true;S.limpar=false;render();window.scrollTo({top:0})}
+function ir(t,semHist){if(!sairEditorOk(()=>ir(t,semHist)))return;S.scroll[S.tela]=window.scrollY;const mudou=t!==S.tela;S.tela=t;S.fbForce=true;S.limpar=false;S.bell=false;render();
+ if(!semHist&&mudou)try{history.pushState({tela:S.tela},'','#'+S.tela)}catch(e){}
+ window.scrollTo({top:S.scroll[S.tela]||0});salvarEstado()}
 const head=(eb,t,sub,right='')=>`<div class="top"><div><p class="eyebrow">${eb}</p><h1>${t}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>${right?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${right}</div>`:''}</div>`;
 const note=t=>`<p class="note">${ic('info')}<span>${t}</span></p>`;
 const novo=(tipo,txt)=>`<button class="btn pri" onclick="abrir('${tipo}')">${txt}</button>`;
@@ -225,15 +224,16 @@ const vazio=(t,d,tipo,b)=>`<div class="empty"><b>${t}</b>${d}${tipo?`<div style=
 const editar=(tipo,id)=>`<button class="btn ghost" onclick="abrir('${tipo}','${esc(id)}')" aria-label="Editar">Editar</button>`;
 const hojeTxt=()=>`${DIAS[HOJE.getDay()]}, ${HOJE.getDate()} de ${MESES[HOJE.getMonth()]}`;
 function linTar(x){const g=stTar(x);return `<div class="row"><div class="t"><b>${esc(x.t)}</b><span>${esc(x.a)} · ${esc(nomeDe(x.r))}</span></div><span class="meta">${fmt(x.prazo)}</span><button class="tag ${g[0]}" onclick="tg('${esc(x.id)}')" title="Avançar status">${g[1]}</button>${editar('tarefa',x.id)}</div>`}
-function triNav(){return `<div class="seg"><button onclick="mvTri(-1)" aria-label="Trimestre anterior">‹</button><span>${S.tri.q}º tri ${S.tri.ano} · pag. ${mesCurto(pagTri(S.tri))}</span><button onclick="mvTri(1)" aria-label="Próximo trimestre">›</button></div>`}
+function triNav(){return `<div class="seg"><button onclick="mvTri(-1)" aria-label="Trimestre anterior">‹</button><span>${S.tri.q}º trimestre de ${S.tri.ano}</span><button onclick="mvTri(1)" aria-label="Próximo trimestre">›</button></div>`}
 function mesNav(k){return `<div class="seg"><button onclick="mvMes('${k}',-1)" aria-label="Mês anterior">‹</button><span>${mesNome(S[k])}</span><button onclick="mvMes('${k}',1)" aria-label="Próximo mês">›</button></div>`}
 function mvTri(n){let {ano,q}=S.tri;q+=n;if(q>4){q=1;ano++}if(q<1){q=4;ano--}S.tri={ano,q};render()}
 function mvMes(k,n){S[k]=addMes(S[k],n);render()}
 function cardDest(d){return `<div class="hcard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tag ${d.tipo==='Reconhecimento'?'ac':d.tipo==='Meta batida'?'ok':d.tipo==='Melhoria implantada'?'wa':'ne'}">${esc(d.tipo)}</span>${pode('feedbacks')?editar('destaque',d.id):''}</div><b>${esc(d.t)}</b>${d.desc?`<p>${esc(d.desc)}</p>`:''}<span class="meta">${d.pessoa?esc(nomeDe(d.pessoa))+' · ':''}${mesCurto(d.mes)}</span></div>`}
 function tabelaTri(ps){
-  const L=ps.map(p=>[p,resumoTri(p.id,S.tri)]);
-  if(!L.length)return vazio('Nenhum colaborador cadastrado','Cadastre a equipe para acompanhar ponto e prazos.','pessoa','Cadastrar colaborador');
-  return `<div class="tbl-wrap"><table><thead><tr><th>Colaborador</th><th>Extras</th><th>Faltantes</th><th>Saldo</th><th>Atrasos</th><th>Faltas</th><th>Prazos no prazo</th><th>Meses lançados</th></tr></thead><tbody>${L.map(([p,r])=>{const s=r.extras-r.falt;return `<tr><td>${esc(p.n)}</td><td>${hrs(r.extras)}</td><td>${hrs(r.falt)}</td><td class="${s>0?'pos':s<0?'neg':''}">${s>0?'+':''}${hrs(s)}</td><td>${r.atrasos}</td><td>${r.faltas}</td><td>${r.pct===null?'—':`${r.pct}% <span class="meta">(${r.prazosOk}/${r.prazosTot})</span>`}</td><td><span class="tag ${r.meses===3?'ok':r.meses?'wa':'ne'}">${r.meses}/3</span></td></tr>`}).join('')}</tbody></table></div>`}
+  const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
+  const L=ps.map(p=>{const r=resumoTri(p.id,S.tri),dm=D.chamados.filter(c=>c.st==='Concluído'&&quemFez(c)===p.id&&(c.concl||'')>=ini&&(c.concl||'')<=fim),dp=dm.filter(c=>c.prazo),dok=dp.filter(c=>!(c.concl>c.prazo)).length;return [p,r,dm.length,dp.length?Math.round(dok/dp.length*100):null]});
+  if(!L.length)return vazio('Nenhum colaborador cadastrado','Cadastre a equipe para acompanhar os prazos.','pessoa','Cadastrar colaborador');
+  return `<div class="tbl-wrap"><table><thead><tr><th>Colaborador</th><th>Rotinas no prazo</th><th>Demandas concluídas</th><th>Demandas no prazo</th><th>Em aberto agora</th></tr></thead><tbody>${L.map(([p,r,dn,dpct])=>`<tr><td>${esc(p.n)}</td><td>${r.pct===null?'—':`${r.pct}% <span class="meta">(${r.prazosOk}/${r.prazosTot})</span>`}</td><td>${dn}</td><td>${dpct===null?'—':dpct+'%'}</td><td>${D.chamados.filter(c=>c.resp===p.id&&c.st!=='Concluído').length}</td></tr>`).join('')}</tbody></table></div>`}
 
 /* ---------- chamados (portal dos departamentos) ---------- */
 const solic=()=>S.perfil.startsWith('sol:');
@@ -244,7 +244,7 @@ function diasUteis(a,b){let n=0;const d=new Date(a+'T12:00'),f=new Date(b+'T12:0
 const stCh={'Aberto':'ac','Em análise':'wa','Pendência com solicitante':'bad','Programado':'ok','Concluído':'ne'};
 const CHK=['Documento (NF, recibo ou boleto) salvo no repositório oficial','Aprovado pelo gestor do departamento','Centro de custo e vencimento conferidos'];
 const CAMPOS_CH=[
- ['tipo','Tipo de chamado','tiposel',1],['dep','Departamento solicitante','depsel',1],['solicitante','Seu nome','text',1],['assunto','Assunto','text',1,'full'],
+ ['tipo','Tipo de chamado','tiposel',1],['dep','Departamento solicitante','depsel',1],['solicitante','Seu nome','text',1],['assunto','Resumo do pedido','text',1,'full'],
  ['favorecido','Fornecedor ou favorecido','text','pg'],['nf','Número da NF ou documento','text','pg'],['venc','Vencimento','date','pg'],['cc','Centro de custo','text','pg'],
  ['aprovador','Gestor que aprovou','text','pg'],['doc','Link do documento no repositório oficial','text','pg','full'],['desc','Descrição','textarea',1,'full']];
 function formCh(v={}){
@@ -279,20 +279,21 @@ async function enviarCh(id){
  const ant=id?D.chamados.find(c=>c.id===id):null;
  if(ant){const {id:_,...b}=ant;if(await salvar('chamados',id,{...b,...o,st:solic()?'Aberto':b.st,pend:solic()?'':b.pend},'Chamado atualizado',solic()?`Corrigiu e reenviou o chamado ${b.proto}`:`Editou o chamado ${b.proto}`))fechar();return}
  const proto='CH-'+String(Date.now()).slice(-6);
- if(await salvar('chamados',null,{...o,por:ME.uid||null,proto,st:'Aberto',aberto:HJ,abertoEm:new Date().toISOString(),resp:'',pend:''},`Chamado ${proto} aberto`,`Abriu o chamado ${proto} · ${o.tipo}${o.fora?' · fora do prazo':''}`)){S.forceAbrir=true;if(solic())S.tela='meus';fechar();render()}}
+ if(await salvar('chamados',null,{...o,por:ME.uid||null,proto,st:'Aberto',aberto:HJ,abertoEm:new Date().toISOString(),resp:'',pend:''},`Chamado ${proto} aberto`,`Abriu o chamado ${proto} · ${o.tipo}${o.fora?' · fora do prazo':''}`)){limparRascunho('tela:abrir:'+S.perfil);S.forceAbrir=true;if(solic())S.tela='meus';fechar();render()}}
 function abrirChSheet(id){const c=id?D.chamados.find(x=>x.id===id):null;FORM={tipo:'_ch'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${c?esc(c.proto):'Novo chamado'}</p><h2 id="sheet-title">${c?(solic()?'Corrigir e reenviar':'Editar chamado'):'Abrir chamado'}</h2>${c?.pend?`<div class="banner" style="background:var(--bad-bg);color:var(--bad);margin-top:8px"><span>Pendência: ${esc(c.pend)}</span></div>`:''}</div>${formCh(c||{})}
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="enviarCh(${c?`'${esc(c.id)}'`:''})">${c?'Salvar e reenviar':'Enviar chamado'}</button></div></div>`;
  document.getElementById('ov').hidden=false;prazoCh()}
-function detalheCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;FORM={tipo:'_det'};
+function detalheCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;FORM={tipo:'_det',id};
  const h=D.logs.filter(l=>(l.alvo||'').includes(c.proto)||(l.acao||'').includes(c.proto));
  const linha=(l,v)=>v?`<div class="row"><div class="t"><span>${l}</span><b>${esc(v)}</b></div></div>`:'';
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(c.st)}</span>${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}</div></div>
+ const sp=stPrazo(c),eq=!solic()&&pode('chamados'),le=pode('ler_email');
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(c.st)}${c.sub?' · '+esc(c.sub):''}</span>${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}</div></div>
  ${c.pend?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>Pendência: ${esc(c.pend)}</span></div>`:''}
- <div>${linha('Tipo',c.tipo)}${linha('Departamento',depNome(c.dep))}${linha('Solicitante',c.solicitante)}${linha('Fornecedor ou favorecido',c.favorecido)}${linha('NF ou documento',c.nf)}${linha('Vencimento',c.venc?fmt(c.venc)+'/'+c.venc.slice(0,4):'')}${linha('Centro de custo',c.cc)}${linha('Gestor que aprovou',c.aprovador)}${linha('Responsável no financeiro',c.resp?(c.resp==='dir'?'Diretor':nomeDe(c.resp)):'Ninguém assumiu ainda')}${linha('Descrição',c.desc)}
- ${c.emailLink?`<div class="row"><div class="t"><span>E-mail de origem</span></div><a class="btn" href="${esc(c.emailLink)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a></div>`:''}${c.doc&&/^https?:\/\//.test(c.doc)?`<div class="row"><div class="t"><span>Documento</span></div><a class="btn" href="${esc(c.doc)}" target="_blank" rel="noopener">Abrir documento</a></div>`:''}</div>
+ <div>${linha('Tipo',c.tipo)}${linha('Assunto',c.cat||c.subcat?catTxt(c):'Sem assunto')}${linha('Setor',c.dep?depNome(c.dep):'Não definido')}${linha(c.origem==='email'?'Remetente':'Solicitante',c.solicitante)}${linha('Chegou em',c.recebidoEm?fmtHora(c.recebidoEm)+'/'+c.recebidoEm.slice(0,4):fmtAno(c.aberto))}${linha('Fornecedor ou favorecido',c.favorecido)}${linha('NF ou documento',c.nf)}${linha('Vencimento do pagamento',c.venc?fmtAno(c.venc):'')}${linha('Centro de custo',c.cc)}${linha('Gestor que aprovou',c.aprovador)}${linha('Responsável no financeiro',c.resp?respNome(c.resp):'Ninguém aceitou ainda')}${linha('Prazo de entrega',c.prazo?fmtAno(c.prazo):'')}${linha('Aceita por',c.aceitoEm?`${c.aceitoNome||'—'} · ${fmtHora(c.aceitoEm)}`:'')}${linha('Realizada por',c.st==='Concluído'?`${quemFezNome(c)} · ${c.conclEm?fmtHora(c.conclEm):fmt(c.concl)}`:'')}${linha('Descrição',c.desc)}
+ ${c.origem==='email'&&le&&(c.msgId||c.emailLink)?`<div class="row"><div class="t"><span>E-mail de origem</span></div>${c.msgId?`<button class="btn" onclick="lerEmail('c:${esc(c.id)}')">Ler aqui</button>`:''}${c.emailLink?`<a class="btn ghost" href="${esc(c.emailLink)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}${c.doc&&/^https?:\/\//.test(c.doc)?`<div class="row"><div class="t"><span>Documento</span></div><a class="btn" href="${esc(c.doc)}" target="_blank" rel="noopener">Abrir documento</a></div>`:''}</div>
  <div><span class="lbl">Histórico</span>${h.length?h.map(l=>`<div class="row"><span class="meta" style="width:96px">${fmtHora(l.em)}</span><div class="t"><b style="font-weight:400">${esc(l.acao)}</b><span>${esc(quemLog(l))}</span></div></div>`).join(''):'<p class="meta">Sem registros.</p>'}</div>
- <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;
+ <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap">${eq&&c.st!=='Concluído'?`<button class="btn" onclick="aceitarSheet({ch:'${esc(c.id)}'})">${c.aceitoEm?'Prazo, assunto e responsável':'Aceitar'}</button>`:''}${eq&&c.st==='Concluído'?`<button class="btn" onclick="reabrirCh('${esc(c.id)}')">${S.reab===c.id?'Confirmar reabertura':'Reabrir'}</button>`:''}</div><button class="btn" onclick="fechar()">Fechar</button></div>`;
  document.getElementById('ov').hidden=false}
 function pendCh(id){const c=D.chamados.find(x=>x.id===id);FORM={tipo:'_pend'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)}</p><h2 id="sheet-title">Devolver com pendência</h2><p class="sub" style="font-size:13px">O solicitante recebe a notificação e corrige o chamado.</p></div>
@@ -301,21 +302,161 @@ function pendCh(id){const c=D.chamados.find(x=>x.id===id);FORM={tipo:'_pend'};
  document.getElementById('ov').hidden=false}
 async function salvaPend(id){const m=document.getElementById('p_mot').value.trim();if(!m){document.getElementById('pe_mot').textContent='Descreva o que precisa ser corrigido.';return}
  const c=D.chamados.find(x=>x.id===id);if(await patch('chamados',id,{st:'Pendência com solicitante',pend:m,devolucoes:(+c.devolucoes||0)+1},'Devolvido ao solicitante',`Devolveu o chamado ${c.proto} com pendência: ${m}`))fechar()}
-function assumir(id){const c=D.chamados.find(x=>x.id===id);patch('chamados',id,{resp:S.perfil,st:c.st==='Aberto'?'Em análise':c.st},'Chamado assumido',`Assumiu o chamado ${c.proto}`)}
-function avCh(id){const c=D.chamados.find(x=>x.id===id);const nx={'Aberto':'Em análise','Em análise':'Programado','Programado':'Concluído'}[c.st];const bl=nx==='Programado'&&bloqueioForn(c.favorecido);if(bl){toast(`Pagamento travado: a troca de dados bancários de ${bl.forn} ainda não foi aprovada.`);return}if(nx)patch('chamados',id,{st:nx,...(nx==='Programado'?{programadoEm:HJ}:{}),...(nx==='Concluído'?{concl:HJ,programadoEm:c.programadoEm||HJ}:{})},`Chamado ${nx.toLowerCase()}`,`Moveu o chamado ${c.proto} para ${nx}`)}
-function cardCh(c,interno){const du=c.venc?diasAte(c.venc):null;
- return `<div class="kcard"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':''}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(depNome(c.dep))}</span>${bloqueioForn(c.favorecido)&&!['Programado','Concluído'].includes(c.st)?'<span class="tag bad" style="font-size:10.5px;margin-top:4px;display:inline-block">Dados bancários em verificação</span>':''}${c.origem==='email'?'<span class="tag ac" style="font-size:10.5px;margin-top:4px;display:inline-block">Via e-mail · conferir dados</span>':''}${c.venc?`<span style="display:block;color:${du!==null&&du<=1&&c.st!=='Concluído'&&c.st!=='Programado'?'var(--bad)':'var(--ink-3)'}">Vence ${fmt(c.venc)}${du!==null&&du>=0&&c.st!=='Concluído'?` · ${du===0?'hoje':du===1?'amanhã':`em ${du} dias`}`:''}</span>`:''}
- ${c.resp?`<span style="display:block">Com: ${esc(c.resp==='dir'?'Diretor':nomeDe(c.resp))}</span>`:''}
- <div class="acts" style="flex-wrap:wrap;gap:4px"><button class="btn ghost" onclick="detalheCh('${esc(c.id)}')">Detalhes</button>${interno?`${!c.resp&&c.st!=='Concluído'?`<button class="btn" onclick="assumir('${esc(c.id)}')">Assumir</button>`:''}${['Aberto','Em análise'].includes(c.st)?`<button class="btn ghost" onclick="pendCh('${esc(c.id)}')">Pendência</button>`:''}${['Aberto','Em análise','Programado'].includes(c.st)?`<button class="btn" onclick="avCh('${esc(c.id)}')">Avançar ›</button>`:''}`:`${c.st==='Pendência com solicitante'?`<button class="btn pri" onclick="abrirChSheet('${esc(c.id)}')">Corrigir</button>`:''}`}</div></div>`}
+function avCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;const nx=proxEtapa(c);if(!nx)return;
+ const bl=nx==='Programado'&&bloqueioForn(c.favorecido);if(bl){toast(`Pagamento travado: a troca de dados bancários de ${bl.forn} ainda não foi aprovada.`);return}
+ const mud={st:nx,sub:''};if(nx==='Programado')mud.programadoEm=HJ;
+ if(nx==='Concluído')Object.assign(mud,{concl:HJ,conclEm:new Date().toISOString(),conclPor:S.perfil,conclUid:ME.uid||null,conclNome:euNome(),programadoEm:c.programadoEm||HJ},c.resp?{}:{resp:S.perfil});
+ const pz=nx==='Concluído'&&c.prazo?(HJ>c.prazo?' com atraso':' no prazo'):'';
+ patch('chamados',id,mud,nx==='Concluído'?`Concluído${pz}. Foi para Demandas realizadas.`:`Chamado ${nx.toLowerCase()}`,nx==='Concluído'?`Concluiu o chamado ${c.proto}${pz}`:`Moveu o chamado ${c.proto} para ${nx}`)}
+function cardCh(c,interno){const du=c.venc?diasAte(c.venc):null,sp=stPrazo(c),subs=subEtapas(c.st),nx=proxEtapa(c);
+ return `<div class="kcard${interno&&chAtrasado(c)?' late':''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':''}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(c.dep?depNome(c.dep):'Setor não definido')}</span>
+ <div class="ktags">${c.cat||c.subcat?`<span class="tag ac">${esc(catTxt(c))}</span>`:''}${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${bloqueioForn(c.favorecido)&&!['Programado','Concluído'].includes(c.st)?'<span class="tag bad">Dados bancários em verificação</span>':''}${c.origem==='email'?`<span class="tag ne">${c.aceitoEm?'Via e-mail':'Via e-mail · conferir'}</span>`:''}</div>
+ ${c.origem==='email'&&(c.solicitante||c.rem)?(interno&&c.rem?`<button class="lnk" style="display:block;font-size:12px" onclick="S.fRem='${esc(c.rem)}';render();window.scrollTo({top:0})" title="Ver tudo deste remetente">De: ${esc(remNomeCh(c))}</button>`:`<span style="display:block">De: ${esc(remNomeCh(c))}</span>`):''}
+ ${c.venc?`<span style="display:block;color:${du!==null&&du<=1&&c.st!=='Concluído'&&c.st!=='Programado'?'var(--bad)':'var(--ink-3)'}">Pagamento vence ${fmt(c.venc)}${du!==null&&du>=0&&c.st!=='Concluído'?` · ${du===0?'hoje':du===1?'amanhã':`em ${du} dias`}`:''}</span>`:''}
+ ${c.resp?`<span style="display:block">Com: ${esc(respNome(c.resp))}</span>`:''}
+ ${interno&&subs.length&&c.st!=='Concluído'?`<select class="inp mini" aria-label="Situação dentro da etapa" onchange="subCh('${esc(c.id)}',this.value)"><option value="">${esc(c.st)}</option>${subs.map(x=>`<option ${x===c.sub?'selected':''}>${esc(x)}</option>`).join('')}${c.sub&&!subs.includes(c.sub)?`<option selected>${esc(c.sub)}</option>`:''}</select>`:c.sub?`<span style="display:block">Situação: ${esc(c.sub)}</span>`:''}
+ <div class="acts" style="flex-wrap:wrap;gap:4px"><button class="btn ghost" onclick="detalheCh('${esc(c.id)}')">Detalhes</button>${interno?`${(!c.resp||!c.prazo)&&c.st!=='Concluído'?`<button class="btn pri" onclick="aceitarSheet({ch:'${esc(c.id)}'})">Aceitar</button>`:''}${['Aberto','Em análise'].includes(c.st)?`<button class="btn ghost" onclick="pendCh('${esc(c.id)}')">Pendência</button>`:''}${nx&&c.resp?`<button class="btn" onclick="avCh('${esc(c.id)}')">${nx==='Concluído'?'Concluir ✓':'Avançar ›'}</button>`:''}`:`${c.st==='Pendência com solicitante'?`<button class="btn pri" onclick="abrirChSheet('${esc(c.id)}')">Corrigir</button>`:''}`}</div></div>`}
 function regrasCh(){return `<div class="panel"><div class="ph"><h2>Antes de abrir um chamado de pagamento</h2></div>
  <div class="row"><div class="t"><b>Prazo mínimo de ${DMIN()} dias úteis antes do vencimento</b><span>Pedidos com prazo menor são aceitos, mas marcados como fora do prazo.</span></div></div>
  <div class="row"><div class="t"><b>Documento salvo no repositório oficial</b><span>Cole o link. Dados bancários e valores ficam no documento e no ERP, nunca no portal.</span></div></div>
  <div class="row"><div class="t"><b>Aprovação do gestor do seu departamento</b><span>Informe quem aprovou.</span></div></div></div>`}
 
+/* ---------- assuntos, prazos e demandas ---------- */
+const assDe=id=>id?D.assuntos.find(a=>a.id===id):null;
+const assNome=id=>assDe(id)?.n||'Sem assunto';
+const assLista=()=>[...D.assuntos].sort((a,b)=>(a.n||'').localeCompare(b.n||''));
+const subsDe=id=>(assDe(id)?.subs||[]).filter(Boolean);
+const catTxt=c=>`${assNome(c.cat)}${c.subcat?' › '+c.subcat:''}`;
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function assPorTexto(t){const nt=norm(t);let best='',bs=0;
+ for(const a of D.assuntos){const ks=[a.n,...String(a.palavras||'').split(/[,;]+/),...(a.subs||[])].map(x=>norm(x).trim()).filter(x=>x.length>1);let s=0;
+  for(const k of ks)if(new RegExp('(^|[^a-z0-9])'+reEsc(k)).test(nt))s++;
+  if(s>bs){bs=s;best=a.id}}
+ return best}
+const respsDe=aid=>aid?D.acessos.filter(a=>a.perfil==='equipe'&&a.ativo!==false&&(a.assuntos||[]).includes(aid)&&pessoa(a.pessoa)).map(a=>a.pessoa):[];
+function addUteis(iso,n){const d=new Date(iso+'T12:00');let k=0;while(k<n){d.setDate(d.getDate()+1);if(util(d))k++}return isoD(d)}
+const diasPadrao=aid=>{const a=assDe(aid);return a&&a.dias!==''&&a.dias!=null&&+a.dias>=0?Math.round(+a.dias):3};
+const prazoPadrao=aid=>addUteis(HJ,diasPadrao(aid));
+const respNome=r=>!r?'—':r==='dir'?'Diretor':nomeDe(r);
+const euNome=()=>dir()?((real()&&!S.sim&&ME.nome)||'Diretor'):nomeDe(S.perfil);
+const quemFez=c=>c.conclPor||c.resp||'';
+const quemFezNome=c=>c.conclNome||respNome(quemFez(c));
+const chAtrasado=c=>c.st!=='Concluído'&&c.prazo&&c.prazo<HJ;
+const fmtAno=iso=>iso?`${fmt(iso)}/${iso.slice(0,4)}`:'—';
+function stPrazo(c){if(!c.prazo)return null;
+ if(c.st==='Concluído'){const late=c.concl&&c.concl>c.prazo?Math.max(1,diasUteis(c.prazo,c.concl)):0;return late?['wa',`Concluída com ${late} ${late>1?'dias úteis':'dia útil'} de atraso`]:['ok','Concluída no prazo']}
+ const d=diasAte(c.prazo);if(d<0)return ['bad',`Atrasada há ${-d} ${d<-1?'dias':'dia'}`];if(d===0)return ['wa','Entrega hoje'];if(d===1)return ['wa','Entrega amanhã'];return ['ne',`Entrega até ${fmt(c.prazo)}`]}
+const subOpts=(cat,v)=>{const l=subsDe(cat);return `<option value="">${l.length?'Nenhuma':'Sem subcategorias'}</option>${l.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}${v&&!l.includes(v)?`<option selected>${esc(v)}</option>`:''}`};
+function dicaResp(cat){const r=respsDe(cat);return r.length?`Responsáveis por ${esc(assNome(cat))}: ${r.map(x=>esc(nomeDe(x))).join(', ')}`:cat?'Ninguém está marcado como responsável por esse assunto. Defina em Usuários e permissões.':''}
+
+/* editor de listas (subcategorias e subetapas): adiciona e exclui na hora */
+function chipsEd(k,ph){return `<div class="chipsed" id="ce_${k}">${chipsIn(k)}</div><div class="grp" style="margin-top:8px"><input class="inp" id="ci_${k}" data-nodraft="1" placeholder="${esc(ph)}" onkeydown="if(event.key==='Enter'){event.preventDefault();chipAdd('${k}')}"><button class="btn" type="button" onclick="chipAdd('${k}')">Adicionar</button></div>`}
+function chipsIn(k){const l=FORM.listas[k]||[];return l.length?l.map((x,i)=>`<span class="chip">${esc(x)}<button type="button" class="chipx" onclick="chipDel('${k}',${i})" aria-label="Excluir ${esc(x)}" title="Excluir">×</button></span>`).join(''):'<span class="meta">Nenhuma ainda.</span>'}
+function chipAdd(k){const el=document.getElementById('ci_'+k),v=(el.value||'').trim().slice(0,60);if(!v)return;const l=FORM.listas[k]=FORM.listas[k]||[];if(l.some(x=>norm(x)===norm(v))){toast('Esse item já existe.');return}l.push(v);el.value='';document.getElementById('ce_'+k).innerHTML=chipsIn(k);el.focus()}
+function chipDel(k,i){FORM.listas[k].splice(i,1);document.getElementById('ce_'+k).innerHTML=chipsIn(k)}
+
+/* gestão dos assuntos */
+function gerirAssuntos(){FORM={tipo:'_assuntos'};const L=assLista();
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Chamados e e-mails</p><h2 id="sheet-title">Assuntos</h2><p class="sub" style="font-size:13px">Separe as demandas por tema. Cada assunto pode ter subcategorias, palavras que ajudam a reconhecer os e-mails e um prazo padrão de entrega.</p></div>
+ <div>${L.length?L.map(a=>{const r=respsDe(a.id);return `<div class="row"><div class="t"><b>${esc(a.n)}</b><span>${a.subs?.length?esc(a.subs.join(' · ')):'Sem subcategorias'} · prazo padrão ${diasPadrao(a.id)} dias úteis${r.length?' · '+r.map(x=>esc(nomeDe(x))).join(', '):''}</span></div><span class="meta">${D.chamados.filter(c=>c.cat===a.id&&c.st!=='Concluído').length} em aberto</span><button class="btn" onclick="editAssunto('${esc(a.id)}')">Editar</button></div>`}).join(''):vazio('Nenhum assunto ainda','Crie assuntos como Pagamentos, Notas fiscais ou Folha para separar as demandas.')}</div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Fechar</button><button class="btn pri" onclick="editAssunto()">Novo assunto</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+function editAssunto(id){const a=(id&&assDe(id))||{};FORM={tipo:'_assunto',id:id||'',del:false,listas:{subs:[...(a.subs||[])]}};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Assuntos</p><h2 id="sheet-title">${id?'Editar assunto':'Novo assunto'}</h2></div>
+ <div class="fgrid"><div class="full"><label class="lbl" for="as_n">Nome do assunto</label><input class="inp" id="as_n" value="${esc(a.n||'')}" placeholder="Notas fiscais"><p class="ferr" id="ase_n"></p></div>
+ <div class="full"><span class="lbl">Subcategorias</span>${chipsEd('subs','Ex.: NF de serviço')}<p class="meta" style="margin:4px 0 0">Adicione ou exclua quando precisar. Chamados antigos guardam a subcategoria que tinham.</p></div>
+ <div class="full"><label class="lbl" for="as_pal">Palavras que identificam o assunto no e-mail · opcional</label><input class="inp" id="as_pal" value="${esc(a.palavras||'')}" placeholder="nota fiscal, nf, danfe, xml"><p class="meta" style="margin:4px 0 0">Separe por vírgula. O portal usa para sugerir o assunto quando um e-mail chega.</p></div>
+ <div><label class="lbl" for="as_dias">Prazo padrão (dias úteis)</label><input class="inp" id="as_dias" type="number" min="0" max="60" value="${id?diasPadrao(id):3}"><p class="ferr" id="ase_dias"></p></div></div>
+ <div class="foot"><div>${id?`<button class="btn danger" id="bdel" onclick="delAssunto()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="gerirAssuntos()">Voltar</button><button class="btn pri" onclick="salvaAssunto()">Salvar</button></div></div>`;
+ document.getElementById('ov').hidden=false;setTimeout(()=>document.getElementById('as_n')?.focus(),30)}
+async function salvaAssunto(){const n=val('as_n'),dias=val('as_dias');errEl('ase_n','');errEl('ase_dias','');
+ if(!n){errEl('ase_n','Dê um nome ao assunto.');return}
+ if(D.assuntos.some(a=>a.id!==FORM.id&&norm(a.n)===norm(n))){errEl('ase_n','Já existe um assunto com esse nome.');return}
+ if(dias!==''&&!(+dias>=0&&+dias<=60)){errEl('ase_dias','Use de 0 a 60.');return}
+ const ant=FORM.id?assDe(FORM.id):null,{id:_,...b}=ant||{};
+ if(await salvar('assuntos',FORM.id||null,{...b,n,palavras:val('as_pal'),dias:dias===''?3:Math.round(+dias),subs:FORM.listas.subs},FORM.id?'Assunto atualizado':'Assunto criado'))gerirAssuntos()}
+async function delAssunto(){const b=document.getElementById('bdel'),n=D.chamados.filter(c=>c.cat===FORM.id).length;
+ if(!FORM.del){FORM.del=true;b.textContent=n?`Confirmar: ${n} ${n>1?'chamados ficam':'chamado fica'} sem assunto`:'Confirmar exclusão';return}
+ const a=assDe(FORM.id);try{await DB.collection('assuntos').doc(FORM.id).delete();log(`Excluiu o assunto "${a?.n||''}"`);toast('Assunto excluído');gerirAssuntos()}catch(e){toast('Não foi possível excluir.')}}
+
+/* subetapas dentro das etapas dos chamados */
+const subEtapas=st=>((CFG.subEtapas||{})[st]||[]).filter(Boolean);
+function cfgEtapasCh(){const se=CFG.subEtapas||{};FORM={tipo:'_etapasch',listas:Object.fromEntries(ETAPAS.map((e,i)=>['e'+i,[...(se[e]||[])]]))};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Painel de chamados</p><h2 id="sheet-title">Subetapas</h2><p class="sub" style="font-size:13px">Divida cada etapa nas situações do dia a dia, como "Aguardando nota fiscal" dentro de Em análise. Adicione ou exclua quando precisar. No cartão do chamado aparece uma lista para escolher a situação.</p></div>
+ ${ETAPAS.map((e,i)=>`<div class="sbox"><span class="lbl">${esc(e)}</span>${chipsEd('e'+i,'Nova subetapa')}</div>`).join('')}
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaEtapasCh()">Salvar</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+async function salvaEtapasCh(){const o={};ETAPAS.forEach((e,i)=>{const l=FORM.listas['e'+i]||[];if(l.length)o[e]=l});
+ try{await DB.doc('config/estrutura').set({...CFG,subEtapas:o});log('Alterou as subetapas do painel de chamados');toast('Subetapas salvas');fechar()}
+ catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar as etapas.':'Não foi possível salvar.')}}
+function subCh(id,v){const c=D.chamados.find(x=>x.id===id);if(!c)return;patch('chamados',id,{sub:v},null,`Marcou o chamado ${c.proto} como "${v||c.st}"`)}
+
+/* aceitar demanda: assunto, prazo de entrega e responsável */
+function aceitarSheet(ref){const em=ref.email?D.emails.find(x=>x.id===ref.email):null,c=ref.ch?D.chamados.find(x=>x.id===ref.ch):null;if(!em&&!c)return;
+ const s=em?.sug||{},cat=c?(c.cat||''):(s.assunto&&assDe(s.assunto)?s.assunto:''),tipo=c?.tipo||s.tipo||'Outros',resp=c?.resp||respsDe(cat)[0]||(dir()?'':S.perfil),prazo=c?.prazo||prazoPadrao(cat),ja=!!c?.aceitoEm;
+ FORM={tipo:'_aceitar',ref:em?'e:'+em.id:'c:'+c.id,email:em?.id||'',ch:c?.id||'',prazoMexido:!!c?.prazo};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${em?'E-mail de '+esc(depNome(em.dep)):esc(c.proto)+' · '+esc(depNome(c.dep))}</p><h2 id="sheet-title">${ja?'Prazo, assunto e responsável':'Aceitar demanda'}</h2><p class="sub" style="font-size:13px">${ja?'Ajuste o que mudou. Fica registrado quem alterou.':'A demanda entra no painel de chamados com prazo e responsável. O atraso passa a contar a partir do prazo que você definir.'}</p></div>
+ ${em?`<div class="trecho"><b style="font-weight:500">${esc(em.assunto)}</b><br>${esc(em.deNome||em.de)} · recebido ${fmtHora(em.recebido)}${em.trecho?'<br>'+esc(em.trecho):''}${em.msgId&&pode('ler_email')?`<br><button class="lnk" type="button" onclick="lerEmail('e:${esc(em.id)}')">Ler o e-mail completo</button>`:''}</div>`:''}
+ <div class="fgrid">
+  <div class="full"><label class="lbl" for="ac_tit">Resumo da demanda</label><input class="inp" id="ac_tit" value="${esc(c?.assunto||em?.assunto||'')}"><p class="ferr" id="ace_tit"></p></div>
+  ${em?`<div class="full"><label class="lbl" for="ac_dep">Setor de quem enviou</label><select class="inp" id="ac_dep"><option value="">Não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===em.dep?'selected':''}>${esc(d.n)}</option>`).join('')}</select><p class="meta" style="margin:4px 0 0">Vale também para os próximos e-mails de ${esc(em.deNome||em.de)}.</p></div>`:''}
+  <div><label class="lbl" for="ac_cat">Assunto</label><select class="inp" id="ac_cat" onchange="acCat()"><option value="">Sem assunto</option>${assLista().map(a=>`<option value="${esc(a.id)}" ${a.id===cat?'selected':''}>${esc(a.n)}</option>`).join('')}</select>${!D.assuntos.length&&pode('cadastros')?'<p class="meta" style="margin:4px 0 0">Crie assuntos em Chamados › Assuntos.</p>':''}</div>
+  <div><label class="lbl" for="ac_sub">Subcategoria</label><select class="inp" id="ac_sub">${subOpts(cat,c?.subcat||'')}</select></div>
+  <div><label class="lbl" for="ac_tipo">Tipo</label><select class="inp" id="ac_tipo">${TIPOS_CH.map(t=>`<option ${t===tipo?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div><label class="lbl" for="ac_prazo">Prazo de entrega</label><input class="inp" id="ac_prazo" type="date" value="${esc(prazo)}" oninput="FORM.prazoMexido=true"><p class="ferr" id="ace_prazo"></p></div>
+  <div class="full"><label class="lbl" for="ac_resp">Responsável</label><select class="inp" id="ac_resp"><option value="">Selecione</option><option value="dir" ${resp==='dir'?'selected':''}>Diretor</option>${colabs().map(p=>`<option value="${esc(p.id)}" ${p.id===resp?'selected':''}>${esc(p.n)}</option>`).join('')}</select><p class="ferr" id="ace_resp"></p><p class="meta" id="ac_dica" style="margin:4px 0 0">${dicaResp(cat)}</p></div>
+ </div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaAceite()">${ja?'Salvar':'Aceitar demanda'}</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+function acCat(){const cat=val('ac_cat'),sub=document.getElementById('ac_sub'),rs=document.getElementById('ac_resp');sub.innerHTML=subOpts(cat,'');
+ if(!FORM.prazoMexido)document.getElementById('ac_prazo').value=prazoPadrao(cat);
+ const r=respsDe(cat);if(r.length&&!r.includes(rs.value))rs.value=r[0];document.getElementById('ac_dica').innerHTML=dicaResp(cat)}
+async function salvaAceite(){const tit=val('ac_tit'),prazo=val('ac_prazo'),resp=val('ac_resp');['tit','prazo','resp'].forEach(k=>errEl('ace_'+k,''));let ok=true;
+ if(!tit){errEl('ace_tit','Descreva a demanda.');ok=false}
+ if(!prazo){errEl('ace_prazo','Defina o prazo de entrega.');ok=false}
+ if(!resp){errEl('ace_resp','Escolha o responsável.');ok=false}
+ if(!ok||S.triando)return;
+ const campos={assunto:tit.slice(0,200),cat:val('ac_cat'),subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
+ const aceite={aceito:HJ,aceitoEm:new Date().toISOString(),aceitoPor:S.perfil,aceitoUid:ME.uid||null,aceitoNome:euNome()};
+ const desc=`prazo ${fmt(prazo)} · ${respNome(resp)}${campos.cat?' · '+catTxt(campos):''}`;
+ if(FORM.email){const em=D.emails.find(x=>x.id===FORM.email);if(!em)return;S.triando=true;
+  try{const r=await aplicar(em,{acao:'chamado',tipo:campos.tipo},false,{...campos,...aceite,st:'Em análise',conferir:false},p=>`Aceitou a demanda ${p} de ${depNome(em.dep)} · ${desc}`);
+   if(r&&r!=='erro'){await patch('emails',em.id,{st:'aplicado',res:r,triadoPor:ME.uid||null,triadoEm:new Date().toISOString()},null,false);
+    const rid=remDoEmail(em),rm=D.remetentes.find(x=>x.id===rid);if(campos.dep&&(!rm||rm.dep!==campos.dep))await setRem(rid,{dep:campos.dep});
+    fechar()}}
+  finally{S.triando=false}return}
+ const c=D.chamados.find(x=>x.id===FORM.ch);if(!c)return;const novo=!c.aceitoEm;
+ if(await patch('chamados',c.id,{...campos,...(novo?aceite:{}),st:c.st==='Aberto'?'Em análise':c.st},novo?'Demanda aceita':'Demanda atualizada',`${novo?'Aceitou':'Alterou'} a demanda ${c.proto} · ${desc}`))fechar()}
+
+/* ler o e-mail dentro do portal (texto puro, nada é guardado no banco) */
+async function lerEmail(ref){if(!pode('ler_email')){toast('Só quem tem a permissão Abrir e-mails no portal pode ler o e-mail completo.');return}const k=ref.slice(0,1),id=ref.slice(2),em=k==='e'?D.emails.find(x=>x.id===id):null,c=k==='c'?D.chamados.find(x=>x.id===id):null;
+ const msgId=em?.msgId||c?.msgId,caixa=(em?em.caixa:c?.caixa)||'',link=em?.link||c?.emailLink||'';const volta=FORM&&FORM.tipo==='_aceitar'?FORM.ref:'';
+ FORM={tipo:'_ler'};const sh=document.getElementById('sheet');
+ const topo=t=>`<div><p class="eyebrow">E-mail${em?' · '+esc(depNome(em.dep)):c?' · '+esc(c.proto):''}</p><h2 id="sheet-title">${esc(t)}</h2></div>`;
+ const pe=`<div class="foot"><div>${link?`<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div><div style="display:flex;gap:8px">${volta?`<button class="btn" onclick="aceitarSheet({${volta.startsWith('e:')?'email':'ch'}:'${esc(volta.slice(2))}'})">Voltar</button>`:`<button class="btn" onclick="fechar()">Fechar</button>`}${em&&em.st==='triagem'&&pode('chamados')&&!volta?`<button class="btn pri" onclick="aceitarSheet({email:'${esc(em.id)}'})">Aceitar como demanda</button>`:''}</div></div>`;
+ const aviso=t=>`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>${esc(t)}</span></div>`;
+ const tit=em?.assunto||c?.assunto||'';
+ document.getElementById('ov').hidden=false;
+ if(!msgId){sh.innerHTML=topo(tit)+aviso('Este e-mail foi registrado antes da leitura dentro do portal. Use Abrir no Outlook.')+pe;return}
+ if(!MCP){sh.innerHTML=topo(tit)+aviso(msgErro({code:'sem_mcp'}))+pe;return}
+ sh.innerHTML=topo(tit)+'<p class="meta">Abrindo o e-mail…</p>'+pe;
+ try{const r=await MCP.callTool(SRV,'outlook_get_message',{id:msgId,...(caixa?{mailboxOwnerEmail:caixa}:{})},{cache:false});const m=r?.payload||r?.structuredContent||{};
+  if(FORM?.tipo!=='_ler')return;
+  const corpo=String(m.body||'').replace(/\r\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim().slice(0,30000);
+  const lin=(l,v)=>v?`<div class="row"><div class="t"><span>${l}</span><b style="font-weight:400">${esc(v)}</b></div></div>`:'';
+  const kb=n=>n?` (${Math.max(1,Math.round(n/1024))} KB)`:'';
+  sh.innerHTML=topo(m.subject||'(sem assunto)')+`<div>${lin('De',(m.senderName?m.senderName+' · ':'')+(m.sender||''))}${lin('Para',(m.to||[]).join(', '))}${lin('Cópia',(m.cc||[]).join(', '))}${lin('Recebido em',m.receivedDateTime?fmtHora(m.receivedDateTime)+'/'+m.receivedDateTime.slice(0,4):'')}${(m.attachments||[]).length?lin('Anexos · abra no Outlook para baixar',m.attachments.map(a=>a.name+kb(a.size)).join(', ')):''}</div>
+  <div class="mailbody">${corpo?esc(corpo):'<span class="meta">E-mail sem texto.</span>'}</div>`+pe}
+ catch(e){if(FORM?.tipo!=='_ler')return;sh.innerHTML=topo(tit)+aviso(e?.code==='not_found'?'Esse e-mail não está na sua caixa. Ele pode estar na caixa de outra pessoa ou ter sido apagado. Tente Abrir no Outlook.':msgErro(e))+pe}}
+
+function reabrirCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;if(S.reab!==id){S.reab=id;detalheCh(id);return}S.reab=null;
+ patch('chamados',id,{st:'Em análise',sub:'',concl:'',conclEm:'',conclPor:'',conclUid:null,conclNome:''},'Chamado reaberto',`Reabriu o chamado ${c.proto}`).then(()=>detalheCh(id))}
+function proxEtapa(c){return c.st==='Aberto'?'Em análise':c.st==='Em análise'?(PAGTO(c.tipo)?'Programado':'Concluído'):c.st==='Programado'?'Concluído':null}
+
 /* ---------- logs e notificações ---------- */
 const fmtHora=s=>s?`${s.slice(8,10)}/${s.slice(5,7)} ${new Date(s).toTimeString().slice(0,5)}`:'';
 function log(acao,extra){if(!DB)return;DB.collection('logs').add({em:new Date().toISOString(),quem:quemSou(),perfil:S.perfil,uid:ME.uid||null,sim:!!(real()&&S.sim),acao,...(extra||{})}).catch(()=>{})}
-const NOMES={verificacoes:'troca de dados bancários',etapas:'etapa do fechamento',fechamentos:'fechamento',feedbacks:'feedback',observacoes:'observação',modelos:'modelo de e-mail',frases:'frase sugerida',acessos:'acesso',pedidos:'pedido de acesso',emails:'e-mail',categorias:'categoria',ferramentas:'ferramenta',equipe:'colaborador',tarefas:'rotina',mensagens:'mensagem',chamados:'chamado',sugestoes:'sugestão',destaques:'destaque',ponto:'lançamento de horas',eventos:'prazo',procedimentos:'procedimento',departamentos:'departamento',entregas:'entrega'};
+const NOMES={cronograma:'rotina do cronograma',execucoes:'marcação do cronograma',remetentes:'remetente',assuntos:'assunto',verificacoes:'troca de dados bancários',etapas:'etapa do fechamento',fechamentos:'fechamento',feedbacks:'feedback',observacoes:'observação',modelos:'modelo de e-mail',frases:'frase sugerida',acessos:'acesso',pedidos:'pedido de acesso',emails:'e-mail',categorias:'categoria',ferramentas:'ferramenta',equipe:'colaborador',tarefas:'rotina',mensagens:'mensagem',chamados:'chamado',sugestoes:'sugestão',destaques:'destaque',ponto:'lançamento de horas',eventos:'prazo',procedimentos:'procedimento',departamentos:'departamento',entregas:'entrega'};
 const tituloDe=d=>d.t||d.item||d.n||d.assunto||(d.pessoa&&d.mes?`${nomeDe(d.pessoa)} · ${mesCurto(d.mes)}`:'')||(d.txt||'').slice(0,40);
 function notifs(){
  const ms=solic()?D.chamados.filter(c=>c.dep===solDep()).map(c=>c.proto):[];
@@ -324,7 +465,7 @@ function notifs(){
 function lido(){if(S.prefs?.lido&&!S.sim)return S.prefs.lido;try{return localStorage.getItem('lido_'+(ME.uid||'')+S.perfil)||''}catch(e){return S['lido_'+S.perfil]||''}}
 function marcarLido(){const v=new Date().toISOString();try{localStorage.setItem('lido_'+(ME.uid||'')+S.perfil,v)}catch(e){S['lido_'+S.perfil]=v}if(DB&&ME.uid&&!S.sim){S.prefs={...(S.prefs||{}),lido:v};DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs).catch(()=>{})}}
 function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs(),lv=lido(),novos=N.filter(n=>n.em>lv).length+A.length;
- return `<div class="tb"><span class="meta">${esc(quemSou())}</span><div style="position:relative"><button class="btn bell" id="bellbtn" onclick="tgBell()" aria-label="Notificações" aria-expanded="${!!S.bell}">${ic('alertas').replace('aria-hidden','style="width:18px;height:18px" aria-hidden')}${novos?`<span class="dot">${novos}</span>`:''}</button>
+ return `<div class="tb"><span class="meta">${esc(quemSou())}</span>${temaBox()}<div style="position:relative"><button class="btn bell" id="bellbtn" onclick="tgBell()" aria-label="Notificações" aria-expanded="${!!S.bell}">${ic('alertas').replace('aria-hidden','style="width:18px;height:18px" aria-hidden')}${novos?`<span class="dot">${novos}</span>`:''}</button>
  ${S.bell?`<div class="pop" role="dialog" aria-label="Notificações"><div class="ph" style="padding:12px 14px 4px"><h2>Notificações</h2><button class="btn ghost" onclick="ir('alertas')">Ver tudo</button></div>
  ${A.map(a=>`<button class="pi" onclick="ir('${a.ir}')"><span class="tag bad" style="flex:none">Alerta</span><span><b>${esc(a.t)}</b><small>${esc(a.s)}</small></span></button>`).join('')}
  ${N.map(n=>`<button class="pi ${n.em>lv?'new':''}" onclick="${/CH-\d+/.test(n.acao)?`abrirLogCh('${(n.acao.match(/CH-\d+/)||[''])[0]}')`:`ir('${pode('logs')?'logs':'alertas'}')`}"><span class="meta" style="flex:none;width:72px">${fmtHora(n.em)}</span><span><b style="font-weight:400">${esc(n.acao)}</b><small>${esc(quemLog(n))}</small></span></button>`).join('')}
@@ -340,8 +481,8 @@ const PERMS=[
  ['ver_tudo','Ver o departamento inteiro','Painel geral, rotinas e entregas de todos'],
  ['chamados','Atender chamados','Assumir, devolver e avançar chamados de outros departamentos'],
  ['entregas','Gerenciar entregas','Cadastrar, receber e cobrar entregas dos departamentos'],
- ['email','E-mails recebidos','Ler o Outlook e fazer a triagem dos e-mails dos departamentos'],
- ['ponto','Ponto e horas de todos','Lançar e ver horas extras, faltantes e faltas da equipe'],
+ ['email','E-mails recebidos','Ler o Outlook e fazer a triagem dos e-mails recebidos'],
+ ['ler_email','Abrir e-mails no portal','Ler o e-mail completo dentro do sistema e abrir no Outlook. Quem não tem vê só o resumo, o assunto e a categoria'],
  ['feedbacks','Feedbacks e destaques','Ver e registrar feedbacks e destaques da equipe'],
  ['whats','WhatsApp da diretoria','Criar e aprovar mensagens'],
  ['cadastros','Cadastros','Departamentos, colaboradores e procedimentos'],
@@ -349,7 +490,8 @@ const PERMS=[
  ['relat','Relatórios','Ver os relatórios do departamento'],
  ['logs','Registro de atividades','Ver quem fez o quê e quando'],
  ['antifraude','Troca de dados bancários','Registrar, conferir e aprovar trocas de conta de fornecedor'],
- ['fechamento','Fechamento D+N','Ver o fechamento e concluir as próprias etapas']];
+ ['fechamento','Fechamento D+N','Ver o fechamento e concluir as próprias etapas'],
+ ['realizadas','Demandas realizadas','Ver o histórico de demandas concluídas, prazos e quem realizou cada uma']];
 const PADRAO={chamados:true,entregas:true,ferramentas:true,antifraude:true,fechamento:true};
 const PAPEIS={diretor:'Diretor',admin:'Administrador do portal',equipe:'Equipe do financeiro',solicitante:'Solicitante de outro departamento'};
 const real=()=>S.modo==='real';
@@ -400,15 +542,16 @@ function editAcesso(uid){const a=acessoDe(uid),p=D.pedidos.find(x=>x.id===uid),v
  ${p&&!a?`<div class="banner"><span>Pediu para entrar como ${esc(PAPEIS[p.perfil]||'')}${p.dep?' · '+esc(depNome(p.dep)):''}${p.obs?'. Observação: '+esc(p.obs):''}</span></div>`:''}
  <div class="fgrid">
   <div class="full"><label class="lbl" for="a_perfil">Perfil</label><select class="inp" id="a_perfil" onchange="perfilCh()">${Object.entries(PAPEIS).map(([k,l])=>`<option value="${k}" ${v.perfil===k?'selected':''}>${l}</option>`).join('')}</select></div>
-  <div class="full" id="a_pbox"><label class="lbl" for="a_pessoa">Colaborador vinculado</label><select class="inp" id="a_pessoa"><option value="">Selecione</option>${D.equipe.map(x=>`<option value="${esc(x.id)}" ${v.pessoa===x.id?'selected':''}>${esc(x.n)} · ${esc(x.c)}</option>`).join('')}</select><p class="ferr" id="ae_pessoa"></p><p class="meta" style="margin:4px 0 0">Liga o login ao cartão da pessoa: rotinas, horas e feedback.</p></div>
+  <div class="full" id="a_pbox"><label class="lbl" for="a_pessoa">Colaborador vinculado</label><select class="inp" id="a_pessoa"><option value="">Selecione</option>${D.equipe.map(x=>`<option value="${esc(x.id)}" ${v.pessoa===x.id?'selected':''}>${esc(x.n)} · ${esc(x.c)}</option>`).join('')}</select><p class="ferr" id="ae_pessoa"></p><p class="meta" style="margin:4px 0 0">Liga o login ao cartão da pessoa: rotinas, demandas e feedback.</p></div>
   <div class="full" id="a_dbox"><label class="lbl" for="a_dep">Departamento</label><select class="inp" id="a_dep"><option value="">Selecione</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${v.dep===d.id?'selected':''}>${esc(d.n)}</option>`).join('')}</select><p class="ferr" id="ae_dep"></p></div>
+  <div class="full" id="a_rbox"><label class="lbl" for="a_funcao">Função no departamento · opcional</label><input class="inp" id="a_funcao" value="${esc(v.funcao||'')}" placeholder="Analista de contas a pagar"><span class="lbl" style="margin-top:12px">Responsável pelos assuntos</span>${D.assuntos.length?`<div class="perms">${assLista().map(x=>`<label class="perm"><input type="checkbox" id="a_as_${esc(x.id)}" ${(v.assuntos||[]).includes(x.id)?'checked':''}><span><b>${esc(x.n)}</b>${x.subs?.length?`<small>${esc(x.subs.join(', '))}</small>`:''}</span></label>`).join('')}</div>`:'<p class="meta">Nenhum assunto cadastrado ainda. Crie em Chamados › Assuntos.</p>'}<p class="meta" style="margin:4px 0 0">Ao aceitar uma demanda desses assuntos, o portal já sugere esta pessoa como responsável.</p></div>
   <div class="full" id="a_permbox"><span class="lbl">Permissões</span><div class="perms">${PERMS.map(([k,l,d])=>`<label class="perm"><input type="checkbox" id="a_p_${k}" ${pm[k]?'checked':''}><span><b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
   <label class="perm full"><input type="checkbox" id="a_ativo" ${v.ativo!==false?'checked':''}><span><b>Acesso ativo</b><small>Desmarque para bloquear sem apagar o histórico.</small></span></label>
  </div>
  <div class="foot"><div>${a?`<button class="btn danger" id="bdel" onclick="removerAcesso()">Remover acesso</button>`:p?`<button class="btn danger" onclick="recusar('${esc(uid)}')">Recusar pedido</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaAcesso()">${a?'Salvar':'Liberar acesso'}</button></div></div>`;
  document.getElementById('sheet-title').textContent=nomeU(uid);
  document.getElementById('ov').hidden=false;perfilCh()}
-function perfilCh(){const p=val('a_perfil');document.getElementById('a_pbox').hidden=p!=='equipe';document.getElementById('a_permbox').hidden=p!=='equipe';document.getElementById('a_dbox').hidden=p!=='solicitante'}
+function perfilCh(){const p=val('a_perfil');document.getElementById('a_pbox').hidden=p!=='equipe';document.getElementById('a_permbox').hidden=p!=='equipe';document.getElementById('a_rbox').hidden=p!=='equipe';document.getElementById('a_dbox').hidden=p!=='solicitante'}
 async function salvaAcesso(){const uid=FORM.uid,perfil=val('a_perfil'),pe=val('a_pessoa'),dp=val('a_dep');errEl('ae_pessoa','');errEl('ae_dep','');
  if(perfil==='equipe'&&!pe){errEl('ae_pessoa','Escolha o colaborador. Se ele não existe, cadastre em Equipe e feedbacks.');return}
  if(perfil==='solicitante'&&!dp){errEl('ae_dep','Escolha o departamento.');return}
@@ -417,7 +560,8 @@ async function salvaAcesso(){const uid=FORM.uid,perfil=val('a_perfil'),pe=val('a
  const ativo=document.getElementById('a_ativo').checked;
  if(!DB){toast('O armazenamento não está disponível nesta visualização.');return}
  const desc=perfil==='equipe'?`equipe, vinculado a ${nomeDe(pe)} (${Object.values(perms).filter(Boolean).length} permissões)`:perfil==='solicitante'?`solicitante de ${depNome(dp)}`:PAPEIS[perfil].toLowerCase();
- try{const ja=!!acessoDe(uid);await DB.doc('acessos/'+uid).set({perfil,pessoa:perfil==='equipe'?pe:'',dep:perfil==='solicitante'?dp:'',perms,ativo,por:ME.uid||null,em:new Date().toISOString()});
+ try{const ja=!!acessoDe(uid);const assuntos=perfil==='equipe'?D.assuntos.filter(x=>document.getElementById('a_as_'+x.id)?.checked).map(x=>x.id):[];
+  await DB.doc('acessos/'+uid).set({perfil,pessoa:perfil==='equipe'?pe:'',dep:perfil==='solicitante'?dp:'',perms,ativo,funcao:perfil==='equipe'?val('a_funcao'):'',assuntos,por:ME.uid||null,em:new Date().toISOString()});
   if(D.pedidos.some(x=>x.id===uid))await DB.doc('pedidos/'+uid).delete().catch(()=>{});
   log(`${ja?'Alterou o acesso':'Liberou acesso'} de uma pessoa como ${desc}${ativo?'':' (bloqueado)'}`,{alvo:uid});toast(ja?'Acesso atualizado':'Acesso liberado');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar acessos.':'Não foi possível salvar.')}}
@@ -427,7 +571,7 @@ async function recusar(uid){try{await DB.doc('pedidos/'+uid).delete();log('Recus
 function matriz(){const pd={...PADRAO};const ck=v=>v?'<span class="pos">Sim</span>':'<span class="meta">—</span>';
  return `<div class="tbl-wrap"><table><thead><tr><th>Permissão</th><th>Diretor e administrador</th><th>Equipe (padrão)</th><th>Solicitante</th></tr></thead><tbody>
  <tr><td>Abrir e acompanhar chamados do próprio departamento</td><td>${ck(1)}</td><td>${ck(1)}</td><td>${ck(1)}</td></tr>
- <tr><td>Ver e atualizar as próprias rotinas, entregas e horas</td><td>${ck(1)}</td><td>${ck(1)}</td><td>${ck(0)}</td></tr>
+ <tr><td>Ver e atualizar as próprias rotinas, entregas e demandas</td><td>${ck(1)}</td><td>${ck(1)}</td><td>${ck(0)}</td></tr>
  ${PERMS.map(([k,l])=>`<tr><td>${l}</td><td>${ck(1)}</td><td>${ck(pd[k])}</td><td>${ck(0)}</td></tr>`).join('')}
  <tr><td>Usuários e permissões</td><td>${ck(1)}</td><td>${ck(0)}</td><td>${ck(0)}</td></tr></tbody></table></div>`}
 
@@ -462,19 +606,48 @@ function classificar(m,dep){
  if(tipo)return {acao:'chamado',tipo,conf:'media'};
  if(cands.length===1)return {acao:'entrega',ref:cands[0].id,conf:'baixa'};
  return {acao:'nenhuma',conf:'baixa'}}
-async function aplicar(em,c,auto){
+async function aplicar(em,c,auto,extra,lg){
  const dn=depNome(em.dep),dia=(em.recebido||new Date().toISOString()).slice(0,10);
  if(c.acao==='entrega'){const e=D.entregas.find(x=>x.id===c.ref);if(!e)return 'erro';
   const ok=await receber(e.id,dia,`${auto?'O e-mail registrou automaticamente':'Confirmou pelo e-mail'} a entrega "${e.item}" de ${dn}${e.prazo&&dia>e.prazo?' (com atraso)':''}`);return ok?'entrega:'+e.id:'erro'}
  if(c.acao==='chamado'){const proto='CH-'+String(Date.now()).slice(-6);
-  const ok=await salvar('chamados',null,{tipo:c.tipo||'Solicitação de pagamento',dep:em.dep,solicitante:em.deNome||em.de,assunto:em.assunto,desc:`Recebido por e-mail de ${em.de} em ${fmtHora(em.recebido)}. ${em.trecho||''}`.trim(),favorecido:'',nf:'',venc:'',cc:'',aprovador:'',doc:'',chk:[],fora:false,proto,st:'Aberto',aberto:dia,abertoEm:new Date().toISOString(),resp:'',pend:'',origem:'email',conferir:true,emailLink:em.link||''},auto?null:`Chamado ${proto} criado`,`${auto?'O e-mail abriu automaticamente':'Criou a partir de e-mail'} o chamado ${proto} · ${dn}`);
+  const ok=await salvar('chamados',null,{tipo:c.tipo||'Solicitação de pagamento',dep:em.dep,solicitante:em.deNome||em.de,assunto:em.assunto,desc:`Recebido por e-mail de ${em.de} em ${fmtHora(em.recebido)}. ${em.trecho||''}`.trim(),favorecido:'',nf:'',venc:'',cc:'',aprovador:'',doc:'',chk:[],fora:false,proto,st:'Aberto',aberto:dia,abertoEm:new Date().toISOString(),resp:'',pend:'',origem:'email',conferir:true,emailLink:em.link||'',cat:em.sug?.assunto||'',msgId:em.msgId||'',caixa:em.caixa||'',recebidoEm:em.recebido||'',rem:em.rem||(em.de?remId(em.de):''),...(extra||{})},auto?null:extra?`Demanda ${proto} aceita`:`Chamado ${proto} criado`,lg?lg(proto):`${auto?'O e-mail abriu automaticamente':'Criou a partir de e-mail'} o chamado ${proto} · ${dn}`);
   return ok?'chamado:'+proto:'erro'}
  return ''}
-async function processar(m,d){
+/* remetentes: todo e-mail da mesma pessoa fica no mesmo grupo, com o setor que vocês definirem */
+const remId=addr=>'r'+hashId('rem:'+norm(addr)).slice(1);
+const remDe=addr=>D.remetentes.find(r=>r.id===remId(addr));
+const remDoEmail=e=>e.rem||remId(e.de);
+const remCh=c=>c.rem||'';
+const remNomeCh=c=>{const r=D.remetentes.find(x=>x.id===c.rem);return r?.nome||r?.email||c.solicitante||'Sem nome'};
+const depPorEmail=addr=>D.departamentos.find(d=>listaEmails(d).some(x=>addr===x||(x.startsWith('@')&&addr.endsWith(x))));
+const lerTodos=()=>CFG.emailTodos!==false;
+const lerEnviados=()=>lerTodos()&&CFG.emailEnviados!==false;
+async function novoContato(de,nome,dep){const rem={id:remId(de),email:de,nome:nome||'',dep:dep||'',cat:'',ignorar:false,criado:new Date().toISOString()};D.remetentes.push(rem);const {id:_,...rb}=rem;try{await DB.collection('remetentes').doc(rem.id).set(rb)}catch(e){}return rem}
+/* e-mails enviados: entram na conversa do contato, sem ir para a triagem */
+async function processarEnviado(m){
  const id=hashId(m.internetMessageId||m.id);
  if(D.emails.some(x=>x.id===id))return 'dup';
- const c=classificar(m,d);
- const em={dep:d.id,de:norm(m.sender||''),deNome:limparTxt(m.senderName).slice(0,80),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',sug:c,criado:new Date().toISOString(),por:ME.uid||null};
+ const eu=[ME.email,CFG.caixa].filter(Boolean).map(norm),dest=(m.to||[]).filter(a=>a.address&&!eu.includes(norm(a.address)));
+ if(!dest.length)return 'dup';
+ const de=norm(dest[0].address);let rem=remDe(de);const d=depDe(rem?.dep)||depPorEmail(de);
+ if(!rem)rem=await novoContato(de,limparTxt(dest[0].name).slice(0,80),d?.id||'');
+ if(rem.ignorar)return 'dup';
+ const em={dir:'enviado',st:'enviado',dep:d?.id||'',de,deNome:limparTxt(dest[0].name).slice(0,80),para:dest.map(a=>norm(a.address)).slice(0,10).join(', '),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',msgId:m.id||'',caixa:CFG.caixa||'',rem:rem.id,criado:new Date().toISOString(),por:ME.uid||null};
+ D.emails.push({id,...em});await DB.collection('emails').doc(id).set(em);return 'enviado'}
+async function processar(m){
+ const id=hashId(m.internetMessageId||m.id);
+ if(D.emails.some(x=>x.id===id))return 'dup';
+ const de=norm(m.sender||'');if(!de.includes('@'))return 'dup';
+ if(ME.email&&de===norm(ME.email))return 'dup';
+ const rid=remId(de);let rem=remDe(de);
+ const d=depDe(rem?.dep)||depPorEmail(de);
+ const txt=(m.subject||'')+' '+limparTxt(m.summary);
+ let c;if(d)c=classificar(m,d);else{const t=tipoPorTexto(txt);c=t?{acao:'chamado',tipo:t,conf:'media'}:{acao:'nenhuma',conf:'baixa'}}
+ c.assunto=rem?.cat&&assDe(rem.cat)?rem.cat:assPorTexto(txt);
+ const em={dep:d?.id||'',de,deNome:limparTxt(m.senderName).slice(0,80),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',sug:c,criado:new Date().toISOString(),por:ME.uid||null,msgId:m.id||'',caixa:CFG.caixa||'',rem:rid};
+ if(!rem)rem=await novoContato(de,em.deNome,d?.id||'');
+ if(rem.ignorar){await DB.collection('emails').doc(id).set({...em,st:'ignorado',auto:true,res:''});return 'dup'}
  D.emails.push({id,...em,st:'processando'});
  const auto=CFG.emailModo==='auto'&&((c.acao==='entrega'&&c.conf==='alta')||c.acao==='chamado');
  if(auto){const r=await aplicar(em,c,true);await DB.collection('emails').doc(id).set({...em,st:r==='erro'?'triagem':'aplicado',res:r,auto:true});return r==='erro'?'novo':'auto'}
@@ -482,32 +655,34 @@ async function processar(m,d){
 async function sincronizar(manual){
  if(S.sync||!pode('email')||!DB)return;
  if(!MCP){S.syncErr={code:'sem_mcp'};render();return}
- const deps=D.departamentos.filter(d=>listaEmails(d).length);
- if(!deps.length){if(manual)toast('Cadastre os e-mails dos departamentos primeiro.');return}
+ const deps=D.departamentos.filter(d=>listaEmails(d).length),todos=lerTodos();
+ if(!todos&&!deps.length){if(manual)toast('Cadastre os e-mails dos departamentos primeiro.');return}
  if(ME.uid){try{const l=await DB.doc('sync/lock').acquire({holder:ME.uid,ttlMs:180000});if(!l.acquired){if(manual)toast('Outra pessoa está verificando o e-mail agora. Tente em instantes.');return}}catch(e){}}
  S.sync=true;S.syncErr=null;render();
  const desde=SYNC.ultima?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
- let novos=0,auto=0,lidos=0;
+ let novos=0,auto=0,lidos=0,env=0;
+ const buscar=async(inp,filtro,fn)=>{let offset=0;
+  for(let pg=0;pg<(todos?8:4);pg++){
+   const q={...inp,afterDateTime:desde,limit:25};if(CFG.caixa)q.mailboxOwnerEmail=CFG.caixa;if(CFG.caixaPasta&&q.folder!=='sentitems'){delete q.folder;q.folderId=CFG.caixaPasta}if(offset)q.offset=offset;
+   const res=await MCP.callTool(SRV,TOOL,q,{cache:false});
+   const {msgs,next}=extrairMsgs(res);lidos+=msgs.length;
+   for(const m of msgs){if(filtro&&!filtro(m))continue;const r=await (fn||processar)(m);if(r==='novo')novos++;if(r==='auto')auto++;if(r==='enviado')env++}
+   if(typeof next==='number'&&next>offset&&msgs.length)offset=next;else break}};
  try{
-  for(const d of deps)for(const addr of listaEmails(d)){let offset=0;
-   for(let pg=0;pg<4;pg++){
-    const inp={sender:addr,afterDateTime:desde,limit:25};if(CFG.caixa)inp.mailboxOwnerEmail=CFG.caixa;if(offset)inp.offset=offset;
-    const res=await MCP.callTool(SRV,TOOL,inp,{cache:false});
-    const {msgs,next}=extrairMsgs(res);lidos+=msgs.length;
-    for(const m of msgs){if(norm(m.sender)!==addr&&!norm(m.sender).endsWith(addr))continue;const r=await processar(m,d);if(r==='novo')novos++;if(r==='auto')auto++}
-    if(typeof next==='number'&&next>offset&&msgs.length)offset=next;else break}}
-  await DB.doc('sync/estado').set({ultima:new Date().toISOString(),uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,erro:''});
-  if(manual||novos||auto)toast(`${lidos} e-mails verificados · ${novos} na triagem · ${auto} registrados automaticamente`);
+  if(todos){await buscar({folder:'inbox'});if(lerEnviados())await buscar({folder:'sentitems'},null,processarEnviado)}
+  else for(const d of deps)for(const addr of listaEmails(d))await buscar({sender:addr},m=>{const x=norm(m.sender);return x===addr||x.endsWith(addr)});
+  await DB.doc('sync/estado').set({ultima:new Date().toISOString(),uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
+  if(manual||novos||auto)toast(`${lidos} e-mails verificados · ${novos} na triagem · ${env} enviados guardados na conversa${auto?` · ${auto} registrados automaticamente`:''}`);
   if(novos||auto)log(`Verificou o Outlook: ${novos} e-mails na triagem e ${auto} registrados automaticamente`);
   try{localStorage.setItem('autoSync_'+(ME.uid||'demo'),'1')}catch(e){}
  }catch(e){S.syncErr=e;DB.doc('sync/estado').set({...SYNC,erro:e?.code||'erro',erroEm:new Date().toISOString()}).catch(()=>{});if(manual)toast(msgErro(e))}
  finally{S.sync=false;render()}}
 function msgErro(e){const c=e?.code;return ({
- server_not_connected:'Para usar o Outlook, entre no portal com a conta Microsoft da empresa.',
- needs_reauth:'A conexão com o Outlook expirou. Clique em Reconectar Outlook, no menu ao lado.',
+ server_not_connected:'O e-mail ainda não está conectado. Clique em Conectar e-mail.',
+ needs_reauth:'A conexão com o e-mail venceu. Clique em Conectar e-mail para continuar.',
  
- not_in_manifest:'O Outlook não liberou o acesso. Clique em Reconectar Outlook e aceite as permissões.',
- approval_required:'O Outlook precisa da sua aprovação. Clique em Reconectar Outlook.',
+ not_in_manifest:'O Outlook não liberou o acesso. Clique em Conectar e-mail e aceite as permissões.',
+ approval_required:'O Outlook precisa da sua aprovação. Clique em Conectar e-mail.',
  blocked_by_policy:'A política da sua organização bloqueia a leitura do Outlook por aqui. Fale com a TI.',
  server_unavailable:'O Outlook não respondeu agora. O portal tenta de novo na próxima verificação.',
  tool_error:'O Outlook recusou a busca: '+String(e?.message||'').slice(0,160),
@@ -519,32 +694,79 @@ async function triar(id,acao){const em=D.emails.find(x=>x.id===id);if(!em||S.tri
   const r=await aplicar(em,c,false);if(r&&r!=='erro')await patch('emails',id,{st:'aplicado',res:r,triadoPor:ME.uid||null,triadoEm:new Date().toISOString()},r.startsWith('entrega')?'Entrega marcada como recebida':null,false)}
  finally{S.triando=false}}
 function resTxt(e){const r=e.res||'';return (e.st==='ignorado'?'Ignorado':r.startsWith('entrega:')?`Entrega "${esc(D.entregas.find(x=>x.id===r.slice(8))?.item||'')}" recebida`:r.startsWith('chamado:')?`Virou o chamado ${esc(r.slice(8))}`:'Processado')+(e.auto?' automaticamente':'')}
-function cardEmail(e){const s=e.sug||{},ents=D.entregas.filter(x=>x.dep===e.dep&&!x.recebido).sort((a,b)=>a.prazo<b.prazo?-1:1),ref=D.entregas.find(x=>x.id===s.ref);
- const sug=s.acao==='entrega'&&ref?`Parece ser a entrega "${esc(ref.item)}"`:s.acao==='chamado'?`Parece um pedido: ${esc(s.tipo)}`:'Sem sugestão. Escolha o que fazer.';
- return `<div class="mail"><div class="mh"><div class="t"><b>${esc(e.assunto)}</b><span>${esc(e.deNome||e.de)} · ${esc(e.de)} · ${esc(depNome(e.dep))} · ${fmtHora(e.recebido)}${e.anexos?' · com anexo':''}</span></div>${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>
+function cardEmail(e){const s=e.sug||{},ents=D.entregas.filter(x=>x.dep===e.dep&&!x.recebido).sort((a,b)=>a.prazo<b.prazo?-1:1),ref=D.entregas.find(x=>x.id===s.ref),le=pode('ler_email');
+ const sug=s.acao==='entrega'&&ref?`Parece ser a entrega "${esc(ref.item)}"`:s.acao==='chamado'?`Parece um pedido: ${esc(s.tipo)}`:'Escolha o que fazer.';
+ return `<div class="mail"><div class="mh"><div class="t"><b>${esc(e.assunto)}</b><span>Recebido ${fmtHora(e.recebido)}${e.anexos?' · com anexo':''}${e.dep?' · '+esc(depNome(e.dep)):''}</span></div>${le?`<div style="display:flex;gap:6px;flex-wrap:wrap">${e.msgId?`<button class="btn" onclick="lerEmail('e:${e.id}')">Ler aqui</button>`:''}${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}</div>
  ${e.trecho?`<p class="trecho">${esc(e.trecho)}</p>`:''}
- <div class="sug"><span class="tag ${s.conf==='alta'?'ok':s.conf==='media'?'ac':'ne'}">${s.conf==='alta'?'Confiança alta':s.conf==='media'?'Confiança média':'Revisar'}</span><span>${sug}</span></div>
- <div class="acts2"><div class="grp"><select class="inp" id="tr_${e.id}" aria-label="Entrega recebida"><option value="">Qual entrega chegou?</option>${ents.map(x=>`<option value="${esc(x.id)}" ${s.ref===x.id?'selected':''}>${esc(x.item)} · prazo ${fmt(x.prazo)}</option>`).join('')}</select><button class="btn ${s.acao==='entrega'?'pri':''}" onclick="triar('${e.id}','entrega')">Confirmar recebimento</button></div>
- <div class="grp"><select class="inp" id="tt_${e.id}" aria-label="Tipo de chamado">${TIPOS_CH.map(t=>`<option ${t===(s.tipo||TIPOS_CH[0])?'selected':''}>${t}</option>`).join('')}</select><button class="btn ${s.acao==='chamado'?'pri':''}" onclick="triar('${e.id}','chamado')">Criar chamado</button></div>
+ <div class="sug"><span class="tag ${s.conf==='alta'?'ok':s.conf==='media'?'ac':'ne'}">${s.conf==='alta'?'Confiança alta':s.conf==='media'?'Confiança média':'Revisar'}</span><span>${sug}</span>${s.assunto&&assDe(s.assunto)?`<span class="tag ac">Assunto: ${esc(assNome(s.assunto))}</span>`:''}</div>
+ <div class="acts2">${pode('chamados')?`<button class="btn ${s.acao!=='entrega'?'pri':''}" onclick="aceitarSheet({email:'${e.id}'})">Aceitar como demanda</button>`:''}
+ ${e.dep&&ents.length?`<div class="grp"><select class="inp" id="tr_${e.id}" data-nodraft="1" aria-label="Entrega recebida"><option value="">Qual entrega chegou?</option>${ents.map(x=>`<option value="${esc(x.id)}" ${s.ref===x.id?'selected':''}>${esc(x.item)} · prazo ${fmt(x.prazo)}</option>`).join('')}</select><button class="btn ${s.acao==='entrega'?'pri':''}" onclick="triar('${e.id}','entrega')">Confirmar recebimento</button></div>`:''}
  <button class="btn ghost" onclick="triar('${e.id}','ignorar')">Ignorar</button></div></div>`}
-function statusSync(){
- if(!MCP)return `<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>${esc(msgErro({code:'sem_mcp'}))}</span></div>`;
- if(S.syncErr)return `<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${esc(msgErro(S.syncErr))}</span><button class="btn" onclick="sincronizar(true)">Tentar de novo</button></div>`;
- return `<div class="banner"><span>${SYNC.ultima?`Última verificação ${fmtHora(SYNC.ultima)} · ${SYNC.lidos||0} e-mails lidos · ${SYNC.novos||0} para triagem · ${SYNC.auto||0} automáticos`:'Nenhuma verificação ainda. Clique em Verificar agora e permita a leitura do Outlook.'} · ${CFG.emailModo==='auto'?'modo automático':'modo com triagem'} · ${CFG.caixa?'caixa '+esc(CFG.caixa):'sua caixa de entrada'}</span></div>`}
+function conversaRem(rid){const le=pode('ler_email'),h=D.emails.filter(e=>remDoEmail(e)===rid&&e.st!=='processando').sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,25);
+ return `<div><span class="lbl">Conversa com este contato · ${h.length?`${h.length} mais recentes`:'nenhum e-mail ainda'}</span>${h.map(e=>`<div class="row"><span class="tag ${e.dir==='enviado'?'ac':'ne'}" style="flex:none">${e.dir==='enviado'?'Enviado':'Recebido'}</span><div class="t"><b style="font-weight:400">${esc(e.assunto)}</b><span>${fmtHora(e.recebido)}${e.dir==='enviado'?' · para '+esc(e.para||e.de):''}${e.st==='triagem'?' · aguardando triagem':e.res?.startsWith('chamado:')?' · virou '+esc(e.res.slice(8)):''}</span></div>${le&&e.msgId?`<button class="btn ghost" onclick="lerEmail('e:${e.id}')">Ler</button>`:''}</div>`).join('')}</div>`}
+function editRem(rid){const r=D.remetentes.find(x=>x.id===rid),em=D.emails.find(e=>remDoEmail(e)===rid),v=r||{email:em?.de||'',nome:em?.deNome||'',dep:em?.dep||'',cat:'',ignorar:false};FORM={tipo:'_rem',id:rid};
+ const n=D.emails.filter(e=>remDoEmail(e)===rid).length;
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Contato · ${n} ${n===1?'e-mail':'e-mails'}</p><h2 id="sheet-title"></h2><p class="sub" style="font-size:13px">Tudo o que vale aqui é aplicado a todos os e-mails desta pessoa, os que estão na triagem e os próximos.</p></div>
+ <div class="fgrid"><div class="full"><label class="lbl" for="rm_n">Nome</label><input class="inp" id="rm_n" value="${esc(v.nome||'')}" placeholder="João Silva"></div>
+ <div><label class="lbl" for="rm_dep">Setor</label><select class="inp" id="rm_dep"><option value="">Não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===v.dep?'selected':''}>${esc(d.n)}</option>`).join('')}</select></div>
+ <div><label class="lbl" for="rm_cat">Assunto padrão</label><select class="inp" id="rm_cat"><option value="">Reconhecer pelo texto</option>${assLista().map(a=>`<option value="${esc(a.id)}" ${a.id===v.cat?'selected':''}>${esc(a.n)}</option>`).join('')}</select></div>
+ <label class="perm full"><input type="checkbox" id="rm_ign" ${v.ignorar?'checked':''}><span><b>Ignorar os e-mails desta pessoa</b><small>Eles deixam de aparecer na triagem. Use para propagandas e avisos automáticos.</small></span></label></div>
+ ${conversaRem(rid)}
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaRem()">Salvar</button></div></div>`;
+ document.getElementById('sheet-title').textContent=v.email||'';document.getElementById('ov').hidden=false}
+async function salvaRem(){if(await setRem(FORM.id,{nome:val('rm_n'),dep:val('rm_dep'),cat:val('rm_cat'),ignorar:document.getElementById('rm_ign').checked}))fechar()}
+async function setRem(rid,mud){const r=D.remetentes.find(x=>x.id===rid),em=D.emails.find(e=>remDoEmail(e)===rid);
+ const {id:_,...base}=r||{email:em?.de||'',nome:em?.deNome||'',dep:'',cat:'',ignorar:false,criado:new Date().toISOString()};const novo={...base,...mud};
+ const nome=novo.nome||novo.email;
+ if(!await salvar('remetentes',rid,novo,'Remetente atualizado',`Atualizou o remetente ${nome}${mud.dep!==undefined?` · setor ${mud.dep?depNome(mud.dep):'não definido'}`:''}${novo.ignorar&&!base.ignorar?' · passou a ignorar':''}`))return false;
+ for(const e of D.emails.filter(e=>remDoEmail(e)===rid&&e.st==='triagem')){const m={};
+  if(mud.dep!==undefined&&e.dep!==novo.dep)m.dep=novo.dep;
+  if(mud.cat&&assDe(mud.cat))m.sug={...(e.sug||{}),assunto:mud.cat};
+  if(novo.ignorar)Object.assign(m,{st:'ignorado',triadoPor:ME.uid||null,triadoEm:new Date().toISOString()});
+  if(Object.keys(m).length)await patch('emails',e.id,m,null,false)}
+ if(mud.dep)for(const c of D.chamados.filter(c=>c.rem===rid&&!c.dep))await patch('chamados',c.id,{dep:mud.dep},null,false);
+ return true}
+
+const ERR_CONECTAR=['needs_reauth','server_not_connected','not_in_manifest','approval_required','sem_mcp'];
+function statusSync(ac=''){
+ if(!MCP)return `<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>${esc(msgErro({code:'sem_mcp'}))}</span>${ac}</div>`;
+ if(S.syncErr)return `<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${esc(msgErro(S.syncErr))}</span>${ERR_CONECTAR.includes(S.syncErr?.code)?`<button class="btn pri" onclick="conectarEmail()">Conectar e-mail</button>`:`<button class="btn" onclick="sincronizar(true)">Tentar de novo</button>`}${ac}</div>`;
+ return `<div class="banner"><span>${SYNC.ultima?`Última verificação ${fmtHora(SYNC.ultima)} · ${SYNC.lidos||0} e-mails lidos · ${SYNC.novos||0} para triagem · ${SYNC.env||0} enviados · ${SYNC.auto||0} automáticos`:'Nenhuma verificação ainda. Clique em Conectar e-mail e depois em Verificar agora.'} · ${CFG.emailModo==='auto'?'modo automático':'modo com triagem'} · ${CFG.caixa||CFG.caixaPasta?(CFG.caixaPasta&&!PASTAS_FIXAS[CFG.caixaPasta.toLowerCase()]?'pasta compartilhada':'caixa')+(CFG.caixa?' '+esc(CFG.caixa):''):'sua caixa de entrada'} · ${lerTodos()?(lerEnviados()?'recebidos e enviados, agrupados por contato':'recebidos, agrupados por remetente'):'só e-mails dos departamentos'}</span>${ac}</div>`}
 function cfgEmail(){FORM={tipo:'_cfgmail'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Integração com o Outlook</p><h2 id="sheet-title">Configurar leitura de e-mails</h2><p class="sub" style="font-size:13px">Cada pessoa lê com a própria conta Microsoft, então só vê o que já tem permissão de ver no Outlook.</p></div>
  <div class="fgrid">
   <div class="full"><label class="lbl" for="g_modo">O que fazer com os e-mails</label><select class="inp" id="g_modo"><option value="triagem" ${CFG.emailModo!=='auto'?'selected':''}>Mandar tudo para a triagem (recomendado no início)</option><option value="auto" ${CFG.emailModo==='auto'?'selected':''}>Registrar sozinho quando a confiança for alta</option></select></div>
-  <div class="full"><label class="lbl" for="g_caixa">Caixa compartilhada do financeiro · opcional</label><input class="inp" id="g_caixa" type="email" placeholder="financeiro@empresa.com.br" value="${esc(CFG.caixa||'')}"><p class="ferr" id="ge_caixa"></p><p class="meta" style="margin:4px 0 0">Em branco, o portal lê a caixa de entrada de quem clicar em Verificar agora.</p></div>
+  <div class="full"><label class="lbl" for="g_todos">Quais e-mails ler</label><select class="inp" id="g_todos"><option value="todos" ${lerTodos()?'selected':''}>Todos os e-mails da caixa de entrada, agrupados por remetente</option><option value="dep" ${lerTodos()?'':'selected'}>Só os e-mails cadastrados nos departamentos</option></select></div>
+  <label class="perm full"><input type="checkbox" id="g_env" ${CFG.emailEnviados!==false?'checked':''}><span><b>Ler também os e-mails enviados</b><small>As respostas de vocês entram na conversa de cada contato. Não vão para a triagem.</small></span></label>
+  <div class="full"><label class="lbl" for="g_caixa">Caixa ou pasta compartilhada · link ou e-mail · opcional</label><input class="inp" id="g_caixa" type="text" autocomplete="off" spellcheck="false" placeholder="https://outlook.office.com/mail/financeiro@empresa.com.br/inbox  ou  financeiro@empresa.com.br" value="${esc(CFG.caixaLink||CFG.caixa||'')}" oninput="mostraCaixa()"><p class="ferr" id="ge_caixa"></p><p class="meta" id="g_caixa_info" style="margin:4px 0 0">${caixaInfo(CFG.caixaLink||CFG.caixa||'')}</p></div>
   <div><label class="lbl" for="g_desde">Buscar e-mails a partir de</label><input class="inp" id="g_desde" type="date" value="${esc(CFG.emailDesde||isoD(new Date(Date.now()-14*864e5)))}"></div>
   <div><label class="lbl" for="g_int">Verificar a cada (minutos)</label><input class="inp" id="g_int" type="number" min="5" max="240" value="${+CFG.emailIntervalo||15}"><p class="ferr" id="ge_int"></p></div></div>
  ${note('A verificação automática roda enquanto alguém com a permissão E-mails recebidos estiver com o portal aberto.')}
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgEmail()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
-async function salvaCfgEmail(){const caixa=val('g_caixa').toLowerCase(),it=+val('g_int');errEl('ge_caixa','');errEl('ge_int','');
- if(caixa&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(caixa)){errEl('ge_caixa','Confira o endereço.');return}
+// Lê o link de uma caixa ou pasta do Outlook (ou só o endereço) e separa o e-mail e a pasta.
+const PASTAS_FIXAS={inbox:'Caixa de entrada',sentitems:'Itens enviados',archive:'Arquivo morto',drafts:'Rascunhos',deleteditems:'Itens excluídos',junkemail:'Lixo eletrônico'};
+const PASTAS_ALIAS={inbox:'inbox',caixadeentrada:'inbox',sentitems:'sentitems',sent:'sentitems',enviados:'sentitems',archive:'archive',drafts:'drafts',deleteditems:'deleteditems',junkemail:'junkemail'};
+function lerCaixa(v){v=String(v||'').trim();if(!v)return {};
+ let t=v;try{t=decodeURIComponent(v)}catch(e){}
+ const email=((t.match(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)||[])[0]||'').toLowerCase();
+ if(!/^https?:\/\//i.test(v))return {email};
+ let partes=[];try{const u=new URL(v);partes=u.pathname.split('/').concat((u.searchParams.get('path')||'').split('/'),(u.hash||'').replace(/^#/,'').split('/'))}catch(e){}
+ partes=partes.map(x=>{try{return decodeURIComponent(x)}catch(e){return x}}).filter(Boolean);
+ let pasta='';for(let i=0;i<partes.length;i++){const x=partes[i],k=x.toLowerCase().replace(/[\s_-]/g,'');
+  if(partes[i-1]&&/^(id|deeplink|readconv)$/i.test(partes[i-1]))continue; // id de uma mensagem, não de pasta
+  if(PASTAS_ALIAS[k]){pasta=PASTAS_ALIAS[k];continue}
+  if(/^(AAMk|AQMk|AAAA)[A-Za-z0-9+/=_-]{20,}$/.test(x))pasta=x}
+ return {email,pasta}}
+function caixaInfo(v){if(!String(v||'').trim())return 'Em branco, o portal lê a caixa de entrada de quem clicar em Verificar agora.';
+ const c=lerCaixa(v);if(!c.email&&!c.pasta)return '<span style="color:var(--bad)">Não reconheci esse link.</span>';
+ const nomeP=c.pasta?(PASTAS_FIXAS[c.pasta]||'pasta escolhida no link'):'Caixa de entrada';
+ return `Vai ler: <b>${esc(nomeP)}</b>${c.email?` da caixa <b>${esc(c.email)}</b>`:' da sua própria caixa'}. Quem clicar em Verificar agora precisa ter permissão nessa pasta no Outlook.`}
+function mostraCaixa(){const el=document.getElementById('g_caixa_info');if(el)el.innerHTML=caixaInfo(document.getElementById('g_caixa')?.value)}
+async function salvaCfgEmail(){const bruto=(document.getElementById('g_caixa')?.value||'').trim(),cx=lerCaixa(bruto),caixa=cx.email,it=+val('g_int');errEl('ge_caixa','');errEl('ge_int','');
+ if(bruto&&!cx.email&&!cx.pasta){errEl('ge_caixa','Não encontrei um e-mail nem uma pasta nesse link. Cole o link da pasta no Outlook na web ou o endereço da caixa.');return}
  if(!(it>=5&&it<=240)){errEl('ge_int','Use um valor entre 5 e 240.');return}
- try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),caixa,emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast('Configuração salva');fechar()}
+ try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),emailTodos:val('g_todos')!=='dep',emailEnviados:!!document.getElementById('g_env')?.checked,caixa,caixaLink:/^https?:/i.test(bruto)?bruto:'',caixaPasta:cx.pasta||'',emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast('Configuração salva');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar essa configuração.':'Não foi possível salvar.')}}
 function iniciarAutoSync(){const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=false;try{ok=localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};setTimeout(tick,5000);setInterval(tick,60000)}
 
@@ -665,7 +887,7 @@ function mostrarCopia(txt){FORM={tipo:'_copia'};document.getElementById('sheet')
 /* estado de navegação do módulo */
 function fbIr(tela,extra){if(!sairEditorOk(()=>fbIr(tela,extra)))return;Object.assign(S,extra||{});S.tela=tela;S.fbForce=true;render();window.scrollTo({top:0})}
 function sairEditorOk(cont){if(S.tela==='fbedit'&&S.fbEd?.dirty){FORM={tipo:'_sair',cont};
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Feedback</p><h2 id="sheet-title">Sair sem salvar?</h2><p class="sub" style="font-size:13px">O que você escreveu neste feedback ainda não foi salvo.</p></div><div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Continuar editando</button><button class="btn danger" onclick="const c=FORM.cont;S.fbEd.dirty=false;fechar();c()">Sair sem salvar</button></div></div>`;
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Feedback</p><h2 id="sheet-title">Sair sem salvar?</h2><p class="sub" style="font-size:13px">O que você escreveu neste feedback ainda não foi salvo.</p></div><div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Continuar editando</button><button class="btn danger" onclick="const c=FORM.cont;limparRascunho(chaveMain());S.fbEd.dirty=false;fechar();c()">Sair sem salvar</button></div></div>`;
  document.getElementById('ov').hidden=false;return false}return true}
 window.addEventListener('beforeunload',e=>{if(S.tela==='fbedit'&&S.fbEd?.dirty){e.preventDefault();e.returnValue=''}});
 
@@ -707,8 +929,9 @@ function fbConfOk(){const e=S.fbEd,c=e.conf;e.conf=null;
  if(c.acao==='base'){const f=D.feedbacks.find(x=>x.id===c.id);e.texto=f.texto||'';e.tom=f.tom;e.assunto=e.assunto||f.assunto||'';e.base=`Texto baseado em "${f.titulo}". Revise antes de salvar.`}
  if(c.acao==='modelo'){const m=D.modelos.find(x=>x.id===c.id);e.texto=m.texto||'';if(m.tom&&m.tom!=='qualquer')e.tom=m.tom;if(document.getElementById('tm_ass')?.checked!==false&&m.assunto)e.assunto=m.assunto}
  e.dirty=true;S.fbForce=true;render()}
+function fbAba(k){S.fbEd.aba=k;const sd=document.getElementById('fbside');if(sd){sd.innerHTML=fbSide();const b=sd.querySelector('.sidebody');if(b)b.scrollTop=0}}
 function fbSide(){const e=S.fbEd,ab=e.aba;
- const tabs=`<div class="tabs">${[['ant','Anteriores'],['mod','Modelos'],['fra','Frases']].map(([k,l])=>`<button class="${ab===k?'on':''}" onclick="S.fbEd.aba='${k}';document.getElementById('fbside').innerHTML=fbSide()">${l}</button>`).join('')}</div>`;
+ const tabs=`<div class="tabs">${ab!=='ant'?`<button class="voltar" title="Voltar para Anteriores" aria-label="Voltar" onclick="fbAba('ant')">‹ Voltar</button>`:''}${[['ant','Anteriores'],['mod','Modelos'],['fra','Frases']].map(([k,l])=>`<button class="${ab===k?'on':''}" onclick="fbAba('${k}')">${l}</button>`).join('')}</div>`;
  const conf=e.conf?`<div class="banner" style="background:var(--warn-bg);color:var(--warn);flex-direction:column;align-items:stretch"><span>${e.conf.acao==='base'?'Substituir o texto atual pelo do feedback escolhido?':'Substituir o texto atual pelo modelo?'}</span>${e.conf.acao==='modelo'?'<label style="display:flex;gap:6px;font-size:12.5px"><input type="checkbox" id="tm_ass" checked> Trocar o assunto também</label>':''}<div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn" onclick="S.fbEd.conf=null;document.getElementById('fbside').innerHTML=fbSide()">Cancelar</button><button class="btn pri" onclick="fbConfOk()">Substituir</button></div></div>`:'';
  let body='';
  if(ab==='ant'){if(!e.pessoa)body='<p class="meta">Escolha o colaborador para ver o histórico dele.</p>';else{const L=fbsDe(e.pessoa).filter(f=>f.id!==e.id),on=obsNovas(e);
@@ -735,7 +958,7 @@ async function fbSalvar(){const e=S.fbEd;errEl('fe_pessoa','');errEl('fe_texto',
  if(!DB){toast('O armazenamento não está disponível nesta visualização.');return}
  try{let id=e.id;if(id)await DB.collection('feedbacks').doc(id).set(full);else{const r=await DB.collection('feedbacks').add(full);id=r.id}
   for(const oid of e.obsUsadas){const o=D.observacoes.find(x=>x.id===oid);if(o){const {id:_,...b}=o;await DB.collection('observacoes').doc(oid).set({...b,usadoEm:id,fb:b.fb||id})}}
-  log(`${ant?'Editou':'Registrou'} um feedback ${String(e.tipo).toLowerCase()}`);toast(ant?'Feedback atualizado':'Feedback salvo');e.dirty=false;
+  log(`${ant?'Editou':'Registrou'} um feedback ${String(e.tipo).toLowerCase()}`);toast(ant?'Feedback atualizado':'Feedback salvo');limparRascunho(chaveMain());e.dirty=false;
   S.fbV={id};S.tela='fbver';S.fbForce=true;render();window.scrollTo({top:0})}
  catch(er){toast(er?.code==='invalid_argument'?'Só o gestor e os administradores podem salvar feedbacks.':'Não foi possível salvar. Seu texto continua aqui.')}}
 function obsRapida(pid,fbid){const p=pid||S.fbEd?.pessoa;if(!p){toast('Escolha o colaborador primeiro.');return}FORM={tipo:'_obs',p,fbid};
@@ -914,12 +1137,232 @@ async function enviarResumo(){const para=listaEnd(val('rs_para'));errEl('rse_par
  try{const d=depDe(FORM.id);await MCP.callTool(SRV,'outlook_send_mail',{to:para,subject:`Indicadores do ${periodoInd()[1].toLowerCase()} · ${d.n} e financeiro`,bodyType:'html',body:md(FORM.txt)},{cache:false});log(`Enviou o resumo de indicadores para ${d.n}`);toast('Resumo enviado');fechar()}
  catch(e){toast(msgErro(e));b.textContent='Enviar por e-mail';FORM.conf=false}}
 
+/* ---------- cronograma do departamento ----------
+   Rotinas recorrentes (coleção "cronograma") e o que foi feito em cada dia
+   (coleção "execucoes", um registro por rotina por dia: dia_idDaRotina). */
+const PROC_PAD=['Identificação','Conferência','Lançamento','Baixa','Pagamento','Conciliação'];
+const SIS_PAD=['WAE','Protheus'];
+const procs=()=>Array.isArray(CFG.cronEtapas)&&CFG.cronEtapas.length?CFG.cronEtapas:PROC_PAD;
+const sists=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_PAD;
+/* módulos guardados para depois: ficam fora do menu até o administrador ligar */
+const MODS=[['fechamento','Fechamento D+N','Etapas do fechamento do mês com prazo em dias úteis'],['entregas','Entregas dos departamentos','O que outras áreas precisam enviar e até quando'],['email','E-mails do Outlook','Alertas de e-mails para revisar e de problemas na leitura da caixa']];
+const modOn=k=>!!(CFG.modulos||{})[k];
+const FREQS=[['diaria','Todo dia útil'],['semanal','Em dias da semana'],['mensal_util','Todo mês, no Nº dia útil'],['mensal_dia','Todo mês, em um dia fixo'],['unica','Uma vez só']];
+const SEM=['dom','seg','ter','qua','qui','sex','sáb'];
+const addDia=(iso,n)=>{const d=new Date(iso+'T12:00');d.setDate(d.getDate()+n);return isoD(d)};
+function* diasDe(a,b){for(let d=a;d<=b;d=addDia(d,1))yield d}
+const ehUtil=iso=>util(new Date(iso+'T12:00'));
+const proxUtil=iso=>{let d=addDia(iso,1);while(!ehUtil(d))d=addDia(d,1);return d};
+const agoraHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+const hmDe=iso=>{const d=new Date(iso||'');return isNaN(d)?'':pad(d.getHours())+':'+pad(d.getMinutes())};
+const diaTxt=iso=>{const d=new Date(iso+'T12:00');return `${DIAS[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`};
+/* dia fixo do mês; se não for dia útil, antecipa. "antes" antecipa mais N dias úteis (ex.: D-1) */
+function diaFixo(m,n,antes){const [y,mm]=m.split('-').map(Number),ult=new Date(y,mm,0).getDate(),d=new Date(y,mm-1,Math.min(Math.max(1,n),ult),12);
+ while(!util(d))d.setDate(d.getDate()-1);let k=0;while(k<(+antes||0)){d.setDate(d.getDate()-1);if(util(d))k++}return isoD(d)}
+function ocorre(r,dia){if(r.ativo===false||(r.ini&&dia<r.ini)||(r.fim&&dia>r.fim))return false;
+ if(r.freq==='unica')return r.data===dia;
+ if(!ehUtil(dia))return false;const m=dia.slice(0,7);
+ if(r.freq==='semanal')return (r.dias||[]).map(Number).includes(new Date(dia+'T12:00').getDay());
+ if(r.freq==='mensal_util')return dataDN(addMes(m,-1),+r.n||1)===dia;
+ if(r.freq==='mensal_dia')return diaFixo(m,+r.n||1,r.antes)===dia||diaFixo(addMes(m,1),+r.n||1,r.antes)===dia;
+ return true}
+function freqTxt(r){const h=r.hora?` · ${r.hora}`:'';
+ if(r.freq==='unica')return `Em ${fmt(r.data)}${h}`;
+ if(r.freq==='semanal')return `Toda ${(r.dias||[]).map(d=>SEM[d]).join(', ')||'—'}${h}`;
+ if(r.freq==='mensal_util')return `${r.n||1}º dia útil do mês${h}`;
+ if(r.freq==='mensal_dia')return `Dia ${r.n||1} de cada mês${+r.antes?` · pago ${r.antes} ${+r.antes>1?'dias úteis':'dia útil'} antes`:''}${h}`;
+ return `Todo dia útil${h}`}
+let _exA=null,_exM=new Map();
+const exDe=(rid,dia)=>{if(_exA!==D.execucoes){_exA=D.execucoes;_exM=new Map(D.execucoes.map(x=>[x.id,x]))}return _exM.get(dia+'_'+rid)};
+const rsDe=r=>(r.rs||[]).filter(Boolean);
+const nomesRs=r=>rsDe(r).map(nomeDe).join(' e ')||'Sem responsável';
+const minhaRot=r=>rsDe(r).includes(S.perfil);
+const vejoRot=r=>dir()||pode('ver_tudo')||minhaRot(r);
+const podeMarcar=r=>dir()||pode('ver_tudo')||minhaRot(r);
+const podeCron=()=>dir()||podeAdmin()||pode('cadastros');
+const ordProc=r=>{const i=procs().indexOf(r.etapa);return i<0?99:i};
+const ordR=(a,b)=>ordProc(a)-ordProc(b)||(a.hora||'99').localeCompare(b.hora||'99')||(a.t||'').localeCompare(b.t||'');
+/* situação de uma rotina num dia */
+function stOc(r,dia){const x=exDe(r.id,dia);
+ if(x?.s==='feita')return x.concl>dia?['wa','Concluída com atraso']:['ok','Concluída'];
+ const late=dia<HJ||(dia===HJ&&r.hora&&agoraHM()>r.hora);
+ if(late)return ['bad',x?.s==='andamento'?'Atrasada · em andamento':'Atrasada'];
+ if(x?.s==='andamento')return ['ac','Em andamento'];
+ return ['ne',dia>HJ?'Prevista':'A fazer']}
+/* o que ficou para trás (últimos 30 dias, incluindo hoje depois do horário) */
+function atrasosCron(filtro){const L=[];for(const dia of diasDe(addDia(HJ,-30),HJ))for(const r of D.cronograma){if((filtro&&!filtro(r))||!ocorre(r,dia))continue;if(stOc(r,dia)[0]==='bad')L.push({r,dia})}return L}
+function contaDia(dia,filtro){const c={tot:0,ok:0,and:0,atr:0,fazer:0};
+ D.cronograma.filter(r=>ocorre(r,dia)&&(!filtro||filtro(r))).forEach(r=>{c.tot++;const x=exDe(r.id,dia),s=stOc(r,dia)[0];if(x?.s==='feita')c.ok++;else if(s==='bad')c.atr++;else if(x?.s==='andamento')c.and++;else c.fazer++});return c}
+/* prazos cumpridos num período: conta cada dia em que a rotina era prevista */
+function resumoCron(filtro,ini,fim){const o={prev:0,ok:0,atr:0,pend:0,pct:null},ate=fim<HJ?fim:HJ;if(ini>ate)return o;
+ for(const dia of diasDe(ini,ate))for(const r of D.cronograma){if(!filtro(r)||!ocorre(r,dia))continue;const x=exDe(r.id,dia);
+  if(x?.s==='feita'){o.prev++;x.concl<=dia?o.ok++:o.atr++}else if(dia<HJ){o.prev++;o.pend++}}
+ o.pct=o.prev?Math.round(o.ok/o.prev*100):null;return o}
+async function ocSet(rid,dia,s){const r=D.cronograma.find(x=>x.id===rid);if(!r)return;
+ if(!podeMarcar(r)){toast('Só os responsáveis por esta rotina e o diretor podem marcar.');return}
+ if(dia>HJ){toast('Essa rotina é de um dia que ainda não chegou.');return}
+ const id=dia+'_'+rid,x=exDe(rid,dia),agora=new Date().toISOString();
+ if(!s){if(!x)return;try{await DB.collection('execucoes').doc(id).delete();log(`Reabriu a rotina "${r.t}" de ${fmt(dia)}`);toast('Rotina reaberta')}catch(e){toast('Não foi possível reabrir.')}return}
+ const atraso=s==='feita'&&HJ>dia;
+ await salvar('execucoes',id,{rot:rid,dia,s,ini:x?.ini||agora,por:S.perfil,porNome:pessoa(S.perfil)?.n||quemSou(),em:agora,concl:s==='feita'?HJ:'',hora:s==='feita'?agoraHM():''},
+  s==='feita'?(atraso?'Concluída com atraso':'Concluída'):'Em andamento',
+  `${s==='feita'?'Concluiu':'Começou'} a rotina "${r.t}" de ${fmt(dia)}${atraso?' (com atraso)':''}`)}
+function ocFeita(rid,dia){ocSet(rid,dia,exDe(rid,dia)?.s==='feita'?null:'feita')}
+function ocAnd(rid,dia){const x=exDe(rid,dia);if(x?.s==='feita')return;ocSet(rid,dia,x?.s==='andamento'?null:'andamento')}
+function linOc(r,dia,comDia){const x=exDe(r.id,dia),st=stOc(r,dia),done=x?.s==='feita',pm=podeMarcar(r)&&dia<=HJ;
+ const info=[(r.sis||[]).join(' · '),nomesRs(r),r.apoio?'apoio: '+r.apoio:''].filter(Boolean).map(esc).join(' · ');
+ return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}"><button class="chkbtn" ${pm?'':'disabled'} onclick="ocFeita('${r.id}','${dia}')" aria-label="${done?'Reabrir':'Concluir'} ${esc(r.t)}" title="${pm?(done?'Reabrir':'Marcar como concluída'):'Só os responsáveis marcam'}">${done?'✓':''}</button>
+ <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
+ ${done?`<span class="pos">Concluída por ${esc(x.porNome||'—')}${x.concl!==dia?` em ${fmt(x.concl)}`:''}${x.hora?` às ${x.hora}`:''}</span>`:x?.s==='andamento'?`<span style="color:var(--accent)">Em andamento com ${esc(x.porNome||'—')} desde ${hmDe(x.ini)}</span>`:''}
+ ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}</div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}
+ <button class="tag ${st[0]}" ${pm&&!done?'':'disabled'} onclick="ocAnd('${r.id}','${dia}')" title="${pm&&!done?(x?.s==='andamento'?'Voltar para a fazer':'Marcar em andamento'):''}">${st[1]}</button></div>`}
+const filtroCron=()=>r=>(!S.cQuem||rsDe(r).includes(S.cQuem))&&(!S.cSis||(r.sis||[]).includes(S.cSis));
+const pessoasCron=()=>[...new Set(D.cronograma.flatMap(rsDe))].filter(pessoa).sort((a,b)=>nomeDe(a).localeCompare(nomeDe(b)));
+function cronFiltros(){const b=(on,txt,js)=>`<button class="chip ${on?'on':''}" onclick="${js};render();salvarEstado()">${esc(txt)}</button>`;
+ return `<div class="filtros cronf">${b(!S.cQuem,'Todas as pessoas',"S.cQuem=''")}${pessoasCron().map(p=>b(S.cQuem===p,nomeDe(p)+(p===S.perfil?' (você)':''),`S.cQuem='${p}'`)).join('')}<span class="sep"></span>${b(!S.cSis,'Todos os sistemas',"S.cSis=''")}${sists().map((s,i)=>b(S.cSis===s,s,`S.cSis=sists()[${i}]`)).join('')}</div>`}
+function cronAbas(){const t=S.cTab||'dia';return `<div class="tabs big" role="tablist" aria-label="Cronograma">${[['dia','Dia'],['semana','Semana'],['quem','Quem faz o quê'],['rotinas','Rotinas cadastradas'],['tri','Trimestre']].map(([k,l])=>`<button role="tab" aria-selected="${t===k}" class="${t===k?'on':''}" onclick="S.cTab='${k}';render();salvarEstado()">${l}</button>`).join('')}</div>`}
+function cDia(n){let d=S.cDia||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S.cDia=d;render()}
+function cronDia(){const dia=S.cDia||HJ,f=filtroCron(),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
+ const nav2=`<div class="seg"><button onclick="cDia(-1)" aria-label="Dia útil anterior">‹</button><span>${diaTxt(dia)}</span><button onclick="cDia(1)" aria-label="Próximo dia útil">›</button></div>${dia!==HJ?`<button class="btn" onclick="S.cDia='';render()">Hoje</button>`:''}`;
+ const ant=dia===HJ?atrasosCron(f).filter(o=>o.dia<HJ).sort((a,b)=>a.dia<b.dia?-1:1):[];
+ const grupos=[...procs(),''].map(g=>[g,L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g)]).filter(([,l])=>l.length);
+ const tav=D.tarefas.filter(t=>(!S.cQuem||t.r===S.cQuem)&&(t.prazo===dia||(dia===HJ&&atrasada(t)))&&(dir()||pode('ver_tudo')||t.r===S.perfil));
+ return `<div class="cronbar">${nav2}</div>${cronFiltros()}`+
+ `<div class="stats"><div class="stat"><p>Previstas</p><strong>${c.tot}</strong><small>${dia===HJ?'hoje':fmt(dia)}</small></div><div class="stat"><p>Concluídas</p><strong style="color:${c.tot&&c.ok===c.tot?'var(--ok)':'var(--ink)'}">${c.ok}</strong><small>${c.tot?Math.round(c.ok/c.tot*100):0}%</small></div><div class="stat"><p>Em andamento</p><strong style="color:${c.and?'var(--accent)':'var(--ink)'}">${c.and}</strong><small>começadas</small></div><div class="stat"><p>Atrasadas</p><strong style="color:${c.atr+ant.length?'var(--bad)':'var(--ink)'}">${c.atr+ant.length}</strong><small>${ant.length?`${ant.length} de dias anteriores`:'passaram do horário'}</small></div></div>`+
+ (ant.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${ant.length} ${ant.length>1?'rotinas':'rotina'} de dias anteriores</span></div>${ant.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:'')+
+ (grupos.length?grupos.map(([g,l])=>{const k=l.filter(r=>exDe(r.id,dia)?.s==='feita').length,i=procs().indexOf(g);return `<div class="panel"><div class="ph"><h2>${i>=0?`<span class="meta">${i+1}.</span> `:''}${esc(g||'Outras atividades')}</h2><span>${k} de ${l.length} concluídas</span></div><div class="bar" style="margin:6px 0 8px"><i style="width:${k/l.length*100}%"></i></div>${l.map(r=>linOc(r,dia)).join('')}</div>`}).join(''):`<div class="panel">${vazio(D.cronograma.length?'Nenhuma rotina neste dia':'Cronograma ainda não montado',D.cronograma.length?'Feriado, fim de semana ou nenhuma rotina para o filtro escolhido.':'Monte o cronograma com as rotinas de cada pessoa.',null)}${!D.cronograma.length&&podeCron()?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div>':''}</div>`)+
+ (tav.length?`<div class="panel"><div class="ph"><h2>Tarefas avulsas</h2><span>${tav.length}</span></div>${tav.map(linTar).join('')}</div>`:'')}
+function cronSemana(){const base=S.cDia||HJ,d0=new Date(base+'T12:00');d0.setDate(d0.getDate()-((d0.getDay()+6)%7));const dias=[0,1,2,3,4].map(i=>addDia(isoD(d0),i));
+ const f=filtroCron(),L=D.cronograma.filter(r=>f(r)&&dias.some(d=>ocorre(r,d))).sort(ordR);
+ const sim={ok:'✓',wa:'✓',ac:'●',bad:'!',ne:''};
+ const nav2=`<div class="seg"><button onclick="S.cDia=addDia('${base}',-7);render()" aria-label="Semana anterior">‹</button><span>Semana de ${fmt(dias[0])} a ${fmt(dias[4])}</span><button onclick="S.cDia=addDia('${base}',7);render()" aria-label="Próxima semana">›</button></div>`;
+ return `<div class="cronbar">${nav2}</div>${cronFiltros()}<div class="panel">${L.length?`<div class="tbl-wrap"><table class="grade wkt"><thead><tr><th>Rotina</th>${dias.map(d=>`<th class="${d===HJ?'hj':''}">${SEM[new Date(d+'T12:00').getDay()]} ${fmt(d)}</th>`).join('')}</tr></thead><tbody>${L.map(r=>`<tr><td><b style="font-weight:500">${esc(r.t)}</b><br><span class="meta">${esc(r.etapa||'Outras')} · ${esc(nomesRs(r))}${r.hora?' · '+esc(r.hora):''}</span></td>${dias.map(d=>{if(!ocorre(r,d))return '<td><span class="wk off" aria-hidden="true"></span></td>';const st=stOc(r,d),pm=podeMarcar(r)&&d<=HJ;return `<td><button class="wk ${st[0]}" ${pm?'':'disabled'} onclick="ocFeita('${r.id}','${d}')" title="${esc(r.t)} · ${fmt(d)} · ${st[1]}" aria-label="${esc(r.t)} ${fmt(d)}: ${st[1]}">${sim[st[0]]}</button></td>`}).join('')}</tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma rotina nesta semana','')}</div>
+ <div class="legend"><span><i style="background:var(--ok)"></i>Concluída</span><span><i style="background:var(--accent)"></i>Em andamento</span><span><i style="background:var(--bad)"></i>Atrasada</span><span><i style="background:var(--warn)"></i>Concluída com atraso</span><span><i style="background:var(--line)"></i>A fazer</span></div>`}
+function cronQuem(){const vig=D.cronograma.filter(r=>r.ativo!==false&&(!r.fim||r.fim>=HJ)),S2=sists(),G=[...procs(),''];
+ const cel=(g,s)=>{const ns=[...new Set(vig.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g&&(r.sis||[]).includes(s)).flatMap(rsDe))].map(nomeDe);return ns.length?ns.map(esc).join('<br>'):'<span class="meta">—</span>'};
+ const ps=pessoasCron(),ap=[...new Set(vig.map(r=>r.apoio).filter(Boolean))];
+ return `<div class="panel"><div class="ph"><h2>Etapa do processo × sistema</h2><span>rotinas em vigor</span></div><div class="tbl-wrap"><table class="grade lista"><thead><tr><th>Etapa</th>${S2.map(s=>`<th>${esc(s)}</th>`).join('')}</tr></thead><tbody>${G.filter(g=>g||vig.some(r=>!procs().includes(r.etapa))).map((g,i)=>`<tr><td><b style="font-weight:500">${g?`${i+1}. ${esc(g)}`:'Outras atividades'}</b></td>${S2.map(s=>`<td>${cel(g,s)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
+ <div class="cards">${ps.map(p=>{const l=vig.filter(r=>rsDe(r).includes(p)).sort(ordR);return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><div class="av">${esc((nomeDe(p)||'?')[0])}</div><b style="font-weight:500">${esc(nomeDe(p))}</b><span class="meta" style="margin-left:auto">${l.length} ${l.length>1?'rotinas':'rotina'}</span></div>${l.map(r=>`<div class="row"><div class="t"><b style="font-weight:400">${esc(r.t)}</b><span>${esc(r.etapa||'Outras')} · ${esc((r.sis||[]).join(', '))} · ${esc(freqTxt(r))}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}</div>`).join('')}</div>`}).join('')}</div>`+
+ (ap.length?note(`Apoio: ${ap.map(esc).join(', ')}.`):'')}
+function cronRotinas(){const pc=podeCron(),G=[...procs(),''],L=[...D.cronograma].sort(ordR);
+ const lin=r=>`<div class="row"><div class="t"><b>${esc(r.t)}</b><span>${esc(freqTxt(r))} · ${esc((r.sis||[]).join(', ')||'Sem sistema')} · ${esc(nomesRs(r))}${r.apoio?' · apoio: '+esc(r.apoio):''}</span><span>${r.ini?`Vale de ${fmt(r.ini)}/${r.ini.slice(0,4)}`:'Vale sempre'}${r.fim?` até ${fmt(r.fim)}/${r.fim.slice(0,4)}`:''}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${r.ativo===false?'<span class="tag ne">Pausada</span>':r.fim&&r.fim<HJ?'<span class="tag ne">Encerrada</span>':''}${pc?`<button class="btn ghost" onclick="editRot('${r.id}')">Editar</button>`:''}</div>`;
+ return (L.length?G.map(g=>{const l=L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g);return l.length?`<div class="panel"><div class="ph"><h2>${esc(g||'Outras atividades')}</h2><span>${l.length}</span></div>${l.map(lin).join('')}</div>`:''}).join(''):`<div class="panel">${vazio('Nenhuma rotina cadastrada','Use o modelo de novembro ou cadastre cada rotina com etapa, sistema, responsáveis e horário.',null)}${pc?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" onclick="editRot()">Nova rotina</button><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div>':''}</div>`)+
+ note('Pausar ou dar data final a uma rotina mantém o histórico. Ao excluir, os registros de dias já feitos deixam de contar.')}
+function cronTri(){const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
+ const lin=(n,o)=>`<tr><td>${n}</td><td>${o.prev}</td><td>${o.ok}</td><td>${o.atr?`<span class="tag wa">${o.atr}</span>`:'0'}</td><td>${o.pend?`<span class="tag bad">${o.pend}</span>`:'0'}</td><td>${o.pct===null?'—':`<span class="${o.pct<70?'neg':o.pct>=90?'pos':''}">${o.pct}%</span>`}</td></tr>`;
+ const th='<th>Previstas até hoje</th><th>No dia</th><th>Com atraso</th><th>Não feitas</th><th>No prazo</th>';
+ const G=[...procs(),''].filter(g=>D.cronograma.some(r=>(procs().includes(r.etapa)?r.etapa:'')===g));
+ return `<div class="cronbar">${triNav()}<span class="meta">${mesesTri(S.tri).map(mesCurto).join(' · ')}</span></div>
+ <div class="panel"><div class="ph"><h2>Por pessoa</h2></div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Pessoa</th>${th}</tr></thead><tbody>${pessoasCron().map(p=>lin(esc(nomeDe(p)),resumoCron(r=>rsDe(r).includes(p),ini,fim))).join('')||'<tr><td colspan="6" style="text-align:left" class="meta">Sem rotinas no trimestre.</td></tr>'}${lin('<b style="font-weight:500">Departamento</b>',resumoCron(()=>true,ini,fim))}</tbody></table></div></div>
+ <div class="panel"><div class="ph"><h2>Por etapa do processo</h2></div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Etapa</th>${th}</tr></thead><tbody>${G.map(g=>lin(esc(g||'Outras atividades'),resumoCron(r=>(procs().includes(r.etapa)?r.etapa:'')===g,ini,fim))).join('')}</tbody></table></div></div>`+
+ note('Cada dia em que a rotina estava prevista conta uma vez. Concluir depois do dia conta como atraso. Esses números entram nos prazos cumpridos de cada pessoa em Equipe e metas e no feedback do trimestre.')}
+/* cadastro de rotina */
+function editRot(id){const r=id?D.cronograma.find(x=>x.id===id):{freq:'diaria',rs:S.cQuem?[S.cQuem]:[],sis:S.cSis?[S.cSis]:[],etapa:procs()[0],prio:'normal',ini:HJ,ativo:true,dias:[1],n:1,antes:0};if(!r)return;
+ FORM={tipo:'_rot',id:id||'',del:false};const ps=colabs(),SS=[...new Set([...sists(),...(r.sis||[])])];
+ const ck=(id2,on,txt)=>`<label class="ck"><input type="checkbox" id="${id2}" ${on?'checked':''}> ${esc(txt)}</label>`;
+ const ets=[...new Set([...procs(),...(r.etapa?[r.etapa]:[])])];
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">${id?'Editar rotina':'Nova rotina'}</h2><p class="sub" style="font-size:13px">Atividade que se repete, com etapa do processo, sistema, responsáveis e horário. Cada pessoa marca em andamento e concluída no dia.</p></div>
+ <div class="fgrid">
+ <div class="full"><label class="lbl" for="rt_t">Descrição</label><input class="inp" id="rt_t" value="${esc(r.t||'')}" placeholder="Baixa no WAE"><p class="ferr" id="rte_t"></p></div>
+ <div><label class="lbl" for="rt_et">Etapa do processo</label><select class="inp" id="rt_et">${ets.map(e=>`<option ${e===r.etapa?'selected':''}>${esc(e)}</option>`).join('')}<option value="" ${!r.etapa?'selected':''}>Outras atividades</option></select></div>
+ <div><label class="lbl" for="rt_prio">Prioridade</label><select class="inp" id="rt_prio"><option value="normal">Normal</option><option value="atencao" ${r.prio==='atencao'?'selected':''}>Atenção (avisa no dia anterior)</option></select></div>
+ <div class="full"><span class="lbl">Sistema</span><div class="cks">${SS.map((s,i)=>ck('rt_s_'+i,(r.sis||[]).includes(s),s)).join('')}</div></div>
+ <div class="full"><span class="lbl">Responsáveis</span><div class="cks">${ps.map(p=>ck('rt_r_'+p.id,(r.rs||[]).includes(p.id),p.n)).join('')||'<span class="meta">Cadastre a equipe em Equipe e metas.</span>'}</div><p class="ferr" id="rte_r"></p></div>
+ <div class="full"><label class="lbl" for="rt_apoio">Apoio · opcional</label><input class="inp" id="rt_apoio" value="${esc(r.apoio||'')}" placeholder="Evandro (Protheus)"></div>
+ <div><label class="lbl" for="rt_freq">Quando acontece</label><select class="inp" id="rt_freq" onchange="rotVis()">${FREQS.map(([k,l])=>`<option value="${k}" ${k===r.freq?'selected':''}>${l}</option>`).join('')}</select></div>
+ <div><label class="lbl" for="rt_hora">Horário · opcional</label><input class="inp" id="rt_hora" type="time" value="${esc(r.hora||'')}"><p class="meta" style="margin:4px 0 0">Passou do horário sem concluir, vira atraso.</p></div>
+ <div class="full" id="rtw_dias"><span class="lbl">Dias da semana</span><div class="cks">${[1,2,3,4,5].map(d=>ck('rt_d_'+d,(r.dias||[]).map(Number).includes(d),SEM[d])).join('')}</div></div>
+ <div id="rtw_n"><label class="lbl" for="rt_n" id="rtl_n">Dia</label><input class="inp" id="rt_n" type="number" min="1" max="31" value="${+r.n||1}"></div>
+ <div id="rtw_antes"><label class="lbl" for="rt_antes">Fazer quantos dias úteis antes · opcional</label><input class="inp" id="rt_antes" type="number" min="0" max="10" value="${+r.antes||0}"><p class="meta" style="margin:4px 0 0">1 = um dia antes do vencimento (D-1).</p></div>
+ <div id="rtw_data"><label class="lbl" for="rt_data">Data</label><input class="inp" id="rt_data" type="date" value="${esc(r.data||'')}"></div>
+ <div><label class="lbl" for="rt_ini">Vale a partir de</label><input class="inp" id="rt_ini" type="date" value="${esc(r.ini||'')}"></div>
+ <div><label class="lbl" for="rt_fim">Até · opcional</label><input class="inp" id="rt_fim" type="date" value="${esc(r.fim||'')}"><p class="meta" style="margin:4px 0 0">Vazio: continua valendo.</p></div>
+ <div class="full"><label class="lbl" for="rt_obs">Observação · opcional</label><textarea class="inp" id="rt_obs" style="min-height:60px" placeholder="Os polos têm outro horário">${esc(r.obs||'')}</textarea></div>
+ <div class="full">${ck('rt_ativo',r.ativo!==false,'Rotina ativa')}</div><p class="ferr full" id="rte_freq"></p></div>
+ <div class="foot"><div>${id?`<button class="btn danger" id="bdel" onclick="delRot()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaRot()">${id?'Salvar alterações':'Cadastrar rotina'}</button></div></div>`;
+ document.getElementById('ov').hidden=false;rotVis();setTimeout(()=>document.getElementById('rt_t')?.focus(),30)}
+function rotVis(){const f=val('rt_freq'),sh=(id,on)=>{const e=document.getElementById(id);if(e)e.style.display=on?'':'none'};
+ sh('rtw_dias',f==='semanal');sh('rtw_n',f==='mensal_util'||f==='mensal_dia');sh('rtw_antes',f==='mensal_dia');sh('rtw_data',f==='unica');
+ const l=document.getElementById('rtl_n');if(l)l.textContent=f==='mensal_util'?'Qual dia útil (1 = primeiro)':'Dia do mês (vencimento)'}
+async function salvaRot(){['rte_t','rte_r','rte_freq'].forEach(e=>errEl(e,''));
+ const t=val('rt_t'),freq=val('rt_freq'),ant=FORM.id?D.cronograma.find(x=>x.id===FORM.id):null,SS=[...new Set([...sists(),...(ant?.sis||[])])];
+ const sis=SS.filter((s,i)=>document.getElementById('rt_s_'+i)?.checked),rs=colabs().filter(p=>document.getElementById('rt_r_'+p.id)?.checked).map(p=>p.id);
+ const dias=[1,2,3,4,5].filter(d=>document.getElementById('rt_d_'+d)?.checked),n=Math.round(+val('rt_n')||0),antes=Math.max(0,Math.round(+val('rt_antes')||0)),data=val('rt_data'),ini=val('rt_ini'),fim=val('rt_fim');let ok=true;
+ if(!t){errEl('rte_t','Descreva a rotina.');ok=false}
+ if(!rs.length){errEl('rte_r','Escolha ao menos um responsável.');ok=false}
+ if(freq==='semanal'&&!dias.length){errEl('rte_freq','Escolha ao menos um dia da semana.');ok=false}
+ if(freq==='mensal_util'&&!(n>=1&&n<=23)){errEl('rte_freq','Use um dia útil de 1 a 23.');ok=false}
+ if(freq==='mensal_dia'&&!(n>=1&&n<=31)){errEl('rte_freq','Use um dia de 1 a 31.');ok=false}
+ if(freq==='unica'&&!data){errEl('rte_freq','Informe a data.');ok=false}
+ if(ini&&fim&&fim<ini){errEl('rte_freq','A data final é antes da inicial.');ok=false}
+ if(!ok)return;const {id:_,...b}=ant||{criado:HJ};
+ if(await salvar('cronograma',FORM.id||null,{...b,t,etapa:val('rt_et'),prio:val('rt_prio'),sis,rs,apoio:val('rt_apoio'),freq,dias,n,antes,data,hora:val('rt_hora'),ini,fim,obs:val('rt_obs'),ativo:document.getElementById('rt_ativo').checked},ant?'Rotina atualizada':'Rotina cadastrada',`${ant?'Alterou':'Cadastrou'} a rotina "${t}" do cronograma`))fechar()}
+async function delRot(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
+ const r=D.cronograma.find(x=>x.id===FORM.id);try{await DB.collection('cronograma').doc(FORM.id).delete();log(`Excluiu a rotina "${r?.t||''}" do cronograma`);toast('Rotina excluída');fechar()}catch(e){toast('Não foi possível excluir.')}}
+/* ajustes: etapas, sistemas e módulos guardados */
+function cfgCron(){FORM={tipo:'_cfgcron',listas:{et:[...procs()],sis:[...sists()]}};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">Ajustes</h2><p class="sub" style="font-size:13px">Etapas do processo, sistemas usados e quais telas antigas ficam no menu.</p></div>
+ <div class="fgrid one"><div><span class="lbl">Etapas do processo (na ordem em que acontecem)</span>${chipsEd('et','Ex.: Aprovação')}</div>
+ <div><span class="lbl">Sistemas</span>${chipsEd('sis','Ex.: Internet banking')}</div>
+ <div><span class="lbl">Telas guardadas para depois</span>${MODS.map(([k,n,d])=>`<label class="perm"><input type="checkbox" id="md_${k}" ${modOn(k)?'checked':''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>
+ <div><span class="lbl">Modelo pronto</span><button class="btn" type="button" onclick="montarModelo()">Montar o cronograma de novembro</button><p class="meta" style="margin:4px 0 0">Cria as rotinas de WAE e Protheus com Natalia, Jeferson e Natasha. Depois é só ajustar.</p></div></div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgCron()">Salvar</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+async function salvaCfgCron(){const L=FORM.listas;if(!L.et.length||!L.sis.length){toast('Deixe ao menos uma etapa e um sistema.');return}
+ const modulos=Object.fromEntries(MODS.map(([k])=>[k,!!document.getElementById('md_'+k)?.checked]));
+ try{await DB.doc('config/estrutura').set({...CFG,cronEtapas:L.et,cronSis:L.sis,modulos});log('Alterou os ajustes do cronograma');toast('Ajustes salvos');fechar()}
+ catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar os ajustes.':'Não foi possível salvar.')}}
+/* departamentos (usados pelos chamados) quando a tela de entregas está guardada */
+function gerirDeps(){FORM={tipo:'_deps'};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Chamados</p><h2 id="sheet-title">Departamentos</h2><p class="sub" style="font-size:13px">Áreas que abrem chamados e enviam documentos para o financeiro.</p></div>
+ <div>${D.departamentos.length?D.departamentos.map(d=>`<div class="row"><div class="t"><b>${esc(d.n)}</b><span>${esc(d.contato||'Sem contato')}${d.emails?' · '+esc(d.emails):''}</span></div><button class="btn" onclick="abrir('departamento','${esc(d.id)}')">Editar</button></div>`).join(''):vazio('Nenhum departamento ainda','')}</div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Fechar</button><button class="btn pri" onclick="abrir('departamento')">Novo departamento</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+/* modelo pronto: cronograma de novembro (transição WAE → Protheus) */
+async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode montar o cronograma.');return}
+ if(D.cronograma.length&&!S.confMod){S.confMod=true;toast('Já existem rotinas. Clique de novo para adicionar o modelo mesmo assim.');setTimeout(()=>S.confMod=false,6000);return}
+ S.confMod=false;const faltam=[];
+ const achar=async(chaves,n)=>{const p=D.equipe.find(x=>chaves.includes(norm(x.n).split(/\s+/)[0]));if(p)return p.id;
+  if(!(dir()||pode('cadastros'))){faltam.push(n);return ''}
+  const id='p'+Math.random().toString(36).slice(2,12);try{await DB.collection('equipe').doc(id).set({n,c:'Financeiro',vinc:'CLT',categ:'colab',criado:HJ});log(`Cadastrou colaborador: ${n}`);return id}catch(e){faltam.push(n);return ''}};
+ const nt=await achar(['natalia'],'Natalia'),jf=await achar(['jeferson','jefferson'],'Jeferson'),ns=await achar(['natasha'],'Natasha');
+ const JN=[jf,ns].filter(Boolean),NA=[nt].filter(Boolean),EV='Evandro (Protheus)',ini=HJ>'2026-11-01'?HJ:'2026-11-01';
+ const M=[
+  ['Identificação','Identificar as contas que vencem em 5 dias úteis (D-5)',['WAE','Protheus'],JN,{obs:'D-5: identificar com 5 dias úteis de antecedência. O pagamento é 1 dia antes do vencimento (D-1).'}],
+  ['Conferência','Conferir documentos, valores, vencimentos e centro de custo',['WAE','Protheus'],JN,{obs:'Contas identificadas no D-5.'}],
+  ['Lançamento','Lançamento no WAE',['WAE'],NA],
+  ['Lançamento','Lançamento no Protheus',['Protheus'],JN,{apoio:EV}],
+  ['Baixa','Baixa no WAE',['WAE'],NA],
+  ['Baixa','Baixa no Protheus',['Protheus'],JN,{apoio:EV}],
+  ['Pagamento','Pagamento · todas as contas',['WAE','Protheus'],JN,{hora:'10:00',obs:'10h: todas as contas. Pagamento 1 dia antes do vencimento (D-1).'}],
+  ['Pagamento','Pagamento · WAE',['WAE'],JN,{hora:'14:30',obs:'A partir das 14:30: WAE.'}],
+  ['Pagamento','Pagamento dos polos',['WAE','Protheus'],JN,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'}],
+  ['Pagamento','Folha de pagamento',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'}],
+  ['Pagamento','Impostos (vencimento dia 20)',['WAE','Protheus'],JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:1,obs:'Atenção: confira as guias. Crie uma rotina para cada vencimento diferente.'}],
+  ['Conciliação','Conciliação bancária',['WAE','Protheus'],JN],
+  ['','Acompanhamento diário do Protheus',['Protheus'],JN,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a adaptação ao Protheus.'}]];
+ let k=0;for(const [etapa,t,sis,rs,x] of M){if(await salvar('cronograma',null,{t,etapa,sis,rs,apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini,fim:'',ativo:true,criado:HJ,...(x||{})},false,false))k++}
+ log(`Montou o cronograma de novembro com ${k} rotinas`);
+ toast(faltam.length?`${k} rotinas criadas. Cadastre ${faltam.join(', ')} e defina nas rotinas.`:`${k} rotinas criadas. Ajuste o que precisar.`);
+ if(FORM)fechar();S.cTab='dia';S.cDia='';ir('rotinas')}
+
+function cronPainel(){if(!D.cronograma.length)return podeCron()?`<div class="panel"><div class="ph"><h2>Cronograma do departamento</h2></div>${vazio('Cronograma ainda não montado','Monte as rotinas de WAE e Protheus com os responsáveis de cada etapa.',null)}<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div></div>`:'';
+ const ps=pessoasCron(),ant=atrasosCron().filter(o=>o.dia<HJ),hoje=D.cronograma.filter(r=>ocorre(r,HJ)).sort(ordR);
+ const vivo=hoje.filter(r=>{const s=stOc(r,HJ)[0];return s==='ac'||s==='bad'});
+ return `<div class="panel"><div class="ph"><h2>Cronograma de hoje</h2><button class="btn ghost" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button></div>
+ <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Pessoa</th><th>Hoje</th><th>Concluídas</th><th>Em andamento</th><th>Atrasadas</th><th>De dias anteriores</th></tr></thead><tbody>${ps.map(p=>{const f=r=>rsDe(r).includes(p),c=contaDia(HJ,f),a=ant.filter(o=>f(o.r)).length;return `<tr><td style="text-align:left">${esc(nomeDe(p))}</td><td>${c.tot}</td><td>${c.ok}</td><td>${c.and?`<span class="tag ac">${c.and}</span>`:'0'}</td><td>${c.atr?`<span class="tag bad">${c.atr}</span>`:'0'}</td><td>${a?`<span class="tag bad">${a}</span>`:'0'}</td></tr>`}).join('')}</tbody></table></div>
+ ${vivo.length||ant.length?`<p class="eyebrow" style="margin:14px 0 0">Em andamento e atrasadas</p>${vivo.map(r=>linOc(r,HJ)).join('')}${ant.slice(0,8).map(o=>linOc(o.r,o.dia,true)).join('')}${ant.length>8?`<p class="meta">E mais ${ant.length-8} no cronograma.</p>`:''}`:`<p class="meta" style="margin:10px 0 0">Nada em andamento ou atrasado agora.</p>`}</div>`}
+
 /* ---------- telas ---------- */
-const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['rotinas','Rotinas e tarefas'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['ponto','Ponto e horas'],['chamados','Chamados'],['bancos','Troca de dados bancários'],['triagem','E-mails recebidos'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
+const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['rotinas','Cronograma'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['chamados','Chamados'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
-const MENU_PERM={whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
-const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(!MENU_PERM[k]||pode(MENU_PERM[k]))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
-const MENU_PAI={fbpessoa:'feedbacks',fbedit:'feedbacks',fbver:'feedbacks',fbmodelos:'feedbacks'};
+const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
+const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
+function chAbas(on){if(!(pode('chamados')&&pode('email')))return '';const nt=D.emails.filter(e=>e.st==='triagem').length;
+ return `<div class="tabs big" role="tablist" aria-label="Chamados e e-mails"><button role="tab" aria-selected="${on==='ch'}" class="${on==='ch'?'on':''}" onclick="ir('chamados')">Chamados</button><button role="tab" aria-selected="${on==='em'}" class="${on==='em'?'on':''}" onclick="ir('triagem')">E-mails para revisar ${nt?`<span class="tag wa" style="font-size:11px;margin-left:4px">${nt}</span>`:''}</button></div>`}
+function chEmail(){if(!pode('email'))return '';
+ return statusSync(`<span style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto"><button class="btn" onclick="conectarEmail()">Conectar e-mail</button>${ME.admin||!real()?`<button class="btn" onclick="cfgEmail()" title="Escolher a caixa ou colar o link da pasta compartilhada">Configurar caixa ou link</button>`:''}<button class="btn pri" onclick="sincronizar(true)">${S.sync?'Verificando…':'Verificar agora'}</button></span>`)}
+const MENU_PAI={triagem:'chamados',fbpessoa:'feedbacks',fbedit:'feedbacks',fbver:'feedbacks',fbmodelos:'feedbacks'};
 function linEnt(e){const g=stEnt(e);return `<div class="row"><div class="t"><b>${esc(e.item)}</b><span>${esc(depNome(e.dep))} · ${esc(e.rec||'Única')} · responsável: ${esc(nomeDe(e.resp))}</span></div><span class="tag ${g[0]}">${g[1]}</span>${!e.recebido?`<button class="btn" onclick="receber('${esc(e.id)}')">Marcar recebido</button>`:''}${pode('entregas')&&entAtrasada(e)?`<button class="btn" onclick="cobrar('${esc(e.id)}')">Cobrar</button>`:''}${editar('entrega',e.id)}</div>`}
 function painelDep(){const R=resumoDep().filter(r=>r.tot);
  if(!R.length)return vazio('Nenhuma entrega cadastrada','Cadastre o que cada departamento precisa enviar e os prazos.','entrega','Cadastrar entrega');
@@ -1044,18 +1487,27 @@ usuarios(){const ped=D.pedidos.filter(p=>!acessoDe(p.id)).sort((a,b)=>a.em<b.em?
  (ped.length?`<div class="panel"><div class="ph"><h2>Pedidos de acesso</h2><span>${ped.length}</span></div>${ped.map(p=>`<div class="row">${avU(p.id)}<div class="t"><b>${esc(nomeU(p.id))}</b><span>${esc(PAPEIS[p.perfil]||'')}${p.dep?' · '+esc(depNome(p.dep)):''}${p.obs?' · '+esc(p.obs):''} · ${fmtHora(p.em)}</span></div><button class="btn" onclick="recusar('${esc(p.id)}')">Recusar</button><button class="btn pri" onclick="editAcesso('${esc(p.id)}')">Revisar e liberar</button></div>`).join('')}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Pessoas com acesso</h2><span>${lst.length}</span></div>
  ${real()?`<div class="row">${avU(ME.uid)}<div class="t"><b>${esc(ME.nome||'Você')} <span class="meta">(você)</span></b><span>Administrador · acesso total</span></div></div>`:''}
- ${lst.filter(a=>a.id!==ME.uid).map(a=>`<div class="row">${avU(a.id)}<div class="t"><b>${esc(nomeU(a.id))}</b><span>${esc(PAPEIS[a.perfil]||'')}${a.perfil==='equipe'?' · '+esc(nomeDe(a.pessoa)):''}${a.perfil==='solicitante'?' · '+esc(depNome(a.dep)):''}</span></div>${a.ativo===false?'<span class="tag bad">Bloqueado</span>':a.perfil==='equipe'?`<span class="meta">${PERMS.filter(([k])=>({...PADRAO,...a.perms})[k]).length} de ${PERMS.length} permissões</span>`:''}<button class="btn" onclick="editAcesso('${esc(a.id)}')">Editar</button></div>`).join('')}
+ ${lst.filter(a=>a.id!==ME.uid).map(a=>`<div class="row">${avU(a.id)}<div class="t"><b>${esc(nomeU(a.id))}</b><span>${esc(PAPEIS[a.perfil]||'')}${a.perfil==='equipe'?' · '+esc(nomeDe(a.pessoa)):''}${a.funcao?' · '+esc(a.funcao):''}${(a.assuntos||[]).filter(assDe).length?' · responsável por '+esc(a.assuntos.filter(assDe).map(assNome).join(', ')):''}${a.perfil==='solicitante'?' · '+esc(depNome(a.dep)):''}</span></div>${a.ativo===false?'<span class="tag bad">Bloqueado</span>':a.perfil==='equipe'?`<span class="meta">${PERMS.filter(([k])=>({...PADRAO,...a.perms})[k]).length} de ${PERMS.length} permissões</span>`:''}<button class="btn" onclick="editAcesso('${esc(a.id)}')">Editar</button></div>`).join('')}
  ${!lst.filter(a=>a.id!==ME.uid).length?vazio('Ninguém liberado ainda','Quando alguém abrir o portal pela primeira vez, o pedido de acesso aparece aqui.'):''}</div>
  <div class="panel"><div class="ph"><h2>O que cada perfil pode fazer</h2><span>a equipe pode ter permissões ajustadas pessoa a pessoa</span></div>${matriz()}</div>`+
  note('Quem entra pela primeira vez aparece em Pedidos de acesso. Diretores e administradores liberam, ajustam permissões ou bloqueiam. Bloquear não apaga o histórico.')},
-triagem(){const pend=D.emails.filter(e=>e.st==='triagem').sort((a,b)=>a.recebido<b.recebido?1:-1),hist=D.emails.filter(e=>e.st==='aplicado'||e.st==='ignorado').sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
- const sem=D.departamentos.filter(d=>!listaEmails(d).length);
- return head('Integração com o Outlook','E-mails <em>recebidos</em>','E-mails dos departamentos viram entregas recebidas ou chamados. A leitura usa a sua própria conta Microsoft.',(ME.admin||!real()?`<button class="btn" onclick="cfgEmail()">Configurar</button>`:'')+`<button class="btn pri" onclick="sincronizar(true)">${S.sync?'Verificando…':'Verificar agora'}</button>`)+
- statusSync()+
- (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="ir('entregas')">Cadastrar</button>`:''}</div>`:'')+
- `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length}</span></div>${pend.length?pend.map(cardEmail).join(''):vazio('Nenhum e-mail para revisar','Quando um departamento mandar e-mail, ele aparece aqui com uma sugestão do que fazer.')}</div>
- <div class="panel"><div class="ph"><h2>Já processados</h2><span>últimos ${hist.length}</span></div>${hist.length?hist.map(e=>`<div class="row"><span class="meta" style="width:96px">${fmtHora(e.recebido)}</span><div class="t"><b>${esc(e.assunto)}</b><span>${esc(depNome(e.dep))} · ${resTxt(e)}</span></div>${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Outlook ↗</a>`:''}</div>`).join(''):'<p class="meta">Nada processado ainda.</p>'}</div>`+
- note('O portal guarda só remetente, assunto, data, um trecho curto e o link do e-mail. Anexos, valores e dados bancários continuam no Outlook.')},
+triagem(){const pend=D.emails.filter(e=>e.st==='triagem'),hist=D.emails.filter(e=>e.st==='aplicado'||(e.st==='ignorado'&&!e.auto)).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
+ const g={};pend.forEach(e=>{const k=remDoEmail(e);(g[k]=g[k]||[]).push(e)});
+ const q=norm(S.fRemT||'');
+ const G=Object.entries(g).map(([k,l])=>{const r=D.remetentes.find(x=>x.id===k);return {k,r,nome:r?.nome||l[0].deNome||l[0].de,email:r?.email||l[0].de,dep:r?r.dep:l[0].dep,l:l.sort((a,b)=>a.recebido<b.recebido?1:-1)}}).filter(x=>!q||norm(x.nome+' '+x.email+' '+depNome(x.dep)).includes(q)).sort((a,b)=>a.l[0].recebido<b.l[0].recebido?1:-1);
+ const sem=lerTodos()?[]:D.departamentos.filter(d=>!listaEmails(d).length);
+ const conhecidos=[...D.remetentes].sort((a,b)=>(a.nome||a.email||'').localeCompare(b.nome||b.email||''));
+ return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+
+ chAbas('em')+chEmail()+
+ (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
+ `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length} ${pend.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
+ ${Object.keys(g).length>3?`<input class="inp" id="fremt" data-nodraft="1" placeholder="Buscar remetente ou setor" value="${esc(S.fRemT||'')}" oninput="S.fRemT=this.value;render()">`:''}
+ ${G.length?G.map(x=>`<div class="remg"><div class="remh"><span class="av">${esc((x.nome||'?')[0].toUpperCase())}</span><div class="t"><b>${esc(x.nome)}</b><span>${esc(x.email)} · ${x.l.length} ${x.l.length===1?'e-mail':'e-mails'}</span></div>
+  <select class="inp" style="width:auto;max-width:100%" aria-label="Setor de ${esc(x.nome)}" onchange="setRem('${esc(x.k)}',{dep:this.value})"><option value="">Setor: não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===x.dep?'selected':''}>Setor: ${esc(d.n)}</option>`).join('')}</select><button class="btn ghost" onclick="editRem('${esc(x.k)}')">Mais opções</button></div>
+  ${x.l.map(cardEmail).join('')}</div>`).join(''):vazio(q?'Nenhum remetente encontrado':'Nenhum e-mail para revisar',q?'Tente outro nome.':'Quando chegar e-mail, ele aparece aqui agrupado por quem enviou.')}</div>
+ <div class="panel"><div class="ph"><h2>Contatos</h2><span>${conhecidos.length}</span></div>${conhecidos.length?conhecidos.map(r=>{const n=D.emails.filter(e=>remDoEmail(e)===r.id).length;return `<div class="row"><span class="av">${esc((r.nome||r.email||'?')[0].toUpperCase())}</span><div class="t"><b>${esc(r.nome||r.email)}</b><span>${esc(r.email)} · ${r.dep?esc(depNome(r.dep)):'setor não definido'}${r.cat&&assDe(r.cat)?' · '+esc(assNome(r.cat)):''} · ${n} ${n===1?'e-mail':'e-mails'}</span></div>${r.ignorar?'<span class="tag ne">Ignorado</span>':''}<button class="btn" onclick="editRem('${esc(r.id)}')">Editar</button></div>`}).join(''):'<p class="meta">Os remetentes aparecem aqui depois da primeira verificação.</p>'}</div>
+ <div class="panel"><div class="ph"><h2>Já processados</h2><span>últimos ${hist.length}</span></div>${hist.length?hist.map(e=>`<div class="row"><span class="meta" style="width:96px">${fmtHora(e.recebido)}</span><div class="t"><b>${esc(e.assunto)}</b><span>${esc(e.deNome||e.de)} · ${resTxt(e)}</span></div>${pode('ler_email')&&e.msgId?`<button class="btn ghost" onclick="lerEmail('e:${e.id}')">Ler</button>`:''}</div>`).join(''):'<p class="meta">Nada processado ainda.</p>'}</div>`+
+ note('O portal guarda só remetente, assunto, data, um trecho curto e a referência do e-mail. O texto completo é lido na hora, direto do Outlook, por quem tem a permissão Abrir e-mails no portal.')},
 ferramentas(){const pf=pode('ferramentas'),q=norm(S.fFer||''),ab=catAberta();
  const cats=[...D.categorias].sort((a,b)=>(a.n||'').localeCompare(b.n||''));
  const orf=D.ferramentas.filter(f=>!D.categorias.some(c=>c.id===f.cat));
@@ -1089,12 +1541,48 @@ meus(){const l=D.chamados.filter(c=>c.dep===solDep()).sort((a,b)=>(b.abertoEm||'
  return head(`Portal de chamados · ${esc(depNome(solDep()))}`,'Meus chamados','Acompanhe cada pedido até o pagamento ser programado.',`<button class="btn pri" onclick="ir('abrir')">Abrir chamado</button>`)+
  (pe.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${pe.length} ${pe.length>1?'chamados precisam':'chamado precisa'} de correção sua.</span></div>`:'')+
  `<div class="panel">${l.length?l.map(c=>`<div class="row"><div class="t"><b>${esc(c.assunto)}</b><span>${esc(c.proto)} · ${esc(c.tipo)} · aberto ${fmt(c.aberto)}${c.venc?' · vence '+fmt(c.venc):''}</span>${c.pend&&c.st==='Pendência com solicitante'?`<span style="display:block;color:var(--bad)">Pendência: ${esc(c.pend)}</span>`:''}</div><span class="tag ${stCh[c.st]}">${esc(c.st)}</span><button class="btn ghost" onclick="detalheCh('${esc(c.id)}')">Detalhes</button>${c.st==='Pendência com solicitante'?`<button class="btn pri" onclick="abrirChSheet('${esc(c.id)}')">Corrigir</button>`:''}</div>`).join(''):vazio('Nenhum chamado ainda','Abra o primeiro chamado do seu departamento.')}</div>`},
-chamados(){const l=D.chamados.filter(c=>(!S.fDepC||c.dep===S.fDepC));const ab=D.chamados.filter(c=>c.st!=='Concluído'),fora=ab.filter(c=>c.fora).length,sem=ab.filter(c=>!c.resp).length;
- return head('Pedidos de outras áreas','Chamados','Pagamentos, reembolsos e dúvidas enviados pelos departamentos.',`${podeAdmin()?`<button class="btn" onclick="cfgPrazo()">Regra de prazo: ${DMIN()} dias úteis</button>`:`<span class="chip">Regra: ${DMIN()} dias úteis</span>`}<button class="btn pri" onclick="abrirChSheet()">Abrir chamado</button>`)+
- `<div class="stats"><div class="stat"><p>Em aberto</p><strong>${ab.length}</strong></div><div class="stat"><p>Sem responsável</p><strong style="color:${sem?'var(--warn)':'var(--ink)'}">${sem}</strong></div><div class="stat"><p>Fora do prazo da política</p><strong style="color:${fora?'var(--warn)':'var(--ink)'}">${fora}</strong></div><div class="stat"><p>Aguardando solicitante</p><strong>${ab.filter(c=>c.st==='Pendência com solicitante').length}</strong></div></div>
- <div style="display:flex;justify-content:flex-end"><select class="inp" style="width:auto" onchange="S.fDepC=this.value;render()"><option value="">Todos os departamentos</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${S.fDepC===d.id?'selected':''}>${esc(d.n)}</option>`).join('')}</select></div>
- <div class="kanban">${ETAPAS.map(e=>{const it=l.filter(c=>c.st===e).sort((a,b)=>(a.venc||'9')<(b.venc||'9')?-1:1);return `<div class="col"><h3>${e}<span>${it.length}</span></h3>${it.map(c=>cardCh(c,true)).join('')}</div>`}).join('')}</div>`+
- note('Os outros departamentos veem só Abrir chamado e Meus chamados. Chamados criados a partir de e-mail aparecem marcados para conferência.')},
+chamados(){if(!pode('chamados'))return V.triagem();const fCat=S.fCat||'',bq=norm(S.fBusca||'');
+ const rems=[...new Map(D.chamados.filter(remCh).map(c=>[remCh(c),remNomeCh(c)])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
+ if(S.fRem&&!rems.some(([k])=>k===S.fRem))S.fRem='';
+ const rSel=S.fRem?D.remetentes.find(x=>x.id===S.fRem):null,rCh=S.fRem?D.chamados.filter(c=>remCh(c)===S.fRem):[];
+ const base=D.chamados.filter(c=>(!S.fRem||remCh(c)===S.fRem)&&(!S.fDepC||(S.fDepC==='_sem'?!c.dep:c.dep===S.fDepC))&&(!S.fResp||c.resp===S.fResp)&&(!bq||norm(`${c.assunto} ${c.proto} ${c.solicitante||''} ${c.desc||''} ${c.subcat||''}`).includes(bq)));
+ const doCat=(c,k)=>k===''?true:k==='_sem'?!assDe(c.cat):c.cat===k;
+ const lim=isoD(new Date(Date.now()-30*864e5));
+ const l=base.filter(c=>doCat(c,fCat)&&(c.st!=='Concluído'||(c.concl||c.aberto||'')>=lim));
+ const ab=D.chamados.filter(c=>c.st!=='Concluído'),fora=ab.filter(c=>c.fora).length,sem=ab.filter(c=>!c.resp).length,atr=ab.filter(chAtrasado).length;
+ const nAb=k=>base.filter(c=>c.st!=='Concluído'&&doCat(c,k)).length;
+ const abas=[['','Todos'],...assLista().map(a=>[a.id,a.n]),...(D.chamados.some(c=>!assDe(c.cat))?[['_sem','Sem assunto']]:[])];
+ return head('Pedidos de outras áreas e e-mails','Chamados','Separados por assunto. Aceite cada demanda com prazo e responsável. Ao concluir, ela vai para Demandas realizadas.',`${podeAdmin()?`<button class="btn" onclick="cfgPrazo()">Regra de prazo: ${DMIN()} dias úteis</button>`:`<span class="chip">Regra: ${DMIN()} dias úteis</span>`}${pode('cadastros')?`<button class="btn" onclick="gerirAssuntos()">Assuntos</button>`:''}${pode('cadastros')&&!modOn('entregas')?`<button class="btn" onclick="gerirDeps()">Departamentos</button>`:''}${podeAdmin()?`<button class="btn" onclick="cfgEtapasCh()">Subetapas</button>`:''}<button class="btn pri" onclick="abrirChSheet()">Abrir chamado</button>`)+
+ chAbas('ch')+chEmail()+`<div class="stats"><div class="stat"><p>Em aberto</p><strong>${ab.length}</strong></div><div class="stat"><p>Sem responsável</p><strong style="color:${sem?'var(--warn)':'var(--ink)'}">${sem}</strong></div><div class="stat"><p>Atrasadas no prazo de entrega</p><strong style="color:${atr?'var(--bad)':'var(--ink)'}">${atr}</strong></div><div class="stat"><p>Fora do prazo da política</p><strong style="color:${fora?'var(--warn)':'var(--ink)'}">${fora}</strong></div></div>
+ <div class="tabs big" role="tablist" aria-label="Assuntos">${abas.map(([k,n])=>`<button role="tab" aria-selected="${fCat===k}" class="${fCat===k?'on':''}" onclick="S.fCat='${esc(k)}';render()">${esc(n)} <span class="meta">${nAb(k)}</span></button>`).join('')}${pode('cadastros')?`<button onclick="gerirAssuntos()" title="Adicionar ou excluir assuntos">+ assunto</button>`:''}</div>
+ <div class="filtros"><input class="inp" id="fbch" data-nodraft="1" placeholder="Buscar por resumo, protocolo ou remetente" value="${esc(S.fBusca||'')}" oninput="S.fBusca=this.value;render()">
+ ${rems.length?`<select class="inp" aria-label="Remetente" onchange="S.fRem=this.value;render()"><option value="">Todos os remetentes</option>${rems.map(([k,n])=>`<option value="${esc(k)}" ${S.fRem===k?'selected':''}>${esc(n)} (${D.chamados.filter(c=>remCh(c)===k&&c.st!=='Concluído').length})</option>`).join('')}</select>`:''}
+ <select class="inp" aria-label="Setor" onchange="S.fDepC=this.value;render()"><option value="">Todos os setores</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${S.fDepC===d.id?'selected':''}>${esc(d.n)}</option>`).join('')}<option value="_sem" ${S.fDepC==='_sem'?'selected':''}>Setor não definido</option></select>
+ <select class="inp" aria-label="Responsável" onchange="S.fResp=this.value;render()"><option value="">Todos os responsáveis</option><option value="dir" ${S.fResp==='dir'?'selected':''}>Diretor</option>${colabs().map(p=>`<option value="${esc(p.id)}" ${S.fResp===p.id?'selected':''}>${esc(p.n)}</option>`).join('')}</select></div>
+ ${S.fRem?`<div class="remg remh"><span class="av">${esc((remNomeCh(rCh[0]||{})||'?')[0].toUpperCase())}</span><div class="t"><b>${esc(remNomeCh(rCh[0]||{}))}</b><span>${esc(rSel?.email||'')} · ${rCh.length} ${rCh.length===1?'chamado':'chamados'}, ${rCh.filter(c=>c.st!=='Concluído').length} em aberto</span></div>
+ ${pode('email')||pode('cadastros')?`<select class="inp" style="width:auto;max-width:100%" aria-label="Setor do remetente" onchange="setRem('${esc(S.fRem)}',{dep:this.value})"><option value="">Setor: não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===(rSel?rSel.dep:rCh[0]?.dep)?'selected':''}>Setor: ${esc(d.n)}</option>`).join('')}</select>`:''}<button class="btn ghost" onclick="editRem('${esc(S.fRem)}')">E-mails e opções</button><button class="btn ghost" onclick="S.fRem='';render()">Ver todos</button></div>`:''}
+ <div class="kanban">${ETAPAS.map(e=>{const it=l.filter(c=>c.st===e).sort((a,b)=>e==='Concluído'?((b.concl||'')<(a.concl||'')?-1:1):((a.prazo||a.venc||'9')<(b.prazo||b.venc||'9')?-1:1));return `<div class="col"><h3>${e}<span>${it.length}</span></h3>${e==='Concluído'?'<span class="meta" style="font-size:11.5px">Últimos 30 dias</span>':''}${it.map(c=>cardCh(c,true)).join('')}${e==='Concluído'&&pode('realizadas')?`<button class="btn ghost" onclick="ir('realizadas')">Ver todas as realizadas</button>`:''}</div>`}).join('')}</div>`+
+ note('Clique em um assunto para ver só as demandas dele. Os outros departamentos veem só Abrir chamado e Meus chamados. Quem não tem a permissão Abrir e-mails no portal vê o resumo, o assunto e a categoria, sem o e-mail.')},
+realizadas(){const per=S.rPer||'mes';
+ const ini={mes:MES_ATUAL+'-01',mesant:addMes(MES_ATUAL,-1)+'-01',tri:mesesTri(triDe(MES_ATUAL))[0]+'-01','12m':isoD(new Date(Date.now()-365*864e5)),tudo:''}[per]??'',fim=per==='mesant'?MES_ATUAL+'-01':'9999';
+ const L=D.chamados.filter(c=>c.st==='Concluído'&&(c.concl||'')>=ini&&(c.concl||'')<fim&&(!S.rCat||(S.rCat==='_sem'?!assDe(c.cat):c.cat===S.rCat))&&(!S.rDep||(S.rDep==='_sem'?!c.dep:c.dep===S.rDep))&&(!S.rQuem||quemFez(c)===S.rQuem)).sort((a,b)=>(b.conclEm||b.concl||'')<(a.conclEm||a.concl||'')?-1:1);
+ S._realiz=L;
+ const cp=L.filter(c=>c.prazo),ok=cp.filter(c=>!(c.concl>c.prazo)).length,atr=cp.length-ok;
+ const tempos=L.map(c=>{const a=(c.aceito||c.aberto||'').slice(0,10);return a&&c.concl?diasUteis(a,c.concl):null}).filter(x=>x!==null),tm=tempos.length?tempos.reduce((a,b)=>a+b,0)/tempos.length:null;
+ const grp=(f,nm)=>{const o={};L.forEach(c=>{const k=f(c)||'';const x=o[k]=o[k]||{k,n:nm(c),t:0,cp:0,ok:0};x.t++;if(c.prazo){x.cp++;if(!(c.concl>c.prazo))x.ok++}});return Object.values(o).sort((a,b)=>b.t-a.t)};
+ const pp=grp(quemFez,quemFezNome),pa=grp(c=>assDe(c.cat)?c.cat:'',c=>assNome(c.cat));
+ const tab=(t,G)=>`<div class="panel"><div class="ph"><h2>${t}</h2></div>${G.length?`<div class="tbl-wrap"><table><thead><tr><th style="text-align:left">${t==='Por pessoa'?'Quem realizou':'Assunto'}</th><th>Concluídas</th><th>No prazo</th><th>Com atraso</th></tr></thead><tbody>${G.map(x=>`<tr><td style="text-align:left">${esc(x.n)}</td><td>${x.t}</td><td>${x.cp?pctCel(Math.round(x.ok/x.cp*100)):'<span class="meta">sem prazo</span>'}</td><td>${x.cp-x.ok}</td></tr>`).join('')}</tbody></table></div>`:'<p class="meta">Nada no período.</p>'}</div>`;
+ const pessoasOpt=[...new Map(D.chamados.filter(c=>c.st==='Concluído').map(c=>[quemFez(c),quemFezNome(c)])).entries()].filter(([k])=>k).sort((a,b)=>a[1].localeCompare(b[1]));
+ return head('Histórico','Demandas <em>realizadas</em>','Tudo o que foi concluído: quem fez, quando chegou, o prazo combinado e se foi entregue no prazo.',`<button class="btn" onclick="csvRealizadas()">Baixar planilha</button>`)+
+ `<div class="filtros"><select class="inp" aria-label="Período" onchange="S.rPer=this.value;render()">${[['mes','Este mês'],['mesant','Mês passado'],['tri','Este trimestre'],['12m','Últimos 12 meses'],['tudo','Tudo']].map(([k,n])=>`<option value="${k}" ${per===k?'selected':''}>${n}</option>`).join('')}</select>
+ <select class="inp" aria-label="Assunto" onchange="S.rCat=this.value;render()"><option value="">Todos os assuntos</option>${assLista().map(a=>`<option value="${esc(a.id)}" ${S.rCat===a.id?'selected':''}>${esc(a.n)}</option>`).join('')}<option value="_sem" ${S.rCat==='_sem'?'selected':''}>Sem assunto</option></select>
+ <select class="inp" aria-label="Setor" onchange="S.rDep=this.value;render()"><option value="">Todos os setores</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${S.rDep===d.id?'selected':''}>${esc(d.n)}</option>`).join('')}<option value="_sem" ${S.rDep==='_sem'?'selected':''}>Setor não definido</option></select>
+ <select class="inp" aria-label="Quem realizou" onchange="S.rQuem=this.value;render()"><option value="">Todas as pessoas</option>${pessoasOpt.map(([k,n])=>`<option value="${esc(k)}" ${S.rQuem===k?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
+ <div class="stats"><div class="stat"><p>Concluídas</p><strong>${L.length}</strong></div><div class="stat"><p>No prazo</p><strong>${cp.length?Math.round(ok/cp.length*100)+'%':'—'}</strong><small>${ok} de ${cp.length} com prazo</small></div><div class="stat"><p>Com atraso</p><strong style="color:${atr?'var(--warn)':'var(--ink)'}">${atr}</strong></div><div class="stat"><p>Tempo médio</p><strong>${tm===null?'—':tm.toFixed(1).replace('.',',')}</strong><small>dias úteis do aceite à conclusão</small></div></div>
+ <div class="grid2">${tab('Por pessoa',pp)}${tab('Por assunto',pa)}</div>
+ <div class="panel"><div class="ph"><h2>Demandas</h2><span>${L.length>200?'200 mais recentes de '+L.length:L.length}</span></div>
+ ${L.length?L.slice(0,200).map(c=>{const sp=stPrazo(c)||['ne','Sem prazo definido'],rec=(c.recebidoEm||c.aberto||'').slice(0,10);return `<div class="row"><span class="meta" style="width:52px">${fmt(c.concl)}</span><div class="t"><b>${esc(c.assunto)}</b><span>${esc(c.proto)} · ${esc(c.dep?depNome(c.dep):'setor não definido')} · ${esc(catTxt(c))} · chegou ${fmt(rec)} · prazo ${c.prazo?fmt(c.prazo):'—'} · realizada por ${esc(quemFezNome(c))}</span></div><span class="tag ${sp[0]}">${sp[1]}</span><button class="btn ghost" onclick="detalheCh('${esc(c.id)}')">Detalhes</button></div>`}).join(''):vazio('Nenhuma demanda concluída no período','Troque o período ou os filtros acima.')}</div>`+
+ note('Cada demanda guarda quem aceitou, o prazo combinado e quem concluiu, com data e hora. O diretor vê tudo; para outras pessoas, libere a permissão Demandas realizadas.')},
 logs(){const q=(S.fLog||'').toLowerCase(),l=D.logs.filter(x=>!q||((x.acao||'')+' '+(x.quem||'')).toLowerCase().includes(q));
  return head('Auditoria','Registro de atividades','Quem fez o quê e quando. Os registros não podem ser editados pela tela.')+
  `<input class="inp" id="flog" placeholder="Filtrar por pessoa, chamado ou ação" value="${esc(S.fLog||'')}" oninput="S.fLog=this.value;document.getElementById('loglist').innerHTML=logRows()">
@@ -1124,34 +1612,39 @@ painel(){
  const ban=dir()&&exemplos?`<div class="banner"><span>Os registros atuais são exemplos para você testar. Quando for usar de verdade, limpe e registre os dados reais.</span><button class="btn" onclick="limparEx()">${S.limpar?'Confirmar limpeza':'Limpar exemplos'}</button></div>`:'';
  const tm=D.tarefas.filter(x=>x.prazo&&x.prazo.slice(0,7)===MES_ATUAL),fm=tm.filter(x=>x.s==='feita').length;
  const atr=D.tarefas.filter(atrasada),pm=pendMsg(),dm=D.destaques.filter(d=>d.mes===MES_ATUAL);
- const saldo=colabs().reduce((a,p)=>{const r=resumoTri(p.id,S.tri);return a+r.extras-r.falt},0);
  const prox=[...D.tarefas.filter(x=>x.s!=='feita'&&x.prazo>=HJ).map(x=>({d:x.prazo,t:x.t,g:x.a,c:'ne'})),...D.eventos.filter(e=>e.data>=HJ).map(e=>({d:e.data,t:e.t,g:e.tipo,c:e.tipo==='Fechamento'?'bad':e.tipo==='Obrigação'?'wa':e.tipo==='Reunião'?'ac':'ne'}))].sort((a,b)=>a.d<b.d?-1:1).slice(0,5);
- if(!dir()&&!pode('ver_tudo')){const p=pessoa(S.perfil),mt=minhas(),r=resumoTri(S.perfil,S.tri);return head(hojeTxt(),`Bom dia, <em>${esc(p?.n||'')}</em>`,'Suas atividades, suas horas e seu desempenho no trimestre.',novo('tarefa','Registrar atividade'))+
-  `<div class="stats"><div class="stat"><p>Minhas tarefas abertas</p><strong>${mt.filter(x=>x.s!=='feita').length}</strong></div><div class="stat"><p>Metas do trimestre</p><strong>${p?.m??0}%</strong></div><div class="stat"><p>Saldo de horas no trimestre</p><strong class="${r.extras-r.falt<0?'neg':''}">${hrs(r.extras-r.falt)}</strong></div><div class="stat"><p>Prazos cumpridos</p><strong>${r.pct===null?'—':r.pct+'%'}</strong></div></div>
-  <div class="panel"><div class="ph"><h2>Minhas rotinas</h2><span>${mt.length} no total</span></div>${mt.length?mt.map(linTar).join(''):vazio('Nenhuma rotina sua ainda','Registre suas atividades para o diretor acompanhar.')}</div>
-  <div class="panel"><div class="ph"><h2>Entregas de departamentos sob sua responsabilidade</h2><span>${minhasEnt().filter(entAtrasada).length} em atraso</span></div>${minhasEnt().filter(e=>!e.recebido).length?minhasEnt().filter(e=>!e.recebido).map(linEnt).join(''):vazio('Nenhuma entrega pendente','')}</div>
+ if(!dir()&&!pode('ver_tudo')){const p=pessoa(S.perfil),mt=minhas(),r=resumoTri(S.perfil,S.tri);const meuF=r=>minhaRot(r),cm=contaDia(HJ,meuF),meus=D.cronograma.filter(r=>meuF(r)&&ocorre(r,HJ)).sort(ordR),meusAtr=atrasosCron(meuF).filter(o=>o.dia<HJ);
+  return head(hojeTxt(),`Bom dia, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+
+  `<div class="stats"><div class="stat"><p>Meu dia</p><strong>${cm.ok}/${cm.tot}</strong><small>${cm.atr+meusAtr.length?`<span class="neg">${cm.atr+meusAtr.length} em atraso</span>`:'rotinas concluídas'}</small></div><div class="stat"><p>Metas do trimestre</p><strong>${p?.m??0}%</strong></div><div class="stat"><p>Minhas demandas em aberto</p><strong>${D.chamados.filter(c=>c.resp===S.perfil&&c.st!=='Concluído').length}</strong></div><div class="stat"><p>Prazos cumpridos</p><strong>${r.pct===null?'—':r.pct+'%'}</strong></div></div>
+  ${meusAtr.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${meusAtr.length}</span></div>${meusAtr.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:''}
+  <div class="panel"><div class="ph"><h2>Meu dia</h2><span>${cm.ok} de ${cm.tot} concluídas</span></div>${meus.length?meus.map(r=>linOc(r,HJ)).join(''):vazio('Nenhuma rotina sua hoje','')}</div>
+  ${mt.filter(x=>x.s!=='feita').length?`<div class="panel"><div class="ph"><h2>Minhas tarefas avulsas</h2><span>${mt.filter(x=>x.s!=='feita').length} abertas</span></div>${mt.filter(x=>x.s!=='feita').map(linTar).join('')}</div>`:''}
+  ${modOn('entregas')?`<div class="panel"><div class="ph"><h2>Entregas de departamentos sob sua responsabilidade</h2><span>${minhasEnt().filter(entAtrasada).length} em atraso</span></div>${minhasEnt().filter(e=>!e.recebido).length?minhasEnt().filter(e=>!e.recebido).map(linEnt).join(''):vazio('Nenhuma entrega pendente','')}</div>`:''}
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2></div>${dm.length?`<div class="hl">${dm.map(cardDest).join('')}</div>`:vazio('Nenhum destaque neste mês','')}</div>`+note('No perfil de colaborador você vê só as suas tarefas, as suas horas e o seu feedback.')}
- const ea=D.entregas.filter(entAtrasada),porDep={};ea.forEach(e=>porDep[depNome(e.dep)]=(porDep[depNome(e.dep)]||0)+1);
+ const ea=modOn('entregas')?D.entregas.filter(entAtrasada):[],porDep={};const cd=contaDia(HJ),cAtr=atrasosCron();ea.forEach(e=>porDep[depNome(e.dep)]=(porDep[depNome(e.dep)]||0)+1);
  const alertaTop=ea.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${ic('alertas').replace('aria-hidden','style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden')}Em atraso: ${Object.entries(porDep).map(([n,q])=>`${esc(n)} (${q})`).join(', ')}</span><button class="btn" onclick="ir('alertas')">Ver alertas</button></div>`:'';
  return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+
  `<div class="stats">
-  <div class="stat"><p>Fechamento do mês</p><strong>${tm.length?Math.round(fm/tm.length*100):0}%</strong><small>${fm} de ${tm.length} rotinas</small></div>
-  <div class="stat"><p>Atrasadas</p><strong style="color:${atr.length?'var(--bad)':'var(--ink)'}">${atr.length}</strong><small>tarefas fora do prazo</small></div>
-  <div class="stat"><p>Entregas em atraso</p><strong style="color:${ea.length?'var(--bad)':'var(--ink)'}">${ea.length}</strong><small>${ea.length?[...new Set(ea.map(e=>depNome(e.dep)))].length+' departamentos':'outros departamentos'}</small></div>
-  <div class="stat"><p>Saldo de horas da equipe</p><strong class="${saldo<0?'neg':''}">${saldo>0?'+':''}${hrs(saldo)}</strong><small>${S.tri.q}º trimestre</small></div></div>
- ${pode('fechamento')?fechResumo():''}
- <div class="grid2">
+  <div class="stat"><p>Cronograma de hoje</p><strong>${cd.ok}/${cd.tot}</strong><small>${cd.tot?Math.round(cd.ok/cd.tot*100):0}% concluído</small></div>
+  <div class="stat"><p>Em andamento</p><strong style="color:${cd.and?'var(--accent)':'var(--ink)'}">${cd.and}</strong><small>rotinas começadas</small></div>
+  <div class="stat"><p>Rotinas atrasadas</p><strong style="color:${cAtr.length+atr.length?'var(--bad)':'var(--ink)'}">${cAtr.length+atr.length}</strong><small>${atr.length?`${atr.length} tarefas avulsas`:'cronograma'}</small></div>
+  ${modOn('entregas')?`<div class="stat"><p>Entregas em atraso</p><strong style="color:${ea.length?'var(--bad)':'var(--ink)'}">${ea.length}</strong><small>${ea.length?[...new Set(ea.map(e=>depNome(e.dep)))].length+' departamentos':'outros departamentos'}</small></div>`:''}
+  <div class="stat"><p>Demandas atrasadas</p><strong style="color:${D.chamados.filter(chAtrasado).length?'var(--bad)':'var(--ink)'}">${D.chamados.filter(chAtrasado).length}</strong><small>prazo de entrega vencido</small></div></div>
+ ${cronPainel()}${modOn('fechamento')&&pode('fechamento')?fechResumo():''}${demResumo()}
+ ${modOn('entregas')?`<div class="grid2">
   <div class="panel"><div class="ph"><h2>Entregas por departamento</h2><button class="btn ghost" onclick="ir('entregas')">Ver entregas</button></div>${painelDep()}</div>
   <div class="panel"><div class="ph"><h2>Atrasos de departamentos</h2><span>${ea.length}</span></div>
    ${ea.length?ea.sort((a,b)=>a.prazo<b.prazo?-1:1).slice(0,5).map(e=>`<div class="row"><div class="t"><b>${esc(depNome(e.dep))}</b><span>${esc(e.item)} · ${-diasAte(e.prazo)} ${diasAte(e.prazo)<-1?'dias':'dia'} de atraso</span></div><button class="btn" onclick="cobrar('${esc(e.id)}')">Cobrar</button></div>`).join(''):vazio('Nenhum departamento em atraso','Todas as entregas estão dentro do prazo.')}
-  </div></div>
+  </div></div>`:''}
  <div class="grid2">
   <div class="panel"><div class="ph"><h2>Precisa da sua atenção</h2></div>
+   ${cAtr.length?`<div class="row"><div class="t"><b>${cAtr.length} ${cAtr.length>1?'rotinas do cronograma atrasadas':'rotina do cronograma atrasada'}</b><span>${esc([...new Set(cAtr.flatMap(o=>rsDe(o.r)))].map(nomeDe).join(', '))}</span></div><button class="btn" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Ver</button></div>`:''}
    ${atr.map(x=>`<div class="row"><div class="t"><b>${esc(x.t)}</b><span>${esc(nomeDe(x.r))} · venceu ${fmt(x.prazo)}</span></div><span class="tag bad">Atrasada</span></div>`).join('')}
    ${pm?`<div class="row"><div class="t"><b>${pm} ${pm>1?'mensagens aguardando':'mensagem aguardando'} aprovação</b><span>WhatsApp da diretoria</span></div><button class="btn" onclick="ir('whats')">Revisar</button></div>`:''}
    ${fbPode()?colabs().filter(p=>seloMes(p.id,addMes(MES_ATUAL,-1))[0]==='ne').map(p=>`<div class="row"><div class="t"><b>Feedback mensal de ${esc(p.n)}</b><span>${esc(mesNome(addMes(MES_ATUAL,-1)))} ainda não registrado</span></div><button class="btn" onclick="fbNovo({pessoa:'${p.id}',tipo:'Mensal'})">Escrever</button></div>`).join(''):''}
+   ${D.chamados.filter(chAtrasado).map(c=>`<div class="row"><div class="t"><b>Demanda atrasada: ${esc(c.assunto)}</b><span>${esc(c.proto)} · ${esc(respNome(c.resp))} · prazo ${fmt(c.prazo)}</span></div><button class="btn" onclick="detalheCh('${esc(c.id)}')">Ver</button></div>`).join('')}
    ${D.chamados.filter(c=>c.st==='Aberto').map(c=>`<div class="row"><div class="t"><b>Novo chamado: ${esc(c.assunto)}</b><span>${esc(depNome(c.dep))} · ${esc(c.tipo)}</span></div><button class="btn" onclick="ir('chamados')">Ver</button></div>`).join('')}
-   ${!atr.length&&!pm&&(!fbPode()||colabs().every(p=>seloMes(p.id,addMes(MES_ATUAL,-1))[0]!=='ne'))?vazio('Tudo em dia','Nada pendente para você agora.'):''}
+   ${!cAtr.length&&!atr.length&&!pm&&(!fbPode()||colabs().every(p=>seloMes(p.id,addMes(MES_ATUAL,-1))[0]!=='ne'))?vazio('Tudo em dia','Nada pendente para você agora.'):''}
   </div>
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2><button class="btn ghost" onclick="ir('destaques')">Ver todos</button></div>
    ${dm.length?dm.slice(0,3).map(d=>`<div class="row"><div class="t"><b>${esc(d.t)}</b><span>${esc(d.tipo)}${d.pessoa?' · '+esc(nomeDe(d.pessoa)):''}</span></div></div>`).join(''):vazio('Nenhum destaque neste mês','Registre conquistas e reconhecimentos.','destaque','Registrar destaque')}
@@ -1160,7 +1653,7 @@ painel(){
   <div class="panel"><div class="ph"><h2>Próximos prazos</h2><button class="btn ghost" onclick="ir('calendario')">Calendário</button></div>
    ${prox.length?prox.map(e=>`<div class="row"><span class="meta" style="width:44px">${fmt(e.d)}</span><div class="t"><b>${esc(e.t)}</b></div><span class="tag ${e.c}">${esc(e.g)}</span></div>`).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}</div>
   <div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
-   <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas com responsável',D.tarefas.filter(t=>t.r).length,Math.max(D.tarefas.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div>
+   <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div>
   </div></div>`},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
@@ -1168,16 +1661,18 @@ destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  (l.length?`<div class="hl">${l.map(cardDest).join('')}</div>`:`<div class="panel">${vazio(`Nenhum destaque em ${mesNome(S.mesDest)}`,'Registre o que a equipe conquistou no mês.',pode('feedbacks')?'destaque':null,'Registrar destaque')}</div>`)+
  (pode('feedbacks')?note('Os destaques do mês entram automaticamente no relatório do trimestre e podem virar uma mensagem de reconhecimento no WhatsApp.'):'')},
 
-rotinas(){const mt=minhas(),grupos=[...new Set(mt.map(x=>x.a))];
- return head(`Competência ${mesCurto(MES_ATUAL)}`,'Rotinas e fechamento','Clique no status para avançar cada tarefa.',novo('tarefa','Nova rotina'))+
- (grupos.length?grupos.map(g=>{const it=mt.filter(x=>x.a===g).sort((a,b)=>(a.prazo||'')<(b.prazo||'')?-1:1),f=it.filter(x=>x.s==='feita').length;return `<div class="panel"><div class="ph"><h2>${esc(g)}</h2><span>${f} de ${it.length} concluídas</span></div><div class="bar" style="margin:6px 0 8px"><i style="width:${f/it.length*100}%"></i></div>${it.map(linTar).join('')}</div>`}).join(''):`<div class="panel">${vazio('Nenhuma rotina registrada','Cadastre as rotinas com responsável e prazo.','tarefa','Nova rotina')}</div>`)+
- note('Ao concluir, o portal guarda a data de conclusão. É assim que calcula os prazos cumpridos no fim do trimestre.')},
+rotinas(){const t=S.cTab||'dia',pc=podeCron();
+ const btns=`${pc?`<button class="btn" onclick="editRot()">Nova rotina</button>`:''}${novo('tarefa','Tarefa avulsa')}${podeAdmin()?`<button class="btn" onclick="cfgCron()">Ajustes</button>`:''}`;
+ return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`${procs().join(' → ')}. Marque em andamento e concluída conforme o dia avança.`,btns)+cronAbas()+
+ (t==='semana'?cronSemana():t==='quem'?cronQuem():t==='rotinas'?cronRotinas():t==='tri'?cronTri():cronDia())+
+ (t==='dia'?note('Clique no quadrado para concluir e na etiqueta para marcar em andamento. O diretor vê na hora o que está em andamento, concluído ou atrasado.'):'')},
 
 calendario(){
  const [y,m]=S.cal.split('-').map(Number),pri=new Date(y,m-1,1).getDay(),nd=new Date(y,m,0).getDate();
  const ev={};const put=(d,t,c)=>{if(d&&d.slice(0,7)===S.cal)(ev[+d.slice(8,10)]=ev[+d.slice(8,10)]||[]).push([t,c])};
  D.eventos.forEach(e=>put(e.data,e.t,e.tipo==='Fechamento'?'bad':e.tipo==='Obrigação'?'wa':e.tipo==='Reunião'?'ac':'ne'));
  minhas().forEach(t=>put(t.prazo,t.t,t.s==='feita'?'ok':atrasada(t)?'bad':'ne'));
+ D.cronograma.filter(r=>['mensal_util','mensal_dia','unica'].includes(r.freq)).forEach(r=>{for(const d of diasDe(S.cal+'-01',isoD(new Date(+S.cal.slice(0,4),+S.cal.slice(5,7),0))))if(ocorre(r,d)){const st=stOc(r,d)[0];put(d,r.t,st==='ok'||st==='wa'?'ok':st==='bad'?'bad':r.prio==='atencao'?'wa':'ne')}});
  let c='';['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>c+=`<div class="dn">${d}</div>`);
  for(let i=0;i<pri;i++)c+='<div></div>';
  for(let d=1;d<=nd;d++){const iso=`${S.cal}-${pad(d)}`;c+=`<div class="day ${iso===HJ?'today':''}">${d}${(ev[d]||[]).slice(0,3).map(e=>`<span class="ev ${e[1]}" title="${esc(e[0])}">${esc(e[0])}</span>`).join('')}${(ev[d]||[]).length>3?`<span class="meta">+${ev[d].length-3}</span>`:''}</div>`}
@@ -1185,23 +1680,13 @@ calendario(){
  `<div class="panel"><div class="cal">${c}</div></div><div class="legend"><span><i style="background:var(--bad)"></i>Fechamento ou atrasada</span><span><i style="background:var(--warn)"></i>Obrigação</span><span><i style="background:var(--accent)"></i>Reunião</span><span><i style="background:var(--ok)"></i>Concluída</span><span><i style="background:var(--ink-3)"></i>Rotina</span></div>`},
 
 equipe(){const l=pode('feedbacks')?colabs():D.equipe.filter(e=>e.id===S.perfil);const ft={Realizado:'ok',Agendado:'wa',Pendente:'bad'};
- return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Equipe e feedbacks','Metas, feedback e o resumo de horas e prazos de cada pessoa.',triNav()+(pode('cadastros')?novo('pessoa','Cadastrar colaborador'):''))+
- (l.length?`<div class="cards">${l.map(e=>{const r=resumoTri(e.id,S.tri),s=r.extras-r.falt;return `<div class="panel"><div style="display:flex;align-items:center;gap:12px"><div class="av">${esc((e.n||'?')[0])}</div><div style="flex:1;min-width:0"><b style="font-weight:500">${esc(e.n)}</b><div style="font-size:12px;color:var(--ink-3)">${esc(e.c)}</div></div>${fbPode()?(()=>{const s=seloMes(e.id,addMes(MES_ATUAL,-1));return `<span class="tag ${s[0]}" title="Feedback mensal do mês anterior">${s[0]==='ok'?'Feedback enviado':s[0]==='wa'?'Feedback registrado':'Feedback pendente'}</span>`})():''}</div>
+ return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Equipe e feedbacks','Metas, feedback e o resumo de prazos e demandas de cada pessoa.',triNav()+(pode('cadastros')?novo('pessoa','Cadastrar colaborador'):''))+
+ (l.length?`<div class="cards">${l.map(e=>{const r=resumoTri(e.id,S.tri),da=D.chamados.filter(c=>c.resp===e.id&&c.st!=='Concluído').length;return `<div class="panel"><div style="display:flex;align-items:center;gap:12px"><div class="av">${esc((e.n||'?')[0])}</div><div style="flex:1;min-width:0"><b style="font-weight:500">${esc(e.n)}</b><div style="font-size:12px;color:var(--ink-3)">${esc(e.c)}</div></div>${fbPode()?(()=>{const s=seloMes(e.id,addMes(MES_ATUAL,-1));return `<span class="tag ${s[0]}" title="Feedback mensal do mês anterior">${s[0]==='ok'?'Feedback enviado':s[0]==='wa'?'Feedback registrado':'Feedback pendente'}</span>`})():''}</div>
   <div style="margin-top:16px"><p style="margin:0 0 6px;display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-2)">Metas do trimestre<span style="font-variant-numeric:tabular-nums">${+e.m||0}%</span></p><div class="bar"><i style="width:${Math.min(100,+e.m||0)}%"></i></div></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"><div class="stat" style="padding:10px 12px;background:var(--side);border-radius:8px"><p>Saldo de horas</p><strong style="font-size:17px" class="${s<0?'neg':s>0?'pos':''}">${s>0?'+':''}${hrs(s)}</strong></div><div class="stat" style="padding:10px 12px;background:var(--side);border-radius:8px"><p>Prazos cumpridos</p><strong style="font-size:17px">${r.pct===null?'—':r.pct+'%'}</strong></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px"><div class="stat" style="padding:10px 12px;background:var(--side);border-radius:8px"><p>Demandas em aberto</p><strong style="font-size:17px">${da}</strong></div><div class="stat" style="padding:10px 12px;background:var(--side);border-radius:8px"><p>Prazos cumpridos</p><strong style="font-size:17px">${r.pct===null?'—':r.pct+'%'}</strong></div></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12px;color:var(--ink-3);gap:8px;flex-wrap:wrap"><span>${esc(e.vinc||'')}</span>${pode('cadastros')||fbPode()?`<span style="display:flex;gap:6px">${editar('pessoa',e.id)}${fbPode()?`<button class="btn pri" onclick="S.fbP='${esc(e.id)}';fbIr('fbpessoa')">Feedbacks</button>`:''}</span>`:''}</div></div>`}).join('')}</div>`:`<div class="panel">${vazio('Nenhum colaborador cadastrado','Cadastre a equipe para começar.','pessoa','Cadastrar colaborador')}</div>`)+
- note(pode('feedbacks')?'Cada colaborador vê apenas o próprio cartão. Dados de avaliação e de ponto são pessoais e seguem a LGPD.':'Este é o seu resumo. Só você e o diretor têm acesso.')},
+ note(pode('feedbacks')?'Cada colaborador vê apenas o próprio cartão. Dados de avaliação são pessoais e seguem a LGPD.':'Este é o seu resumo. Só você e o diretor têm acesso.')},
 
-ponto(){const ps=(dir()||pode('ponto'))?colabs():D.equipe.filter(p=>p.id===S.perfil),ms=mesesTri(S.tri),fim=fimTri(S.tri),dd=diasAte(fim);
- const lanc=D.ponto.filter(p=>ms.includes(p.mes)&&(pode('ponto')||p.pessoa===S.perfil)).sort((a,b)=>a.mes<b.mes?1:a.mes>b.mes?-1:nomeDe(a.pessoa).localeCompare(nomeDe(b.pessoa)));
- const faltam=ps.reduce((a,p)=>a+ms.filter(m=>m<=MES_ATUAL&&!D.ponto.some(x=>x.pessoa===p.id&&x.mes===m)).length,0);
- return head('Fechamento do trimestre','Ponto e horas','Horas extras, horas faltantes, atrasos, faltas e prazos cumpridos.',triNav()+(pode('ponto')?novo('ponto','Lançar horas do mês'):''))+
- `<div class="banner"><span>${(()=>{const f=faseTri(S.tri);return `<b style="font-weight:600">${S.tri.q}º trimestre ${S.tri.ano}</b>: apuração de ${MESES[(S.tri.q-1)*3]} a ${MESES[(S.tri.q-1)*3+2]}, pagamento em ${mesNome(pagTri(S.tri))}. Situação: ${f[1].toLowerCase()}.`})()} ${faltam?`Faltam ${faltam} lançamentos mensais.`:'Todos os meses até agora estão lançados.'}</span></div>
- <div class="panel"><div class="ph"><h2>Ciclo dos trimestres de ${S.tri.ano}</h2><span>apuração e mês de pagamento</span></div><div class="tbl-wrap"><table><thead><tr><th>Trimestre</th><th style="text-align:left">Meses apurados</th><th style="text-align:left">Pagamento</th><th>Situação</th></tr></thead><tbody>${[1,2,3,4].map(q=>{const t={ano:S.tri.ano,q},f=faseTri(t);return `<tr ${q===S.tri.q?'style="background:var(--accent-soft)"':''}><td><button class="btn ghost" style="padding:2px 6px" onclick="S.tri={ano:${S.tri.ano},q:${q}};render()">${q}º tri</button></td><td style="text-align:left">${mesesTri(t).map(m=>MESES[+m.slice(5)-1].slice(0,3)).join(', ')}</td><td style="text-align:left">${mesCurto(pagTri(t))}</td><td><span class="tag ${f[0]}">${f[1]}</span></td></tr>`}).join('')}</tbody></table></div></div>
- <div class="panel"><div class="ph"><h2>Consolidado do trimestre</h2><span>${ms.map(mesCurto).join(' · ')} · pagamento em ${mesCurto(pagTri(S.tri))}</span></div>${tabelaTri(ps)}</div>
- <div class="panel"><div class="ph"><h2>Lançamentos mensais</h2><span>${lanc.length} registros</span></div>
- ${lanc.length?lanc.map(p=>`<div class="row"><div class="t"><b>${esc(nomeDe(p.pessoa))} · ${mesCurto(p.mes)}</b><span>Extras ${hrs(p.extras)} · Faltantes ${hrs(p.faltantes)} · ${+p.atrasos||0} atrasos · ${+p.faltas||0} faltas${p.obs?' · '+esc(p.obs):''}</span></div>${pode('ponto')?editar('ponto',p.id):''}</div>`).join(''):vazio('Nenhum lançamento neste trimestre','Lance as horas de cada colaborador ao fim de cada mês.',pode('ponto')?'ponto':null,'Lançar horas do mês')}</div>`+
- note('Os prazos cumpridos são calculados sozinhos pelas rotinas concluídas. As horas podem ser lançadas à mão ou, no futuro, importadas do sistema de ponto com aprovação do RH e da TI.')},
 
 whats(){
  return head('Comunicação','WhatsApp da diretoria','Nenhuma mensagem sai sem a sua aprovação.',novo('mensagem','Nova mensagem'))+
@@ -1223,7 +1708,7 @@ relat(){const tf=D.tarefas,f=tf.filter(x=>x.s==='feita').length,ms=mesesTri(S.tr
  `<div class="panel"><div class="ph"><h2>Situação atual</h2><span>atualizado agora</span></div>
  ${[['Rotinas concluídas',`${f} de ${tf.length}`],['Tarefas atrasadas',tf.filter(atrasada).length],['Chamados em aberto',D.chamados.filter(c=>c.st!=='Concluído').length],['Chamados fora do prazo da política',D.chamados.filter(c=>c.fora).length],['Feedbacks mensais do mês anterior registrados',`${colabs().filter(p=>seloMes(p.id,addMes(MES_ATUAL,-1))[0]!=='ne').length} de ${colabs().length}`],['Mensagens aprovadas',D.mensagens.filter(m=>m.s==='aprovada').length],['Sugestões implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length]].map(r=>`<div class="row"><div class="t"><b style="font-weight:400">${r[0]}</b></div><span style="font-variant-numeric:tabular-nums;font-weight:500">${r[1]}</span></div>`).join('')}</div>
  <div class="panel"><div class="ph"><h2>Entregas dos departamentos</h2><span>pontualidade e atrasos</span></div>${painelDep()}</div>
- <div class="panel"><div class="ph"><h2>Fechamento do ${S.tri.q}º trimestre · ponto, horas e prazos</h2><span>${ms.map(mesCurto).join(' · ')} · pagamento em ${mesNome(pagTri(S.tri))}</span></div>${tabelaTri(colabs())}</div>
+ <div class="panel"><div class="ph"><h2>Prazos do ${S.tri.q}º trimestre</h2><span>${ms.map(mesCurto).join(' · ')}</span></div>${tabelaTri(colabs())}</div>
  <div class="panel"><div class="ph"><h2>Destaques do trimestre</h2><span>${dq.length}</span></div>${dq.length?`<div class="hl">${dq.map(cardDest).join('')}</div>`:vazio('Nenhum destaque registrado no trimestre','')}</div>`}};
 
 function procList(l){return l.length?l.map(p=>`<div class="row"><div class="t"><b>${esc(p.t)}</b><span>${esc(p.a)}${p.formato?' · '+esc(p.formato):''}</span></div>${p.link&&/^https?:\/\//.test(p.link)?`<a class="btn" href="${esc(p.link)}" target="_blank" rel="noopener">Abrir</a>`:''}${editar('procedimento',p.id)}</div>`).join(''):vazio(S.busca?'Nada encontrado':'Nenhum procedimento ainda',S.busca?'Tente outra palavra.':'Documente o passo a passo das atividades.')}
@@ -1267,9 +1752,106 @@ function cfgPrazo(){FORM={tipo:'_cfg'};
 async function salvaCfg(){const v=+document.getElementById('f_dm').value;if(!(v>=0&&v<=30)){document.getElementById('e_dm').textContent='Informe um número entre 0 e 30.';return}
  if(!DB)return toast('O armazenamento não está disponível nesta visualização.');
  try{await DB.doc('config/estrutura').set({...CFG,diasMin:v});log(`Alterou a regra de prazo de chamados para ${v} dias úteis`);toast('Regra atualizada');fechar()}catch(e){toast('Não foi possível salvar.')}}
+/* ---------- conectar o e-mail da Microsoft ---------- */
+async function conectarEmail(){FORM={tipo:'_conectar'};const sh=document.getElementById('sheet');
+ sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar e-mail</h2></div><p class="meta">Verificando…</p>`;document.getElementById('ov').hidden=false;
+ const ativo=window.portalMicrosoftAtivo?await window.portalMicrosoftAtivo():null;if(FORM?.tipo!=='_conectar')return;
+ const cb=(window.PORTAL_CONFIG||{}).supabaseUrl?(window.PORTAL_CONFIG.supabaseUrl.replace(/\/+$/,'')+'/auth/v1/callback'):'https://SEU-PROJETO.supabase.co/auth/v1/callback';
+ if(ativo){sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar o e-mail da empresa</h2><p class="sub" style="font-size:13px">O Prumo lê os e-mails com a sua própria conta Microsoft. Ele nunca vê a sua senha.</p></div>
+  <ol class="passos"><li>Clique em <b>Ir para a Microsoft</b>.</li><li>Entre com o e-mail da empresa${ME.email?` (o mesmo do Prumo: <b>${esc(ME.email)}</b>)`:''}.</li><li>Clique em <b>Aceitar</b>.</li><li>Se aparecer <b>Precisa de aprovação do administrador</b>, escreva o motivo e clique em <b>Solicitar aprovação</b>. O pedido vai para a TI. Depois que a TI aprovar, volte aqui e clique em Conectar e-mail de novo.</li></ol>
+  ${note('A conexão dura cerca de 1 hora por vez. Quando vencer, o portal avisa e você clica em Conectar e-mail de novo, normalmente sem digitar senha.')}
+  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="window.portalReconectarMicrosoft()">Ir para a Microsoft</button></div></div>`;return}
+ const pedido=`Preciso registrar o sistema Prumo no Microsoft Entra ID para ele ler e enviar e-mails pelo Outlook com a conta de cada usuário.
+
+1. App registrations > New registration: nome Prumo, somente esta organização. Redirect URI (Web): ${cb}
+2. API permissions > Microsoft Graph > Delegated: openid, profile, email, offline_access, User.Read, Mail.Read, Mail.Read.Shared, Mail.Send. Depois, Grant admin consent.
+3. Certificates & secrets: criar um Client secret.
+4. Me passar o Application (client) ID e o Directory (tenant) ID. O valor do secret deve ser colado direto no Supabase (Authentication > Sign In / Providers > Azure), não por e-mail.`;
+ FORM.pedido=pedido;
+ sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Falta um passo, feito uma vez só</h2><p class="sub" style="font-size:13px">A Microsoft exige que todo sistema que lê e-mails seja registrado no Microsoft 365 da empresa. Depois disso, o botão Conectar e-mail leva direto para a tela de aceite da Microsoft.</p></div>
+  <ol class="passos"><li><b>A TI registra o Prumo.</b> Copie o pedido abaixo e mande para a TI.</li><li><b>Alguém com acesso ao Supabase</b> abre <b>Authentication › Sign In / Providers › Azure</b>, liga e cola o Client ID, o secret e <b>https://login.microsoftonline.com/</b> seguido do tenant ID.</li><li>Volte aqui e clique em <b>Conectar e-mail</b>.</li></ol>
+  <pre class="mailbody" style="max-height:260px">${esc(pedido)}</pre>
+  ${ativo===null?note('Não foi possível verificar agora se a conexão já está ligada. Se a TI já fez o registro, recarregue a página e tente de novo.'):''}
+  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Fechar</button><button class="btn pri" onclick="copiar('',FORM.pedido)">Copiar pedido para a TI</button></div></div>`}
+
+/* ---------- painel do diretor: demandas ---------- */
+function demResumo(){if(!pode('chamados')&&!pode('realizadas'))return '';
+ const ab=D.chamados.filter(c=>c.st!=='Concluído'),atr=ab.filter(chAtrasado).sort((a,b)=>a.prazo<b.prazo?-1:1),mes=D.chamados.filter(c=>c.st==='Concluído'&&(c.concl||'').slice(0,7)===MES_ATUAL),cp=mes.filter(c=>c.prazo),ok=cp.filter(c=>!(c.concl>c.prazo)).length;
+ if(!D.chamados.length)return '';
+ return `<div class="panel"><div class="ph"><h2>Demandas</h2><div style="display:flex;gap:6px;flex-wrap:wrap">${pode('chamados')?`<button class="btn ghost" onclick="ir('chamados')">Painel de chamados</button>`:''}${pode('realizadas')?`<button class="btn ghost" onclick="ir('realizadas')">Realizadas</button>`:''}</div></div>
+ <div class="stats"><div class="stat"><p>Em andamento</p><strong>${ab.length}</strong></div><div class="stat"><p>Atrasadas</p><strong style="color:${atr.length?'var(--bad)':'var(--ink)'}">${atr.length}</strong></div><div class="stat"><p>Concluídas no mês</p><strong>${mes.length}</strong></div><div class="stat"><p>No prazo no mês</p><strong>${cp.length?Math.round(ok/cp.length*100)+'%':'—'}</strong></div></div>
+ ${atr.slice(0,5).map(c=>`<div class="row"><div class="t"><b>${esc(c.assunto)}</b><span>${esc(c.proto)} · ${esc(catTxt(c))} · ${esc(respNome(c.resp))} · prazo ${fmt(c.prazo)}</span></div><span class="tag bad">${stPrazo(c)[1]}</span><button class="btn ghost" onclick="detalheCh('${esc(c.id)}')">Detalhes</button></div>`).join('')}</div>`}
+async function csvRealizadas(){const L=S._realiz||[];if(!L.length){toast('Nada para baixar com esses filtros.');return}if(!DL){toast('O download não está disponível nesta visualização.');return}
+ const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+ const cab=['Protocolo','Resumo','Setor','Assunto','Subcategoria','Tipo','Remetente ou solicitante','Chegou em','Aceita em','Aceita por','Prazo','Concluída em','Realizada por','Situação'];
+ const lin=L.map(c=>[c.proto,c.assunto,c.dep?depNome(c.dep):'',assDe(c.cat)?assNome(c.cat):'',c.subcat||'',c.tipo,c.solicitante||'',fmtAno((c.recebidoEm||c.aberto||'').slice(0,10)),c.aceito?fmtAno(c.aceito):'',c.aceitoNome||'',c.prazo?fmtAno(c.prazo):'',fmtAno(c.concl),quemFezNome(c),(stPrazo(c)||['','Sem prazo definido'])[1]].map(q).join(';'));
+ try{await DL.save({filename:`demandas-realizadas-${HJ}.csv`,data:new Blob(['﻿'+[cab.map(q).join(';'),...lin].join('\r\n')],{type:'text/csv'})});log(`Baixou a planilha de demandas realizadas (${L.length})`)}catch(e){toast('Não foi possível gerar o arquivo.')}}
+
+/* ---------- aparência: claro, escuro ou automático ---------- */
+const LS={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+function tema(){try{return localStorage.getItem('prumo_tema')||'auto'}catch(e){return 'auto'}}
+function setTema(t){try{if(t==='auto')localStorage.removeItem('prumo_tema');else localStorage.setItem('prumo_tema',t)}catch(e){}
+ if(t==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t);marcarTema()}
+function temaBox(){const t=tema(),I={auto:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',light:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',dark:'<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>'};
+ return `<div class="temas temas-top" role="group" aria-label="Aparência">${[['auto','Automático'],['light','Claro'],['dark','Escuro']].map(([k,l])=>`<button type="button" data-t="${k}" title="Aparência: ${l}" aria-label="${l}" aria-pressed="${t===k}" onclick="setTema('${k}')"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">${I[k]}</svg></button>`).join('')}</div>`}
+function marcarTema(){document.querySelectorAll('.temas button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.t===tema())))}
+marcarTema();
+
+/* ---------- continuar de onde parou: tela, filtros, rolagem e o que estava digitando ---------- */
+const EST_K=['cTab','cQuem','cSis','tela','fRem','fDepC','fCat','fResp','fBusca','rPer','rCat','rDep','rQuem','fDep','fLog','fFer','busca','mesDest','cal','iPer','fRemT','fbP'];
+S.scroll={};
+function salvarEstado(){if(S.modo==='carregando')return;const o={scroll:S.scroll,em:Date.now()};EST_K.forEach(k=>{if(S[k]!==undefined&&S[k]!==null)o[k]=S[k]});
+ if(['fbedit','fbver'].includes(o.tela))o.tela=S.fbP?'fbpessoa':'feedbacks';LS.set('prumo_estado',o)}
+(function(){const o=LS.get('prumo_estado',null);
+ if(o&&Date.now()-(o.em||0)<30*864e5){EST_K.forEach(k=>{if(o[k]!==undefined)S[k]=o[k]});S.scroll=o.scroll||{}}
+ const h=(location.hash||'').slice(1);if(/^[a-z]+$/.test(h)&&V[h])S.tela=h;
+ if(S.tela==='fbpessoa'&&!S.fbP)S.tela='feedbacks';if(['fbedit','fbver'].includes(S.tela))S.tela='feedbacks';
+ S.voltarScroll=true})();
+let _rolar;window.addEventListener('scroll',()=>{clearTimeout(_rolar);_rolar=setTimeout(()=>{if(S.modo==='carregando')return;S.scroll[S.tela]=window.scrollY;salvarEstado()},250)},{passive:true});
+
+/* botão Voltar do navegador e do celular: fecha o painel aberto ou volta para a tela anterior */
+new MutationObserver(()=>{const ov=document.getElementById('ov');if(!ov.hidden&&!(history.state&&history.state.sheet)){try{history.pushState({...(history.state||{}),sheet:1},'')}catch(e){}}}).observe(document.getElementById('ov'),{attributes:true,attributeFilter:['hidden']});
+window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
+ const ov=document.getElementById('ov');if(!ov.hidden){ov.hidden=true;FORM=null;return}
+ const t=e.state?.tela||(location.hash||'').slice(1);if(t&&t!==S.tela&&V[t])ir(t,true)});
+
+/* rascunhos: o que foi digitado num formulário volta quando você reabre */
+const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
+(function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
+const SEM_RASC=new Set(['_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
+function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
+const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);
+const lerV=el=>el.type==='checkbox'||el.type==='radio'?el.checked:el.value;
+const avisar=el=>el.dispatchEvent(new Event(el.tagName==='SELECT'||el.type==='checkbox'||el.type==='radio'?'change':'input',{bubbles:true}));
+function limparRascunho(k){if(!k||!RASC[k])return;delete RASC[k];LS.set(RASC_K,RASC)}
+function ligarRascunho(root,key){if(!key){root._rb=null;return}
+ if(!root._rb||root._rb.key!==key)root._rb={key,base:Object.fromEntries(camposDe(root).map(el=>[el.id,lerV(el)]))};
+ const r=RASC[key];if(!r)return;let n=0;
+ for(const [id,d] of Object.entries(r.f||{})){const el=document.getElementById(id);if(!el||!root.contains(el)||d.v===d.b||lerV(el)!==d.b)continue;
+  if(el.type==='checkbox'||el.type==='radio')el.checked=d.v;else{if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===d.v))continue;el.value=d.v}
+  avisar(el);n++}
+ if(n&&!root.querySelector('.rasc')){const b=document.createElement('div');b.className='banner rasc';b.innerHTML='<span>Continuando de onde você parou.</span><button class="btn" type="button">Descartar o que eu tinha digitado</button>';
+  b.querySelector('button').onclick=()=>descartarRascunho(root);const alvo=root.id==='sheet'?root.firstElementChild:root.querySelector('#topbar');if(alvo)alvo.after(b);else root.prepend(b)}}
+function descartarRascunho(root){const k=root._rb?.key,r=k&&RASC[k];if(!r)return;limparRascunho(k);
+ for(const [id,d] of Object.entries(r.f||{})){const el=document.getElementById(id);if(!el)continue;if(el.type==='checkbox'||el.type==='radio')el.checked=d.b;else el.value=d.b;avisar(el)}
+ limparRascunho(k);root.querySelector('.rasc')?.remove()}
+function anotar(e){const el=e.target;if(!el||!el.id)return;const root=el.closest('#sheet')||el.closest('#main');if(!root||!root._rb)return;const {key,base}=root._rb;if(!(el.id in base))return;
+ const v=lerV(el),b=base[el.id],r=RASC[key]=RASC[key]||{f:{}};if(v===b)delete r.f[el.id];else r.f[el.id]={v,b};r.em=Date.now();if(!Object.keys(r.f).length)delete RASC[key];
+ clearTimeout(anotar.t);anotar.t=setTimeout(()=>LS.set(RASC_K,RASC),300)}
+document.addEventListener('input',anotar,true);document.addEventListener('change',anotar,true);
+let _formAnt=null;
+new MutationObserver(()=>{const sh=document.getElementById('sheet');if(_formAnt&&_formAnt!==FORM&&_formAnt.gravou){const k=chaveSheet(_formAnt);if(k)limparRascunho(k)}_formAnt=FORM;ligarRascunho(sh,chaveSheet())}).observe(document.getElementById('sheet'),{childList:true});
+
+/* marca quando um formulário aberto realmente gravou algo, para não trazer de volta um rascunho já salvo */
+function vigiarDB(db){const marca=p=>{const c=String(p).split('/')[0];if(FORM&&!['logs','sync','backups','data'].includes(c))FORM.gravou=true};
+ const doc=r=>{for(const m of ['set','update','delete']){const f=r[m].bind(r);r[m]=async(...a)=>{const x=await f(...a);marca(r.path);return x}}const sub=r.collection;r.collection=n=>col(sub(n));return r};
+ const col=c=>{const d=c.doc,a=c.add;c.doc=id=>doc(d(id));c.add=async v=>{const x=await a(v);marca(c.path);return x};return c};
+ return {doc:p=>doc(db.doc(p)),collection:p=>col(db.collection(p))}}
+
 /* ---------- render ---------- */
 function nav(){const pm=pode('whats')?pendMsg():0,na=alertas().filter(a=>a.c==='bad').length,nc=D.chamados.filter(c=>c.st==='Aberto'&&!c.resp).length,nt=D.emails.filter(e=>e.st==='triagem').length,np=D.pedidos.filter(p=>!acessoDe(p.id)).length;
- const badge=(k)=>k==='whats'&&pm?`<span class="count">${pm}</span>`:k==='chamados'&&nc?`<span class="count" style="background:var(--accent-soft);color:var(--accent-ink)">${nc}</span>`:k==='triagem'&&nt?`<span class="count">${nt}</span>`:k==='usuarios'&&np?`<span class="count">${np}</span>`:k==='alertas'&&na?`<span class="count" style="background:var(--bad-bg);color:var(--bad)">${na}</span>`:'';
+ const nr=atrasosCron(vejoRot).length;const badge=(k)=>k==='rotinas'&&nr?`<span class="count" style="background:var(--bad-bg);color:var(--bad)" title="Rotinas em atraso">${nr}</span>`:k==='whats'&&pm?`<span class="count">${pm}</span>`:k==='chamados'&&(nc||(pode('email')&&nt))?`<span class="count" style="background:var(--accent-soft);color:var(--accent-ink)" title="${nc} sem responsável${pode('email')&&nt?` · ${nt} e-mails para revisar`:''}">${nc+(pode('email')?nt:0)}</span>`:k==='usuarios'&&np?`<span class="count">${np}</span>`:k==='alertas'&&na?`<span class="count" style="background:var(--bad-bg);color:var(--bad)">${na}</span>`:'';
  document.getElementById('nav').innerHTML=(solic()||S.perfil==='pendente'||S.modo==='carregando'?'':`<button class="nav reg ${S.tela==='registrar'?'on':''}" onclick="ir('registrar')">${ic('reg')}<span>Registrar</span></button>`)+
  (S.modo==='carregando'?'':vis().map(([k,n])=>`<button class="nav ${(MENU_PAI[S.tela]||S.tela)===k?'on':''}" onclick="ir('${k}')">${ic(k)}<span>${n}</span>${badge(k)}</button>`).join(''))}
 function perfis(){const q=document.getElementById('quem'),box=document.getElementById('simbox');
@@ -1296,6 +1878,8 @@ function render(o){
  const ae=document.activeElement,fid=ae&&ae.id&&m.contains(ae)?ae.id:null,pos=fid&&ae.selectionStart!=null?ae.selectionStart:null;
  m.dataset.tela=S.tela;m.dataset.perfil=S.perfil;
  m.innerHTML=`<div id="topbar">${S.perfil==='pendente'?'':bell()}</div>`+avisos+V[S.tela]();
+ ligarRascunho(m,chaveMain());salvarEstado();
+ if(S.voltarScroll){S.voltarScroll=false;try{history.replaceState({tela:S.tela},'','#'+S.tela)}catch(e){}const y=S.scroll[S.tela]||0;if(y)setTimeout(()=>window.scrollTo({top:y}),60)}
  if(fid){const el=document.getElementById(fid);if(el){el.focus();try{if(pos!=null)el.setSelectionRange(pos,pos)}catch(e){}}}
  if(S.tela==='abrir')prazoCh()}
 document.getElementById('perfil').addEventListener('change',e=>{S.sim=e.target.value||(real()?'':'dir');S.bell=false;S.forceAbrir=true;render()});
@@ -1309,7 +1893,7 @@ render();
  if(user){const m=await user.me();ME.uid=m.id;ME.owner=m.isOwner;ME.edit=m.canEdit;ME.admin=!!(m.isOwner||m.canEdit);ME.nome=m.name||'';ME.email=m.email;ME.write=await user.can('data.write')}
  S.modo=ME.uid&&db?'real':'demo';if(!real())S.sim=S.sim||'dir';
  if(!db){S.online=false;render();return}
- DB=db;S.online=true;
+ DB=vigiarDB(db);S.online=true;
  let t;const later=()=>{clearTimeout(t);t=setTimeout(()=>render({snap:true}),40)};
  document.getElementById('main').addEventListener('focusout',()=>setTimeout(()=>{if(S.pend&&S.tela!=='fbedit'&&!document.getElementById('main').contains(document.activeElement))render()},200));
  COLS.forEach(c=>db.collection(c).onSnapshot(s=>{D[c]=s.docs.map(d=>({id:d.id,...d.data()}));if(c==='acessos')S.acOk=true;later()},()=>{if(c==='acessos'){S.acOk=true;later()}}));
