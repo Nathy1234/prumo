@@ -1265,6 +1265,23 @@ async function marcaEu(rid,dia,acao){const r=D.cronograma.find(x=>x.id===rid);if
  if(!await salvar('feitos',mid,doc,acao==='ini'?'Iniciado':atraso?'Finalizado (depois do dia previsto)':'Finalizado',`${acao==='ini'?'Iniciou':'Finalizou'} "${r.t}" de ${fmt(dia)}${atraso?' (com atraso)':''}`))return;
  await syncEx(rid,dia,[...outros,doc])}
 /* atalho (semana e outras atividades): finaliza ou desfaz o seu */
+const podeHora=f=>!!f.id&&!f.legado&&(dir()||podeAdmin()||f.pid===S.perfil);
+const paraLocal=iso=>{const d=new Date(iso||'');return isNaN(d)?'':`${isoD(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`};
+function editHora(fid){const f=D.feitos.find(x=>x.id===fid);if(!f||!podeHora(f))return;const r=D.cronograma.find(x=>x.id===f.rot);FORM={tipo:'_hora',id:fid};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(r?.t||'Rotina')} · ${fmt(f.dia)}</p><h2 id="sheet-title">Horário de ${esc(f.nome||'')}</h2><p class="sub" style="font-size:13px">Corrija a data e a hora de início e de término. Deixe o término vazio se ainda está em andamento.</p></div>
+ <div class="fgrid"><div><label class="lbl" for="hr_ini">Início</label><input class="inp" id="hr_ini" type="datetime-local" value="${paraLocal(f.ini)}"><p class="ferr" id="hre_ini"></p></div>
+ <div><label class="lbl" for="hr_fim">Término · vazio se em andamento</label><input class="inp" id="hr_fim" type="datetime-local" value="${stF(f)==='feita'?paraLocal(f.fim||(f.feitoEm?f.feitoEm+'T'+(f.hora||'12:00'):'')):''}"><p class="ferr" id="hre_fim"></p></div></div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaHora()">Salvar horário</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+async function salvaHora(){const f=D.feitos.find(x=>x.id===FORM.id);if(!f)return;const vi=val('hr_ini'),vf=val('hr_fim');errEl('hre_ini','');errEl('hre_fim','');
+ if(!vi){errEl('hre_ini','Informe o início.');return}const di=new Date(vi),df=vf?new Date(vf):null;
+ if(df&&df<di){errEl('hre_fim','O término é antes do início.');return}
+ if(df&&isoD(df)>HJ){errEl('hre_fim','O término não pode ser no futuro.');return}
+ const {id:_,...b}=f,ini=di.toISOString(),fim=df?df.toISOString():'';
+ const doc={...b,ini,fim,st:df?'feita':'andamento',hora:df?`${pad(df.getHours())}:${pad(df.getMinutes())}`:'',feitoEm:df?isoD(df):'',horaAjustada:true};
+ const r=D.cronograma.find(x=>x.id===f.rot);
+ if(!await salvar('feitos',f.id,doc,'Horário salvo',`Alterou o horário de ${f.nome||''} em "${r?.t||''}" de ${fmt(f.dia)}: início ${dtH(ini)}${fim?`, término ${dtH(fim)}`:''}`))return;
+ await syncEx(f.rot,f.dia,[...D.feitos.filter(x=>x.rot===f.rot&&x.dia===f.dia&&x.id!==f.id),doc]);fechar()}
 function opcMarca(rid,dia,acao){const ms=stF(meuF(rid,dia));return marcaEu(rid,dia,(acao==='ini'&&ms==='andamento')||(acao==='fim'&&ms==='feita')?'desfazer':acao)}
 function botoesMarca(rid,dia,ms){return `<button class="btn sm mk ${ms==='andamento'?'on-ac':''}" aria-pressed="${ms==='andamento'}" onclick="opcMarca('${rid}','${dia}','ini')" title="${ms==='andamento'?'Clique para desfazer':'Guarda a data e a hora de início'}">${ms==='andamento'?'● ':''}Em andamento</button><button class="btn sm mk ${ms==='feita'?'on-ok':''}" aria-pressed="${ms==='feita'}" onclick="opcMarca('${rid}','${dia}','fim')" title="${ms==='feita'?'Clique para desfazer':'Guarda a data e a hora de término'}">✓ Finalizado</button>`}
 function euFiz(rid,dia){return marcaEu(rid,dia,euFizEsse(rid,dia)?'desfazer':'fim')}
@@ -1275,7 +1292,7 @@ function linOc(r,dia,comDia,semSis){const x=exDe(r.id,dia),st=stOc(r,dia),done=x
  const acoes=pm?botoesMarca(r.id,dia,ms):'';
  return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}">${ind}
  <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
- ${FT.map(f=>`<span class="${stF(f)==='feita'?'pos':'emand'}">${stF(f)==='feita'?'✓':'●'} ${esc(txtPessoa(f))}</span>`).join('')}
+ ${FT.map(f=>`<span class="${stF(f)==='feita'?'pos':'emand'}">${stF(f)==='feita'?'✓':'●'} ${esc(txtPessoa(f))}${podeHora(f)?` <button class="lnk hr" onclick="editHora('${esc(f.id)}')" aria-label="Alterar horário de ${esc(f.nome||'')}">alterar horário</button>`:''}</span>`).join('')}
  ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}${r.freq!=='unica'||itensDe(r.id,dia).length?linItens(r,dia):''}</div>${r.chamado?`<span class="tag ac" title="Veio do chamado">${esc(r.chamado)}</span>`:''}${r.fim&&r.freq!=='unica'?`<span class="tag ne">só até ${fmt(r.fim)}</span>`:''}${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${st[0]==='bad'&&!done?`<span class="tag bad">${st[1]}</span>`:''}
  <div class="oc-acoes">${acoes}</div>${podeEditRot()?`<button class="btn ghost sm" onclick="editRot('${r.id}')" aria-label="Editar ${esc(r.t)}">Editar</button>`:''}</div>`}
 const filtroCron=()=>r=>(!S.cQuem||rsDe(r).includes(S.cQuem))&&(!S.cSis||(r.sis||[]).includes(S.cSis));
@@ -1319,7 +1336,7 @@ const SUGESTOES_OPC=['Repasse de polos','Adiantamento a fornecedor','Reembolso d
 function outrasOpcoes(dia){const L=avulsasDia(dia),pm=podeEditRot()&&dia<=HJ,tem=new Set(D.cronograma.filter(r=>r.freq==='avulsa').map(r=>norm(r.t)));
  const sug=podeEditRot()?SUGESTOES_OPC.filter(t=>!tem.has(norm(t))):[];
  const chip=r=>{const ft=feitosDe(r.id,dia),fe=ft.some(f=>stF(f)==='feita'),an=ft.some(f=>stF(f)==='andamento'),ms=stF(meuF(r.id,dia));
-  return `<div class="opc ${fe?'on':an?'and':''}"><span class="opc-ck">${fe?'✓':an?'●':''}</span><span class="opc-t">${esc(r.t)}${ft.map(f=>`<small class="${stF(f)==='feita'?'':'emand'}">${esc(stF(f)==='feita'?`✓ ${f.nome||'—'}${f.hora?' '+f.hora:''}`:`● ${f.nome||'—'} desde ${hmDe(f.ini)}`)}</small>`).join('')}</span>${pm?`<span class="opc-b">${botoesMarca(r.id,dia,ms)}</span>`:''}</div>`};
+  return `<div class="opc ${fe?'on':an?'and':''}"><span class="opc-ck">${fe?'✓':an?'●':''}</span><span class="opc-t">${esc(r.t)}${ft.map(f=>`<small class="${stF(f)==='feita'?'':'emand'}">${esc(stF(f)==='feita'?`✓ ${f.nome||'—'}${f.hora?' '+f.hora:''}`:`● ${f.nome||'—'} desde ${hmDe(f.ini)}`)}${podeHora(f)?` <button class="lnk hr" onclick="editHora('${esc(f.id)}')">alterar</button>`:''}</small>`).join('')}</span>${pm?`<span class="opc-b">${botoesMarca(r.id,dia,ms)}</span>`:''}</div>`};
  return `<div class="qd-opc"><div class="opcs">${L.map(chip).join('')||'<span class="meta">Nenhuma opção ainda.</span>'}${podeEditRot()?`<button class="opc add" onclick="novaOpcao()">+ Nova opção</button>`:''}</div>${sug.length&&L.length<4?`<p class="meta" style="margin:8px 0 4px">Sugestões, clique para incluir na lista:</p><div class="opcs">${sug.map((t,i)=>`<button class="opc sug" onclick="addSugestao(${SUGESTOES_OPC.indexOf(t)})">+ ${esc(t)}</button>`).join('')}</div>`:''}</div>`}
 function novaOpcao(){FORM={tipo:'_opc'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Outras atividades</p><h2 id="sheet-title">Nova opção</h2><p class="sub" style="font-size:13px">Escreva só uma vez. Depois ela aparece para todos como botão: é só clicar quando fizer.</p></div>

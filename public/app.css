@@ -333,3 +333,7 @@ div.opc{cursor:default;flex-wrap:wrap}.opc.and{background:var(--accent-soft);bor
 .opc .opc-t small.emand{color:var(--accent)}
 .opc-b{display:flex;gap:6px;margin-left:auto}
 .stdot{border-radius:50%;width:20px;height:20px;font-size:11px}
+/* a rotina não some nem fica riscada para os outros quando alguém finaliza */
+.row.oc.done b{text-decoration:none;font-weight:500}
+.row.oc.done{opacity:1}
+.lnk.hr{font-size:11.5px;color:var(--ink-3);margin-left:4px}
