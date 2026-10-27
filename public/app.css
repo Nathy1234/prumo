@@ -273,3 +273,10 @@ table.wkt th.hj{color:var(--accent)}
 .nd{background:transparent;color:var(--ink-3);border:1px dashed var(--line)}.cel.nd{border-style:dashed;cursor:pointer}
 .chegada{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
 button.chip.on.bad{background:var(--bad-bg);color:var(--bad)}
+/* itens dentro da rotina */
+.itens{display:flex;flex-direction:column;gap:3px;margin-top:6px;padding-left:2px}
+.item{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
+.item input{accent-color:var(--ok);margin:0;flex:none}.item .it{flex:1;min-width:0;overflow-wrap:anywhere}
+.item.done .it{text-decoration:line-through;text-decoration-color:var(--ink-3);color:var(--ink-3)}.item small{text-decoration:none;color:var(--ok);font-size:11.5px}
+.itx{border:0;background:transparent;color:var(--ink-3);cursor:pointer;font-size:16px;line-height:1;padding:0 4px}.itx:hover{color:var(--bad)}
+.itadd{align-self:flex-start;font-size:12px !important;margin-top:2px}

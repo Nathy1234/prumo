@@ -186,6 +186,7 @@ O menu **Cronograma** junta rotinas, tarefas e o acompanhamento do dia numa tela
 
 - **Rotinas fixas já prontas**: a ordem do processo e o D-5 valem sempre. Em novembro o pagamento é D-2 (WAE e Protheus juntos, Protheus em teste); a partir de dezembro, D-1. Ninguém precisa cadastrar o que é feito todo dia: só **Outra atividade** para o que for extra.
 - **Andamento do departamento**: logo ao entrar, o Painel mostra etapa por etapa, separado por WAE e Protheus, o que foi concluído, por quem e a que horas. Clique numa etapa para abrir as rotinas.
+- **Itens dentro da rotina**: em cada rotina do dia (por exemplo, Lançamento no WAE), **+ Adicionar chamado ou item** inclui um chamado em aberto ou um item escrito à mão. Cada item é marcado como feito, com nome e hora, e o Painel mostra quantos itens foram feitos.
 - **Chamado vira demanda do dia**: no chamado, **Levar para o cronograma** coloca a demanda no dia, na etapa e com os responsáveis. Quando o e-mail estiver ligado, o e-mail separado vira chamado e segue o mesmo caminho.
 - **Chegada dos pedidos**: em cada chamado a equipe marca se chegou **no prazo** ou **atrasado**. O diretor vê no Painel o resumo por departamento.
 - **Próximos prazos e avisos**: prazos fixos (toda semana, todo mês) ou de uma vez, para todos ou só para pessoas escolhidas. Aparecem no sino de notificações e, depois de clicar em **Ativar avisos no canto da tela**, como aviso do computador. Os avisos funcionam com o portal aberto, mesmo em outra aba.
