@@ -1336,6 +1336,10 @@ function quickAvulsas(dia){const L=avulsasDia(dia),pend=L.filter(r=>exDe(r.id,di
  return `<div class="panel"><div class="ph"><h2>Aconteceu hoje?</h2><span>clique no que foi feito</span></div><div class="cks">${pend.map(r=>`<button class="btn" onclick="fazerHoje('${r.id}','${dia}')" title="${esc(r.obs||'')}">✓ ${esc(r.t)}</button>`).join('')}${podeEditRot()?`<button class="btn ghost" onclick="editRot('',{freq:'avulsa',etapa:'',ini:'',rs:[],sis:[]})">+ Nova opção</button>`:''}</div>${L.length&&!pend.length?'<p class="meta" style="margin:8px 0 0">Tudo o que estava na lista já foi registrado neste dia.</p>':''}<p class="meta" style="margin:8px 0 0">Fica registrado com nome e hora. Para desfazer, clique no quadrado da atividade na lista abaixo.</p></div>`}
 /* rotinas que valem sempre e foram programadas para começar depois: antecipa para hoje (só WAE; o Protheus começa em novembro) */
 const paraComecar=()=>D.cronograma.filter(r=>r.freq!=='unica'&&r.freq!=='avulsa'&&!r.fim&&iniEf(r)&&iniEf(r)>HJ&&r.ini<='2026-11-01'&&(r.sis||[]).includes('WAE'));
+async function limparHorasModelo(){if(S._lh||!real()||S.sim||!podeEditRot()||!DB||!D.cronograma.length)return;S._lh=true;
+ const L=D.cronograma.filter(r=>!r.horaLimpa&&!r.horaEditada&&((r.hora==='10:00'&&/^pagamento · todas as contas/i.test(r.t||''))||(r.hora==='14:30'&&/^pagamento · wae/i.test(r.t||''))));
+ let k=0;for(const r of L){const {id,...b}=r;if(await salvar('cronograma',id,{...b,hora:'',horaLimpa:true,obs:/10h|14:30|regra/i.test(b.obs||'')?b.obs:((r.hora==='10:00'?'Regra: 10h todas as contas. ':'Regra: WAE a partir das 14:30. ')+(b.obs||'')).trim()},false,false))k++}
+ if(k)log(`Tirou o horário padrão de ${k} rotinas de pagamento (a hora só entra se alguém escolher)`)}
 async function comecarHoje(){const L=paraComecar();if(!L.length)return;
  if(!S.confCom){S.confCom=true;toast(`Clique de novo para começar hoje ${L.length} rotinas do WAE.`);render();setTimeout(()=>{S.confCom=false;render()},6000);return}S.confCom=false;
  let k=0;for(const r of L){const {id,...b}=r;if(await salvar('cronograma',id,{...b,ini:HJ},false,false))k++}
@@ -1437,7 +1441,7 @@ async function salvaRot(){['rte_t','rte_r','rte_freq'].forEach(e=>errEl(e,''));
  if(freq==='unica'&&!data){errEl('rte_freq','Informe a data.');ok=false}
  if(ini&&fim&&fim<ini){errEl('rte_freq','A data final é antes da inicial.');ok=false}
  if(!ok)return;const {id:_,...b}=ant||{criado:HJ};
- if(await salvar('cronograma',FORM.id||null,{...b,editadoPor:pessoa(S.perfil)?.n||quemSou(),editadoEm:new Date().toISOString(),t,etapa:val('rt_et'),prio:val('rt_prio'),sis,rs,apoio:val('rt_apoio'),freq,dias,n,antes,data,hora:val('rt_hora'),ini,fim,obs:val('rt_obs'),ativo:document.getElementById('rt_ativo').checked},ant?'Rotina atualizada':'Rotina cadastrada',`${ant?'Alterou':'Cadastrou'} a rotina "${t}" do cronograma`))fechar()}
+ if(await salvar('cronograma',FORM.id||null,{...b,horaEditada:!!val('rt_hora'),horaLimpa:true,editadoPor:pessoa(S.perfil)?.n||quemSou(),editadoEm:new Date().toISOString(),t,etapa:val('rt_et'),prio:val('rt_prio'),sis,rs,apoio:val('rt_apoio'),freq,dias,n,antes,data,hora:val('rt_hora'),ini,fim,obs:val('rt_obs'),ativo:document.getElementById('rt_ativo').checked},ant?'Rotina atualizada':'Rotina cadastrada',`${ant?'Alterou':'Cadastrou'} a rotina "${t}" do cronograma`))fechar()}
 async function delRot(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
  const r=D.cronograma.find(x=>x.id===FORM.id);try{await DB.collection('cronograma').doc(FORM.id).delete();log(`Excluiu a rotina "${r?.t||''}" do cronograma`);toast('Rotina excluída');fechar()}catch(e){toast('Não foi possível excluir.')}}
 /* ajustes: etapas, sistemas e módulos guardados */
@@ -1473,9 +1477,9 @@ function modeloCron({NA,JN}){const EV='Evandro (Protheus)',N0='2026-11-01',N1='2
   r('confer-'+suf,'Conferência','Conferir documentos, valores, vencimentos e centro de custo',x,JN,{obs:'Contas identificadas no D-5.'},old(['confer','Conferir documentos, valores, vencimentos e centro de custo']));
   r('lanc-'+suf,'Lançamento',`Lançamento no ${x}`,x,w?NA:JN,w?{}:pe,[`Lançamento no ${x}`]);
   r('baixa-'+suf,'Baixa',`Baixa no ${x}`,x,w?NA:JN,w?{}:pe,[`Baixa no ${x}`]);
-  r('pagnov-'+suf,'Pagamento','Pagamento · todas as contas (D-2 em novembro)',x,JN,{hora:'10:00',fim:N1,obs:'Novembro: pagamento adiantado para 2 dias úteis antes do vencimento (D-2), porque trabalhamos no WAE e no Protheus.'},old(['pag-nov','Pagamento · todas as contas (D-2 em novembro)','Pagamento · todas as contas']));
-  r('pagd1-'+suf,'Pagamento','Pagamento · todas as contas (D-1)',x,JN,{hora:'10:00',ini:DZ,obs:'Pagamento 1 dia útil antes do vencimento (D-1).'},old(['pag','Pagamento · todas as contas (D-1)']));
-  if(w)r('pag1430-wae','Pagamento','Pagamento · WAE a partir das 14:30',W,JN,{hora:'14:30',obs:'Segue o D-1 (D-2 em novembro).'},['pag-wae','Pagamento · WAE']);
+  r('pagnov-'+suf,'Pagamento','Pagamento · todas as contas (D-2 em novembro)',x,JN,{fim:N1,obs:'Regra: 10h todas as contas. Novembro: pagamento adiantado para 2 dias úteis antes do vencimento (D-2), porque trabalhamos no WAE e no Protheus.'},old(['pag-nov','Pagamento · todas as contas (D-2 em novembro)','Pagamento · todas as contas']));
+  r('pagd1-'+suf,'Pagamento','Pagamento · todas as contas (D-1)',x,JN,{ini:DZ,obs:'Regra: 10h todas as contas. Pagamento 1 dia útil antes do vencimento (D-1).'},old(['pag','Pagamento · todas as contas (D-1)']));
+  if(w)r('pag1430-wae','Pagamento','Pagamento · WAE',W,JN,{obs:'Regra: WAE a partir das 14:30. Segue o D-1 (D-2 em novembro).'},['pag-wae','Pagamento · WAE','Pagamento · WAE a partir das 14:30']);
   r('polos-'+suf,'Pagamento','Pagamento dos polos',x,JN,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'},old(['pag-polos','Pagamento dos polos']));
   r('folha-'+suf,'Pagamento','Folha de pagamento',x,JN,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'},old(['folha','Folha de pagamento']));
   r('impnov-'+suf,'Pagamento','Impostos do dia 20 (D-2 em novembro)',x,JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:2,fim:N1,obs:'Atenção: confira as guias. Em novembro, pagar 2 dias úteis antes.'},old(['imp-nov','Impostos do dia 20 (D-2 em novembro)','Impostos (vencimento dia 20)']));
@@ -1506,7 +1510,7 @@ async function organizarModelo(){if(!podeCron()){toast('Só quem cadastra pode o
  for(const {_alias,...sp} of M){const al=_alias.map(norm),sis0=sp.sis[0];
   const ant=D.cronograma.find(r=>!usados.has(r.id)&&r.chave===sp.chave)||D.cronograma.find(r=>!usados.has(r.id)&&(r.mv||0)<MODELO_VER&&r.chave&&_alias.includes(r.chave))||D.cronograma.find(r=>!usados.has(r.id)&&(r.mv||0)<MODELO_VER&&!r.chave&&al.includes(norm(r.t))&&(!(r.sis||[]).length||(r.sis||[]).includes(sis0)));
   if(ant){usados.add(ant.id);const {id,...b}=ant;
-   if(await salvar('cronograma',id,{...b,...sp,rs:rsDe(ant).length?ant.rs:sp.rs,hora:ant.hora||sp.hora,apoio:ant.apoio||sp.apoio,ini:ant.ini&&ant.ini<sp.ini&&!sp.fim&&!sp.ini.startsWith('2026-12')?ant.ini:sp.ini,editadoPor:quem,editadoEm:agora},false,false))up++}
+   if(await salvar('cronograma',id,{...b,...sp,rs:rsDe(ant).length?ant.rs:sp.rs,hora:ant.horaEditada?ant.hora:sp.hora,horaLimpa:true,apoio:ant.apoio||sp.apoio,ini:ant.ini&&ant.ini<sp.ini&&!sp.fim&&!sp.ini.startsWith('2026-12')?ant.ini:sp.ini,editadoPor:quem,editadoEm:agora},false,false))up++}
   else if(await salvar('cronograma',null,{...sp,criado:HJ},false,false))cr++}
  log(`Organizou o cronograma: ${up} rotinas atualizadas e ${cr} criadas`);
  toast(`${up} rotinas atualizadas e ${cr} criadas.${faltam.length?` Cadastre ${faltam.join(', ')}.`:''}`);
@@ -2212,4 +2216,5 @@ render();
  iniciarAutoSync();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
  setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);
+ setTimeout(limparHorasModelo,6000);setInterval(limparHorasModelo,3e4);
 })();
