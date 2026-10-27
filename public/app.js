@@ -1598,6 +1598,19 @@ function avisosDevidos(){if(solic()||S.perfil==='pendente')return [];const mn=t=
   if(d<=15&&d>0)L.push({k:'rt_'+r.id,t:`${r.hora} · ${r.t}`,s:`Em ${d} min · ${nomesRs(r)}`,ir:'rotinas'});else if(d<=0&&d>-180)L.push({k:'ra_'+r.id,t:`Atrasada: ${r.t}`,s:`Era às ${r.hora} · ${nomesRs(r)}`,ir:'rotinas'})});
  const ant=atrasosCron(vejoRot).filter(o=>o.dia<HJ).length;if(ant)L.push({k:'ant',t:`${ant} ${ant>1?'rotinas de dias anteriores':'rotina de dia anterior'} em atraso`,s:'Veja em Cronograma',ir:'rotinas'});
  const am=proxUtil(HJ);D.cronograma.filter(r=>r.prio==='atencao'&&vejoRot(r)&&ocorre(r,am)).forEach(r=>L.push({k:'at_'+r.id,t:`Atenção no próximo dia útil: ${r.t}`,s:r.obs||nomesRs(r),ir:'rotinas'}));
+ /* lembretes periódicos no expediente (dias úteis, 8h às 18h) */
+ const now=new Date(),hh=now.getHours(),expediente=ehUtil(HJ)&&hh>=8&&hh<18;
+ if(expediente){
+  /* a cada 1 hora: lembrar de registrar (para quem é da equipe) */
+  if(pessoa(S.perfil)){const meus=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,HJ)&&minhaRot(r)),sem=meus.filter(r=>stF(meuF(r.id,HJ))!=='feita'&&exDe(r.id,HJ)?.s!=='feita').length;
+   L.push({k:'reg_'+hh,t:'Registre no Prumo o que você fez',s:sem?`${sem} ${sem>1?'rotinas suas ainda sem registro hoje':'rotina sua ainda sem registro hoje'}. Marque Em andamento ou Finalizado.`:'Marque Em andamento ou Finalizado no que você fez, inclusive em Outras atividades.',ir:'rotinas'})}
+  /* a cada 30 minutos: próximos compromissos e pendências */
+  const slot=hh*2+(now.getMinutes()>=30?1:0),hm=agoraHM(),partes=[];
+  const ev=D.eventos.filter(e=>paraMimEv(e)&&evOcorre(e,HJ)&&(!e.hora||e.hora>=hm)).sort((a,b)=>(a.hora||'99').localeCompare(b.hora||'99'));
+  if(ev.length)partes.push(ev.slice(0,2).map(e=>`${e.hora?e.hora+' ':''}${e.t}`).join(' · '));
+  const atr=atrasosCron(r=>vejoRot(r)).length;if(atr)partes.push(`${atr} ${atr>1?'rotinas atrasadas':'rotina atrasada'}`);
+  const atc=D.cronograma.filter(r=>r.prio==='atencao'&&vejoRot(r)&&(ocorre(r,HJ)||ocorre(r,am))&&exDe(r.id,HJ)?.s!=='feita').length;if(atc)partes.push(`${atc} de atenção (folha, impostos)`);
+  if(partes.length)L.push({k:'res_'+slot,t:ev.length?'Próximos compromissos':'Pendências do departamento',s:partes.join(' · '),ir:ev.length?'calendario':'rotinas'})}
  return L}
 function cantoAviso(a){let c=document.getElementById('avcanto');if(!c){c=document.createElement('div');c.id='avcanto';c.setAttribute('aria-live','polite');document.body.appendChild(c)}
  const el=document.createElement('div');el.className='avc';el.innerHTML=`<button class="avx" aria-label="Fechar aviso">×</button><b>${esc(a.t)}</b>${a.s?`<span>${esc(a.s)}</span>`:''}`;
