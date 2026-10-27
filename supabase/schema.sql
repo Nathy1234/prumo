@@ -229,7 +229,7 @@ declare
   v_cols text[] := array['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto',
     'eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias',
     'ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos',
-    'assuntos','remetentes','cronograma','execucoes','cronitens'];
+    'assuntos','remetentes','cronograma','execucoes','cronitens','feitos'];
   v_dia  text := to_char((now() at time zone 'America/Sao_Paulo')::date, 'YYYY-MM-DD');
   v_id   text := 'd-' || v_dia;
   v_cfg  jsonb;

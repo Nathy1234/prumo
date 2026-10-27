@@ -186,6 +186,7 @@ O menu **Cronograma** junta rotinas, tarefas e o acompanhamento do dia numa tela
 
 - **Rotinas fixas já prontas**: a ordem do processo e o D-5 valem sempre. Em novembro o pagamento é D-2 (WAE e Protheus juntos, Protheus em teste); a partir de dezembro, D-1. Ninguém precisa cadastrar o que é feito todo dia: só **Outra atividade** para o que for extra.
 - **Andamento do departamento**: logo ao entrar, o Painel mostra etapa por etapa, separado por WAE e Protheus, o que foi concluído, por quem e a que horas. Clique numa etapa para abrir as rotinas.
+- **WAE e Protheus lado a lado**: na tela do dia, cada etapa (Identificação, Conferência, Lançamento, Baixa, Pagamento, Conciliação) aparece em duas colunas, uma para cada sistema. **Cada pessoa clica no quadrado do que ela fez**; se outra pessoa também fez, marca o dela. O Painel mostra a tabela **Quem fez o quê no dia**, com nome e hora.
 - **Aconteceu hoje?**: atividades que não são de todo dia, como **Repasse de polos**, ficam como botões. Quando fizer, é só clicar: fica registrado com nome e hora. Em **+ Nova opção** a equipe inclui outras.
 - **Começar hoje**: se as rotinas do WAE estiverem programadas para começar depois, o botão antecipa para hoje (o Protheus continua começando em novembro).
 - **Quem vê cada prazo**: Todos; Pessoas escolhidas (elas, quem criou e o diretor); ou Só para mim (ninguém mais vê). Cada pessoa recebe avisos só do que é para ela.
