@@ -1188,6 +1188,8 @@ const minhaRot=r=>rsDe(r).includes(S.perfil);
 const vejoRot=r=>dir()||pode('ver_tudo')||minhaRot(r);
 const podeMarcar=r=>dir()||pode('ver_tudo')||minhaRot(r);
 const podeCron=()=>dir()||podeAdmin()||pode('cadastros');
+/* toda a equipe pode corrigir e cadastrar rotinas; excluir fica com quem cadastra */
+const podeEditRot=()=>dir()||podeAdmin()||(!solic()&&S.perfil!=='pendente');
 const ordProc=r=>{const i=procs().indexOf(r.etapa);return i<0?99:i};
 const ordR=(a,b)=>ordProc(a)-ordProc(b)||(a.hora||'99').localeCompare(b.hora||'99')||(a.t||'').localeCompare(b.t||'');
 /* situação de uma rotina num dia */
@@ -1223,7 +1225,7 @@ function linOc(r,dia,comDia){const x=exDe(r.id,dia),st=stOc(r,dia),done=x?.s==='
  <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
  ${done?`<span class="pos">Concluída por ${esc(x.porNome||'—')}${x.concl!==dia?` em ${fmt(x.concl)}`:''}${x.hora?` às ${x.hora}`:''}</span>`:x?.s==='andamento'?`<span style="color:var(--accent)">Em andamento com ${esc(x.porNome||'—')} desde ${hmDe(x.ini)}</span>`:''}
  ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}</div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}
- <button class="tag ${st[0]}" ${pm&&!done?'':'disabled'} onclick="ocAnd('${r.id}','${dia}')" title="${pm&&!done?(x?.s==='andamento'?'Voltar para a fazer':'Marcar em andamento'):''}">${st[1]}</button></div>`}
+ <button class="tag ${st[0]}" ${pm&&!done?'':'disabled'} onclick="ocAnd('${r.id}','${dia}')" title="${pm&&!done?(x?.s==='andamento'?'Voltar para a fazer':'Marcar em andamento'):''}">${st[1]}</button>${podeEditRot()?`<button class="btn ghost" onclick="editRot('${r.id}')" aria-label="Editar ${esc(r.t)}">Editar</button>`:''}</div>`}
 const filtroCron=()=>r=>(!S.cQuem||rsDe(r).includes(S.cQuem))&&(!S.cSis||(r.sis||[]).includes(S.cSis));
 const pessoasCron=()=>[...new Set(D.cronograma.flatMap(rsDe))].filter(pessoa).sort((a,b)=>nomeDe(a).localeCompare(nomeDe(b)));
 function cronFiltros(){const b=(on,txt,js)=>`<button class="chip ${on?'on':''}" onclick="${js};render();salvarEstado()">${esc(txt)}</button>`;
@@ -1254,8 +1256,8 @@ function cronQuem(){const vig=D.cronograma.filter(r=>r.ativo!==false&&(!r.fim||r
  return `<div class="panel"><div class="ph"><h2>Etapa do processo × sistema</h2><span>rotinas em vigor</span></div><div class="tbl-wrap"><table class="grade lista"><thead><tr><th>Etapa</th>${S2.map(s=>`<th>${esc(s)}</th>`).join('')}</tr></thead><tbody>${G.filter(g=>g||vig.some(r=>!procs().includes(r.etapa))).map((g,i)=>`<tr><td><b style="font-weight:500">${g?`${i+1}. ${esc(g)}`:'Outras atividades'}</b></td>${S2.map(s=>`<td>${cel(g,s)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
  <div class="cards">${ps.map(p=>{const l=vig.filter(r=>rsDe(r).includes(p)).sort(ordR);return `<div class="panel"><div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><div class="av">${esc((nomeDe(p)||'?')[0])}</div><b style="font-weight:500">${esc(nomeDe(p))}</b><span class="meta" style="margin-left:auto">${l.length} ${l.length>1?'rotinas':'rotina'}</span></div>${l.map(r=>`<div class="row"><div class="t"><b style="font-weight:400">${esc(r.t)}</b><span>${esc(r.etapa||'Outras')} · ${esc((r.sis||[]).join(', '))} · ${esc(freqTxt(r))}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}</div>`).join('')}</div>`}).join('')}</div>`+
  (ap.length?note(`Apoio: ${ap.map(esc).join(', ')}.`):'')}
-function cronRotinas(){const pc=podeCron(),G=[...procs(),''],L=[...D.cronograma].sort(ordR);
- const lin=r=>`<div class="row"><div class="t"><b>${esc(r.t)}</b><span>${esc(freqTxt(r))} · ${esc((r.sis||[]).join(', ')||'Sem sistema')} · ${esc(nomesRs(r))}${r.apoio?' · apoio: '+esc(r.apoio):''}</span><span>${r.ini?`Vale de ${fmt(r.ini)}/${r.ini.slice(0,4)}`:'Vale sempre'}${r.fim?` até ${fmt(r.fim)}/${r.fim.slice(0,4)}`:''}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${r.ativo===false?'<span class="tag ne">Pausada</span>':r.fim&&r.fim<HJ?'<span class="tag ne">Encerrada</span>':''}${pc?`<button class="btn ghost" onclick="editRot('${r.id}')">Editar</button>`:''}</div>`;
+function cronRotinas(){const pc=podeEditRot(),G=[...procs(),''],L=[...D.cronograma].sort(ordR);
+ const lin=r=>`<div class="row"><div class="t"><b>${esc(r.t)}</b><span>${esc(freqTxt(r))} · ${esc((r.sis||[]).join(', ')||'Sem sistema')} · ${esc(nomesRs(r))}${r.apoio?' · apoio: '+esc(r.apoio):''}</span><span>${r.ini?`Vale de ${fmt(r.ini)}/${r.ini.slice(0,4)}`:'Vale sempre'}${r.fim?` até ${fmt(r.fim)}/${r.fim.slice(0,4)}`:''}${r.editadoPor?` · editada por ${esc(r.editadoPor)} em ${fmt((r.editadoEm||'').slice(0,10))} às ${hmDe(r.editadoEm)}`:''}</span></div>${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${r.ativo===false?'<span class="tag ne">Pausada</span>':r.fim&&r.fim<HJ?'<span class="tag ne">Encerrada</span>':''}${pc?`<button class="btn ghost" onclick="editRot('${r.id}')">Editar</button>`:''}</div>`;
  return (L.length?G.map(g=>{const l=L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g);return l.length?`<div class="panel"><div class="ph"><h2>${esc(g||'Outras atividades')}</h2><span>${l.length}</span></div>${l.map(lin).join('')}</div>`:''}).join(''):`<div class="panel">${vazio('Nenhuma rotina cadastrada','Use o modelo de novembro ou cadastre cada rotina com etapa, sistema, responsáveis e horário.',null)}${pc?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" onclick="editRot()">Nova rotina</button><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div>':''}</div>`)+
  note('Pausar ou dar data final a uma rotina mantém o histórico. Ao excluir, os registros de dias já feitos deixam de contar.')}
 function cronTri(){const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
@@ -1289,7 +1291,7 @@ function editRot(id){const r=id?D.cronograma.find(x=>x.id===id):{freq:'diaria',r
  <div><label class="lbl" for="rt_fim">Até · opcional</label><input class="inp" id="rt_fim" type="date" value="${esc(r.fim||'')}"><p class="meta" style="margin:4px 0 0">Vazio: continua valendo.</p></div>
  <div class="full"><label class="lbl" for="rt_obs">Observação · opcional</label><textarea class="inp" id="rt_obs" style="min-height:60px" placeholder="Os polos têm outro horário">${esc(r.obs||'')}</textarea></div>
  <div class="full">${ck('rt_ativo',r.ativo!==false,'Rotina ativa')}</div><p class="ferr full" id="rte_freq"></p></div>
- <div class="foot"><div>${id?`<button class="btn danger" id="bdel" onclick="delRot()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaRot()">${id?'Salvar alterações':'Cadastrar rotina'}</button></div></div>`;
+ <div class="foot"><div>${id&&podeCron()?`<button class="btn danger" id="bdel" onclick="delRot()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaRot()">${id?'Salvar alterações':'Cadastrar rotina'}</button></div></div>`;
  document.getElementById('ov').hidden=false;rotVis();setTimeout(()=>document.getElementById('rt_t')?.focus(),30)}
 function rotVis(){const f=val('rt_freq'),sh=(id,on)=>{const e=document.getElementById(id);if(e)e.style.display=on?'':'none'};
  sh('rtw_dias',f==='semanal');sh('rtw_n',f==='mensal_util'||f==='mensal_dia');sh('rtw_antes',f==='mensal_dia');sh('rtw_data',f==='unica');
@@ -1306,7 +1308,7 @@ async function salvaRot(){['rte_t','rte_r','rte_freq'].forEach(e=>errEl(e,''));
  if(freq==='unica'&&!data){errEl('rte_freq','Informe a data.');ok=false}
  if(ini&&fim&&fim<ini){errEl('rte_freq','A data final é antes da inicial.');ok=false}
  if(!ok)return;const {id:_,...b}=ant||{criado:HJ};
- if(await salvar('cronograma',FORM.id||null,{...b,t,etapa:val('rt_et'),prio:val('rt_prio'),sis,rs,apoio:val('rt_apoio'),freq,dias,n,antes,data,hora:val('rt_hora'),ini,fim,obs:val('rt_obs'),ativo:document.getElementById('rt_ativo').checked},ant?'Rotina atualizada':'Rotina cadastrada',`${ant?'Alterou':'Cadastrou'} a rotina "${t}" do cronograma`))fechar()}
+ if(await salvar('cronograma',FORM.id||null,{...b,editadoPor:pessoa(S.perfil)?.n||quemSou(),editadoEm:new Date().toISOString(),t,etapa:val('rt_et'),prio:val('rt_prio'),sis,rs,apoio:val('rt_apoio'),freq,dias,n,antes,data,hora:val('rt_hora'),ini,fim,obs:val('rt_obs'),ativo:document.getElementById('rt_ativo').checked},ant?'Rotina atualizada':'Rotina cadastrada',`${ant?'Alterou':'Cadastrou'} a rotina "${t}" do cronograma`))fechar()}
 async function delRot(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
  const r=D.cronograma.find(x=>x.id===FORM.id);try{await DB.collection('cronograma').doc(FORM.id).delete();log(`Excluiu a rotina "${r?.t||''}" do cronograma`);toast('Rotina excluída');fechar()}catch(e){toast('Não foi possível excluir.')}}
 /* ajustes: etapas, sistemas e módulos guardados */
@@ -1671,7 +1673,7 @@ destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  (l.length?`<div class="hl">${l.map(cardDest).join('')}</div>`:`<div class="panel">${vazio(`Nenhum destaque em ${mesNome(S.mesDest)}`,'Registre o que a equipe conquistou no mês.',pode('feedbacks')?'destaque':null,'Registrar destaque')}</div>`)+
  (pode('feedbacks')?note('Os destaques do mês entram automaticamente no relatório do trimestre e podem virar uma mensagem de reconhecimento no WhatsApp.'):'')},
 
-rotinas(){const t=S.cTab||'dia',pc=podeCron();
+rotinas(){const t=S.cTab||'dia',pc=podeEditRot();
  const btns=`${pc?`<button class="btn" onclick="editRot()">Nova rotina</button>`:''}${novo('tarefa','Tarefa avulsa')}${podeAdmin()?`<button class="btn" onclick="cfgCron()">Ajustes</button>`:''}`;
  return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`${procs().join(' → ')}. Marque em andamento e concluída conforme o dia avança.`,btns)+cronAbas()+
  (t==='semana'?cronSemana():t==='quem'?cronQuem():t==='rotinas'?cronRotinas():t==='tri'?cronTri():cronDia())+
