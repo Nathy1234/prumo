@@ -1175,8 +1175,11 @@ const diaTxt=iso=>{const d=new Date(iso+'T12:00');return `${DIAS[d.getDay()]}, $
 /* dia fixo do mês; se não for dia útil, antecipa. "antes" antecipa mais N dias úteis (ex.: D-1) */
 function diaFixo(m,n,antes){const [y,mm]=m.split('-').map(Number),ult=new Date(y,mm,0).getDate(),d=new Date(y,mm-1,Math.min(Math.max(1,n),ult),12);
  while(!util(d))d.setDate(d.getDate()-1);let k=0;while(k<(+antes||0)){d.setDate(d.getDate()-1);if(util(d))k++}return isoD(d)}
+/* o WAE já é o dia a dia: as rotinas fixas do WAE programadas para 01/11 valem desde 27/10/2026 */
+const INICIO_WAE='2026-10-27';
+const iniEf=r=>r.ini==='2026-11-01'&&!r.fim&&(r.sis||[]).length===1&&r.sis[0]==='WAE'&&r.freq!=='unica'&&r.freq!=='avulsa'?INICIO_WAE:r.ini;
 function ocorre(r,dia){if(r.freq==='avulsa')return !!exDe(r.id,dia);
- if(r.ativo===false||(r.ini&&dia<r.ini)||(r.fim&&dia>r.fim))return false;
+ const ini=iniEf(r);if(r.ativo===false||(ini&&dia<ini)||(r.fim&&dia>r.fim))return false;
  if(r.freq==='unica')return r.data===dia;
  if(!ehUtil(dia))return false;const m=dia.slice(0,7);
  if(r.freq==='semanal')return (r.dias||[]).map(Number).includes(new Date(dia+'T12:00').getDay());
@@ -1310,7 +1313,7 @@ async function addSugestao(i){const t=SUGESTOES_OPC[i];if(!t||D.cronograma.some(
 function quickAvulsas(dia){const L=avulsasDia(dia),pend=L.filter(r=>exDe(r.id,dia)?.s!=='feita');if(dia>HJ||(!L.length&&!podeEditRot()))return '';
  return `<div class="panel"><div class="ph"><h2>Aconteceu hoje?</h2><span>clique no que foi feito</span></div><div class="cks">${pend.map(r=>`<button class="btn" onclick="fazerHoje('${r.id}','${dia}')" title="${esc(r.obs||'')}">✓ ${esc(r.t)}</button>`).join('')}${podeEditRot()?`<button class="btn ghost" onclick="editRot('',{freq:'avulsa',etapa:'',ini:'',rs:[],sis:[]})">+ Nova opção</button>`:''}</div>${L.length&&!pend.length?'<p class="meta" style="margin:8px 0 0">Tudo o que estava na lista já foi registrado neste dia.</p>':''}<p class="meta" style="margin:8px 0 0">Fica registrado com nome e hora. Para desfazer, clique no quadrado da atividade na lista abaixo.</p></div>`}
 /* rotinas que valem sempre e foram programadas para começar depois: antecipa para hoje (só WAE; o Protheus começa em novembro) */
-const paraComecar=()=>D.cronograma.filter(r=>r.freq!=='unica'&&r.freq!=='avulsa'&&!r.fim&&r.ini&&r.ini>HJ&&r.ini<='2026-11-01'&&(r.sis||[]).includes('WAE'));
+const paraComecar=()=>D.cronograma.filter(r=>r.freq!=='unica'&&r.freq!=='avulsa'&&!r.fim&&iniEf(r)&&iniEf(r)>HJ&&r.ini<='2026-11-01'&&(r.sis||[]).includes('WAE'));
 async function comecarHoje(){const L=paraComecar();if(!L.length)return;
  if(!S.confCom){S.confCom=true;toast(`Clique de novo para começar hoje ${L.length} rotinas do WAE.`);render();setTimeout(()=>{S.confCom=false;render()},6000);return}S.confCom=false;
  let k=0;for(const r of L){const {id,...b}=r;if(await salvar('cronograma',id,{...b,ini:HJ},false,false))k++}
@@ -1319,7 +1322,7 @@ async function comecarHoje(){const L=paraComecar();if(!L.length)return;
 const comecarBtn=()=>paraComecar().length&&podeEditRot()?`<div class="banner"><span>As rotinas do WAE que valem sempre estão programadas para começar só em ${fmt(paraComecar()[0].ini)}. Comece hoje para registrar o que já fazem no dia a dia.</span><button class="btn pri" onclick="comecarHoje()">${S.confCom?'Confirmar: começar hoje':'Começar hoje'}</button></div>`:'';
 function quadroDia(dia,f){const grp=r=>procs().includes(r.etapa)?r.etapa:'',SS=sists().filter(x=>!S.cSis||x===S.cSis),L=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(!S.cQuem||rsDe(r).includes(S.cQuem)||feitosDe(r.id,dia).some(x=>x.pid===S.cQuem)));
  const G=[...procs(),''];
- const comeca=x=>{const l=D.cronograma.filter(r=>(r.sis||[]).includes(x)&&r.freq!=='avulsa'&&r.freq!=='unica'&&r.ativo!==false&&r.ini&&r.ini>dia).map(r=>r.ini).sort();return l[0]||''};
+ const comeca=x=>{const l=D.cronograma.filter(r=>(r.sis||[]).includes(x)&&r.freq!=='avulsa'&&r.freq!=='unica'&&r.ativo!==false&&r.ini&&r.ini>dia).map(iniEf).filter(d=>d>dia).sort();return l[0]||''};
  const cab=SS.map(x=>{const l=L.filter(r=>(r.sis||[]).includes(x)),k=l.filter(r=>exDe(r.id,dia)?.s==='feita').length,c=comeca(x);return `<div class="qd-h"><b>${esc(x)}</b>${emTeste(x)?'<small class="tag wa">em teste</small>':''}<span class="meta">${l.length?`${k} de ${l.length} feitas`:c?`começa em ${fmt(c)}`:'nada previsto'}</span>${!l.length&&c&&dia===HJ&&x==='WAE'&&paraComecar().length&&podeEditRot()?`<button class="btn pri qd-start" onclick="comecarHoje()">${S.confCom?'Confirmar: começar hoje':'Começar hoje'}</button>`:''}</div>`}).join('');
  return `<div class="qd" style="--n:${SS.length}"><div class="qd-cab"><span></span>${cab}</div>${G.map(g=>{const i=procs().indexOf(g);
   const temCols=L.some(r=>grp(r)===g);
