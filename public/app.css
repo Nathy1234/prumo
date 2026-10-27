@@ -312,3 +312,4 @@ table.andt.quem td{text-align:left}
 .opc.sug{border-style:dashed;color:var(--ink-2);background:transparent;font-size:12.5px;min-height:34px;padding:6px 10px}
 .opc:disabled{cursor:default;opacity:.7}
 @media (max-width:820px){.qd-row.outras .qd-opc{grid-column:1/-1}}
+.qd-start{margin-left:auto;padding:6px 12px;font-size:12.5px}.qd-h .qd-start+*{display:none}
