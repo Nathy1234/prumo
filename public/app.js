@@ -105,7 +105,7 @@ function alertas(){
   if(pode('antifraude')){D.verificacoes.filter(v=>v.st==='aprovacao'&&!mesmaPessoa(v.verUid,v.verPerf)).forEach(v=>A.push({n:3,ic:'bancos',c:'bad',t:`Troca de dados bancários aguardando sua aprovação: ${v.forn}`,s:`Conferida por ${v.verPapel||''}. Os pagamentos estão travados.`,ir:'bancos'}));D.verificacoes.filter(v=>v.st==='verificacao').forEach(v=>A.push({n:2,ic:'bancos',c:'wa',t:`Troca de dados bancários para conferir: ${v.forn}`,s:`Recebido por ${String(v.origem||'').toLowerCase()} em ${fmt(v.recebido)}`,ir:'bancos'}))}
   if(dir())D.verificacoes.filter(v=>v.st==='recusada'&&diasAte((v.fimEm||'').slice(0,10))>=-7).forEach(v=>A.push({n:3,ic:'bancos',c:'bad',t:`Possível golpe: troca de conta de ${v.forn} recusada`,s:v.motivo||'',ir:'bancos'}));
   if(modOn('fechamento')&&pode('fechamento')){const c=compPadrao();D.etapas.filter(e=>atrasoF(c,e)&&(dir()||pode('ver_tudo')||e.resp===S.perfil)).forEach(e=>A.push({n:3,ic:'fechamento',c:'bad',t:`Etapa do fechamento atrasada: ${e.t}`,s:`Prazo D+${e.dn} (${fmt(dataDN(c,+e.dn||1))}) · ${nomeDe(e.resp)}`,ir:'fechamento'}))}
-  if(modOn('email')&&pode('email')){const n=D.emails.filter(e=>e.st==='triagem').length;if(n)A.push({n:2,ic:'triagem',c:'wa',t:`${n} ${n>1?'e-mails aguardam':'e-mail aguarda'} triagem`,s:'Confirme se viraram entregas recebidas ou chamados',ir:'triagem'});if(S.syncErr&&S.syncErr.code!=='sem_mcp')A.push({n:2,ic:'triagem',c:'bad',t:'Leitura do Outlook com problema',s:msgErro(S.syncErr),ir:'triagem'})}
+  if(modOn('email')&&pode('email')){const n=emPend().length;if(n)A.push({n:2,ic:'triagem',c:'wa',t:`${n} ${n>1?'e-mails aguardam':'e-mail aguarda'} triagem`,s:'Confirme se viraram entregas recebidas ou chamados',ir:'triagem'});if(S.syncErr&&S.syncErr.code!=='sem_mcp')A.push({n:2,ic:'triagem',c:'bad',t:'Leitura do Outlook com problema',s:msgErro(S.syncErr),ir:'triagem'})}
   if(podeAdmin()){const n=D.pedidos.filter(p=>!acessoDe(p.id)).length;if(n)A.push({n:2,ic:'usuarios',c:'wa',t:`${n} ${n>1?'pedidos':'pedido'} de acesso aguardando`,s:'Revise em Usuários e permissões',ir:'usuarios'});
    if(real()&&S.bkCarregado&&CFG.bkAuto!==false&&!D.backups.some(b=>b.id==='d-'+HJ)&&!S.bk)A.push({n:1,ic:'backup',c:'wa',t:'Backup de hoje ainda não foi feito',s:'Ele é criado em instantes, com o portal aberto',ir:'backup'})}
   /* por enquanto os alertas vêm só do cronograma; os outros voltam em Cronograma > Ajustes */
@@ -685,6 +685,14 @@ async function sincronizar(manual){
   try{localStorage.setItem('autoSync_'+(ME.uid||'demo'),'1')}catch(e){}
  }catch(e){S.syncErr=e;DB.doc('sync/estado').set({...SYNC,erro:e?.code||'erro',erroEm:new Date().toISOString()}).catch(()=>{});if(manual)toast(msgErro(e))}
  finally{S.sync=false;render()}}
+/* só conta e mostra os e-mails da caixa configurada (ex.: contas a pagar); os de outra caixa ficam de fora */
+const daCaixa=e=>!CFG.caixa||norm(e.caixa||'')===norm(CFG.caixa);
+const emPend=()=>D.emails.filter(e=>e.st==='triagem'&&daCaixa(e));
+const deOutraCaixa=()=>D.emails.filter(e=>!daCaixa(e)&&e.st!=='aplicado');
+async function removerOutraCaixa(){const L=deOutraCaixa();if(!L.length)return;
+ if(!S.confOC){S.confOC=true;toast(`Clique de novo para remover ${L.length} e-mails que não são da caixa ${CFG.caixa}.`);render();setTimeout(()=>{S.confOC=false;render()},6000);return}S.confOC=false;
+ let k=0;for(const e of L){try{await DB.collection('emails').doc(e.id).delete();k++}catch(x){}}
+ log(`Removeu do Prumo ${k} e-mails que não eram da caixa ${CFG.caixa}`);toast(`${k} e-mails removidos do Prumo`);render()}
 function msgErro(e){const c=e?.code,cx=CFG.caixa||'a caixa configurada';return ({
  sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
@@ -730,7 +738,7 @@ async function setRem(rid,mud){const r=D.remetentes.find(x=>x.id===rid),em=D.ema
  const {id:_,...base}=r||{email:em?.de||'',nome:em?.deNome||'',dep:'',cat:'',ignorar:false,criado:new Date().toISOString()};const novo={...base,...mud};
  const nome=novo.nome||novo.email;
  if(!await salvar('remetentes',rid,novo,'Remetente atualizado',`Atualizou o remetente ${nome}${mud.dep!==undefined?` · setor ${mud.dep?depNome(mud.dep):'não definido'}`:''}${novo.ignorar&&!base.ignorar?' · passou a ignorar':''}`))return false;
- for(const e of D.emails.filter(e=>remDoEmail(e)===rid&&e.st==='triagem')){const m={};
+ for(const e of D.emails.filter(e=>remDoEmail(e)===rid&&e.st==='triagem'&&daCaixa(e))){const m={};
   if(mud.dep!==undefined&&e.dep!==novo.dep)m.dep=novo.dep;
   if(mud.cat&&assDe(mud.cat))m.sug={...(e.sug||{}),assunto:mud.cat};
   if(novo.ignorar)Object.assign(m,{st:'ignorado',triadoPor:ME.uid||null,triadoEm:new Date().toISOString()});
@@ -1756,7 +1764,7 @@ const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramenta
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
 const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
 const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
-function chAbas(on){if(!(pode('chamados')&&pode('email')))return '';const nt=D.emails.filter(e=>e.st==='triagem').length;
+function chAbas(on){if(!(pode('chamados')&&pode('email')))return '';const nt=emPend().length;
  return `<div class="tabs big" role="tablist" aria-label="Chamados e e-mails"><button role="tab" aria-selected="${on==='ch'}" class="${on==='ch'?'on':''}" onclick="ir('chamados')">Chamados</button><button role="tab" aria-selected="${on==='em'}" class="${on==='em'?'on':''}" onclick="ir('triagem')">E-mails para revisar ${nt?`<span class="tag wa" style="font-size:11px;margin-left:4px">${nt}</span>`:''}</button></div>`}
 function chEmail(){if(!pode('email'))return '';
  return statusSync(`<span style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto"><button class="btn" onclick="conectarEmail()">Conectar e-mail</button>${ME.admin||!real()?`<button class="btn" onclick="cfgEmail()" title="Escolher a caixa ou colar o link da pasta compartilhada">Configurar caixa ou link</button>`:''}<button class="btn pri" onclick="sincronizar(true)">${S.sync?'Verificando…':'Verificar agora'}</button></span>`)}
@@ -1889,13 +1897,13 @@ usuarios(){const ped=D.pedidos.filter(p=>!acessoDe(p.id)).sort((a,b)=>a.em<b.em?
  ${!lst.filter(a=>a.id!==ME.uid).length?vazio('Ninguém liberado ainda','Quando alguém abrir o portal pela primeira vez, o pedido de acesso aparece aqui.'):''}</div>
  <div class="panel"><div class="ph"><h2>O que cada perfil pode fazer</h2><span>a equipe pode ter permissões ajustadas pessoa a pessoa</span></div>${matriz()}</div>`+
  note('Quem entra pela primeira vez aparece em Pedidos de acesso. Diretores e administradores liberam, ajustam permissões ou bloqueiam. Bloquear não apaga o histórico.')},
-triagem(){const pend=D.emails.filter(e=>e.st==='triagem'),hist=D.emails.filter(e=>e.st==='aplicado'||(e.st==='ignorado'&&!e.auto)).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
+triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="banner"><span>${oc} ${oc>1?'e-mails vieram':'e-mail veio'} de outra caixa, não do ${esc(CFG.caixa)}. Eles não aparecem mais na revisão. Quer apagar essas cópias do Prumo? Os chamados já criados não mudam.</span><button class="btn ${S.confOC?'danger':''}" onclick="removerOutraCaixa()">${S.confOC?'Confirmar: remover':'Remover do Prumo'}</button></div>`:'';const pend=emPend(),hist=D.emails.filter(e=>e.st==='aplicado'||(e.st==='ignorado'&&!e.auto)).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
  const g={};pend.forEach(e=>{const k=remDoEmail(e);(g[k]=g[k]||[]).push(e)});
  const q=norm(S.fRemT||'');
  const G=Object.entries(g).map(([k,l])=>{const r=D.remetentes.find(x=>x.id===k);return {k,r,nome:r?.nome||l[0].deNome||l[0].de,email:r?.email||l[0].de,dep:r?r.dep:l[0].dep,l:l.sort((a,b)=>a.recebido<b.recebido?1:-1)}}).filter(x=>!q||norm(x.nome+' '+x.email+' '+depNome(x.dep)).includes(q)).sort((a,b)=>a.l[0].recebido<b.l[0].recebido?1:-1);
  const sem=lerTodos()?[]:D.departamentos.filter(d=>!listaEmails(d).length);
  const conhecidos=[...D.remetentes].sort((a,b)=>(a.nome||a.email||'').localeCompare(b.nome||b.email||''));
- return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+
+ return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+ocBan+
  chAbas('em')+chEmail()+
  (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length} ${pend.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
@@ -2258,7 +2266,7 @@ function vigiarDB(db){const marca=p=>{const c=String(p).split('/')[0];if(FORM&&!
  return {doc:p=>doc(db.doc(p)),collection:p=>col(db.collection(p))}}
 
 /* ---------- render ---------- */
-function nav(){const pm=pode('whats')?pendMsg():0,na=alertas().filter(a=>a.c==='bad').length,nc=D.chamados.filter(c=>c.st==='Aberto'&&!c.resp).length,nt=D.emails.filter(e=>e.st==='triagem').length,np=D.pedidos.filter(p=>!acessoDe(p.id)).length;
+function nav(){const pm=pode('whats')?pendMsg():0,na=alertas().filter(a=>a.c==='bad').length,nc=D.chamados.filter(c=>c.st==='Aberto'&&!c.resp).length,nt=emPend().length,np=D.pedidos.filter(p=>!acessoDe(p.id)).length;
  const nr=atrasosCron(vejoRot).length;const badge=(k)=>k==='rotinas'&&nr?`<span class="count" style="background:var(--bad-bg);color:var(--bad)" title="Rotinas em atraso">${nr}</span>`:k==='whats'&&pm?`<span class="count">${pm}</span>`:k==='chamados'&&(nc||(pode('email')&&nt))?`<span class="count" style="background:var(--accent-soft);color:var(--accent-ink)" title="${nc} sem responsável${pode('email')&&nt?` · ${nt} e-mails para revisar`:''}">${nc+(pode('email')?nt:0)}</span>`:k==='usuarios'&&np?`<span class="count">${np}</span>`:k==='alertas'&&na?`<span class="count" style="background:var(--bad-bg);color:var(--bad)">${na}</span>`:'';
  document.getElementById('nav').innerHTML=(solic()||S.perfil==='pendente'||S.modo==='carregando'?'':`<button class="nav reg ${S.tela==='registrar'?'on':''}" onclick="ir('registrar')">${ic('reg')}<span>Registrar</span></button>`)+
  (S.modo==='carregando'?'':vis().map(([k,n])=>`<button class="nav ${(MENU_PAI[S.tela]||S.tela)===k?'on':''}" onclick="ir('${k}')">${ic(k)}<span>${n}</span>${badge(k)}</button>`).join(''))}
