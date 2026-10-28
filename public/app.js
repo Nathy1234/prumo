@@ -53,7 +53,7 @@ const fimTri=t=>{const m=mesesTri(t)[2];const [y,mm]=m.split('-').map(Number);re
 const diasAte=iso=>Math.round((new Date(iso+'T12:00')-new Date(HJ+'T12:00'))/864e5);
 const hrs=n=>{const v=Math.round((+n||0)*10)/10;return `${String(v).replace('.',',')} h`};
 
-const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes','cronitens','feitos','metas'];
+const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes','cronitens','feitos','metas','fluxo'];
 const D={logs:[],backups:[]};COLS.forEach(c=>D[c]=[]);
 let CFG={};
 const S={tela:'painel',perfil:'dir',modo:'carregando',sim:'',online:null,mesDest:MES_ATUAL,tri:triDe(MESES_ATUAL_FIX()),cal:MES_ATUAL,busca:'',limpar:false,loaded:0};
@@ -462,7 +462,7 @@ function proxEtapa(c){return c.st==='Aberto'?'Em análise':c.st==='Em análise'?
 /* ---------- logs e notificações ---------- */
 const fmtHora=s=>s?`${s.slice(8,10)}/${s.slice(5,7)} ${new Date(s).toTimeString().slice(0,5)}`:'';
 function log(acao,extra){if(!DB)return;DB.collection('logs').add({em:new Date().toISOString(),quem:quemSou(),perfil:S.perfil,uid:ME.uid||null,sim:!!(real()&&S.sim),acao,...(extra||{})}).catch(()=>{})}
-const NOMES={metas:'meta ou item a fazer',feitos:'marcação de quem fez',cronitens:'item de rotina',cronograma:'rotina do cronograma',execucoes:'marcação do cronograma',remetentes:'remetente',assuntos:'assunto',verificacoes:'troca de dados bancários',etapas:'etapa do fechamento',fechamentos:'fechamento',feedbacks:'feedback',observacoes:'observação',modelos:'modelo de e-mail',frases:'frase sugerida',acessos:'acesso',pedidos:'pedido de acesso',emails:'e-mail',categorias:'categoria',ferramentas:'ferramenta',equipe:'colaborador',tarefas:'rotina',mensagens:'mensagem',chamados:'chamado',sugestoes:'sugestão',destaques:'destaque',ponto:'lançamento de horas',eventos:'prazo',procedimentos:'procedimento',departamentos:'departamento',entregas:'entrega'};
+const NOMES={fluxo:'e-mail no processo',metas:'meta ou item a fazer',feitos:'marcação de quem fez',cronitens:'item de rotina',cronograma:'rotina do cronograma',execucoes:'marcação do cronograma',remetentes:'remetente',assuntos:'assunto',verificacoes:'troca de dados bancários',etapas:'etapa do fechamento',fechamentos:'fechamento',feedbacks:'feedback',observacoes:'observação',modelos:'modelo de e-mail',frases:'frase sugerida',acessos:'acesso',pedidos:'pedido de acesso',emails:'e-mail',categorias:'categoria',ferramentas:'ferramenta',equipe:'colaborador',tarefas:'rotina',mensagens:'mensagem',chamados:'chamado',sugestoes:'sugestão',destaques:'destaque',ponto:'lançamento de horas',eventos:'prazo',procedimentos:'procedimento',departamentos:'departamento',entregas:'entrega'};
 const tituloDe=d=>d.t||d.item||d.n||d.assunto||(d.pessoa&&d.mes?`${nomeDe(d.pessoa)} · ${mesCurto(d.mes)}`:'')||(d.txt||'').slice(0,40);
 function notifs(){
  const ms=solic()?D.chamados.filter(c=>c.dep===solDep()).map(c=>c.proto):[];
@@ -1405,7 +1405,8 @@ function quadroDia(dia,f){const grp=r=>procs().includes(r.etapa)?r.etapa:'',SS=[
  const sw=`<div class="sisw" role="tablist" aria-label="Sistema">${sists().map((x,i)=>{const l=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(r.sis||[]).includes(x)),k=l.filter(r=>estadoSis(r,dia,x).fe).length,c=comeca(x);return `<button role="tab" aria-selected="${x===SS[0]}" class="${x===SS[0]?'on':''}" onclick="S.cSis=sists()[${i}];render();salvarEstado()"><b>${esc(x)}</b>${emTeste(x)?'<small class="tag wa">em teste</small>':''}<span>${l.length?`${k} de ${l.length} finalizadas`:c?`começa em ${fmt(c)}`:'nada previsto'}</span></button>`}).join('')}</div>`;
  return `${sw}<div class="qd" style="--n:1">${G.map(g=>{const i=procs().indexOf(g);
   const temCols=L.some(r=>grp(r)===g);
-  return `<div class="qd-row ${g?'':'outras'}"><h3>${i>=0?`<span class="meta">${i+1}.</span> `:''}${esc(g||'Outras atividades')}${g?'':'<small>Clique no que fez</small>'}</h3>${g||temCols?SS.map(x=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x)).sort(ordR);
+  const nfx=g?fluxoAtivos(SS[0]).filter(f=>f.etapa===g).length:0;
+  return `<div class="qd-row ${g?'':'outras'}"><h3>${i>=0?`<span class="meta">${i+1}.</span> `:''}${esc(g||'Outras atividades')}${g?'':'<small>Clique no que fez</small>'}${nfx?`<small class="fx-n">${nfx} ${nfx>1?'e-mails':'e-mail'} nesta etapa</small>`:''}</h3>${g||temCols?SS.map(x=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x)).sort(ordR);
    return `<div class="qd-col"><p class="qd-sis">${esc(x)}</p>${l.length?l.map(r=>linOc(r,dia,false,true)).join(''):'<p class="meta qd-vazio">—</p>'}</div>`}).join(''):''}${g?'':outrasOpcoes(dia)}</div>`}).join('')}</div>`}
 function cDia(n){let d=S.cDia||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S.cDia=d;render()}
 function cronDia(){const dia=S.cDia||HJ,f0=filtroCron(),f=r=>f0(r)&&(r.sis||[]).includes(sisAtual()),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
@@ -1413,7 +1414,7 @@ function cronDia(){const dia=S.cDia||HJ,f0=filtroCron(),f=r=>f0(r)&&(r.sis||[]).
  const ant=dia===HJ?atrasosCron(f).filter(o=>o.dia<HJ).sort((a,b)=>a.dia<b.dia?-1:1):[];
  const grupos=[...procs(),''].map(g=>[g,L.filter(r=>(procs().includes(r.etapa)?r.etapa:'')===g)]).filter(([,l])=>l.length);
  const tav=D.tarefas.filter(t=>(!S.cQuem||t.r===S.cQuem)&&(t.prazo===dia||(dia===HJ&&atrasada(t)))&&(dir()||pode('ver_tudo')||t.r===S.perfil));
- return `<div class="cronbar">${nav2}</div>${comecarBtn()}${andamento(dia,'cDia',true)}${cronFiltros(true)}`+
+ return `<div class="cronbar">${nav2}</div>${comecarBtn()}${andamento(dia,'cDia',true)}${quadroFluxo(dia)}${cronFiltros(true)}`+
  `<div class="stats"><div class="stat"><p>Previstas</p><strong>${c.tot}</strong><small>${dia===HJ?'hoje':fmt(dia)}</small></div><div class="stat"><p>Concluídas</p><strong style="color:${c.tot&&c.ok===c.tot?'var(--ok)':'var(--ink)'}">${c.ok}</strong><small>${c.tot?Math.round(c.ok/c.tot*100):0}%</small></div><div class="stat"><p>Em andamento</p><strong style="color:${c.and?'var(--accent)':'var(--ink)'}">${c.and}</strong><small>começadas</small></div><div class="stat"><p>Atrasadas</p><strong style="color:${c.atr+ant.length?'var(--bad)':'var(--ink)'}">${c.atr+ant.length}</strong><small>${ant.length?`${ant.length} de dias anteriores`:'passaram do horário'}</small></div></div>`+
  (()=>{const E=D.eventos.filter(e=>vejoEv(e)&&evOcorre(e,dia)&&(!S.cQuem||e.quem!=='pessoas'||(e.ps||[]).includes(S.cQuem))).sort((a,b)=>(a.hora||'99').localeCompare(b.hora||'99'));
   return E.length?`<div class="panel"><div class="ph"><h2>Compromissos do dia</h2><span>${E.length}</span></div>${E.map(e=>`<div class="row"><span class="meta" style="width:44px">${esc(e.hora||'')}</span><div class="t"><b>${esc(e.t)}</b><span>${esc(quemEv(e))}${e.obs?' · '+esc(e.obs):''}</span></div><span class="tag ${corEv(e)}">${esc(e.tipo||'Outro')}</span>${podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')">Editar</button>`:''}</div>`).join('')}</div>`:''})()+
@@ -1711,6 +1712,45 @@ function resumoMetas(mes){const ps=colabs(),lin=(n,d)=>{const L=itensMeta(mes,d)
  if(!D.metas.some(x=>x.mes===mes))return '';
  return `<div class="panel"><div class="ph"><h2>Metas de ${mesNome(mes)}</h2><button class="btn ghost" onclick="S.mM='${mes}';ir('metas')">Abrir metas</button></div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Quem</th><th>Itens</th><th>Feitos</th><th>Em andamento</th><th>Prazo passou</th><th>%</th></tr></thead><tbody>${lin('Departamento','dep')}${itensMeta(mes,'dir').length?lin('Diretoria','dir'):''}${ps.map(p=>lin(p.n,p.id)).join('')}</tbody></table></div></div>`}
 
+/* ---------- e-mails no processo: cada e-mail (ou chamado) anda pelas etapas até ser concluído ---------- */
+const refFluxo=f=>f.ref?.startsWith('email:')?D.emails.find(e=>e.id===f.ref.slice(6)):D.chamados.find(c=>c.id===(f.ref||'').slice(8));
+const fluxoAtivos=x=>D.fluxo.filter(f=>f.st!=='concluido'&&(!x||!f.sis||f.sis===x));
+const fluxoConcluidosDia=(dia,x)=>D.fluxo.filter(f=>f.st==='concluido'&&(f.concluidoEm||'').slice(0,10)===dia&&(!x||!f.sis||f.sis===x));
+function linFluxo(f,dia){const pm=podeEditRot(),fim=f.st==='concluido',ult=(f.hist||[]).slice(-1)[0],r=refFluxo(f);
+ const abrir=f.ref?.startsWith('chamado:')&&r?`<button class="lnk" onclick="detalheCh('${esc(r.id)}')">${esc(r.proto||'chamado')}</button> `:r?.link?`<a class="lnk" href="${esc(r.link)}" target="_blank" rel="noopener">abrir no Outlook ↗</a> `:'';
+ return `<div class="fx-row ${fim?'done':''}"><div class="t"><b>${esc(f.t||'(sem assunto)')}</b><span>${[f.de,f.recebido?'recebido '+fmt(f.recebido.slice(0,10)):''].filter(Boolean).map(esc).join(' · ')} ${abrir}</span>
+ ${ult?`<span class="meta">${fim?`✓ Concluído por ${esc(f.concluidoPor||ult.por||'—')} em ${dtH(f.concluidoEm)}`:`${esc(ult.etapa)} desde ${dtH(ult.em)} · ${esc(ult.por||'—')}`}</span>`:''}</div>
+ ${fim?(pm?`<button class="lnk desf" onclick="fluxoReabrir('${f.id}')">reabrir</button>`:''):`<select class="inp fx-sel" ${pm?'':'disabled'} aria-label="Etapa de ${esc(f.t||'')}" onchange="fluxoEtapa('${f.id}',this.value)">${procs().map(e=>`<option ${e===f.etapa?'selected':''}>${esc(e)}</option>`).join('')}</select>${pm?`<button class="btn sm mk on-ok-hover" onclick="fluxoConcluir('${f.id}')">✓ Concluir</button><button class="itx" onclick="fluxoTirar('${f.id}')" title="Tirar do processo" aria-label="Tirar do processo">×</button>`:''}`}</div>`}
+function quadroFluxo(dia){const x=sisAtual(),A=fluxoAtivos(x),C=fluxoConcluidosDia(dia,x),pm=podeEditRot();
+ const grupos=procs().map((g,i)=>[g,i,A.filter(f=>f.etapa===g)]).filter(([, ,l])=>l.length);
+ return `<div class="panel fx"><div class="ph"><h2>E-mails no processo · ${esc(x)}</h2>${pm?`<button class="btn pri" onclick="fluxoNovo()">+ Selecionar e-mail</button>`:''}</div>
+ ${A.length?grupos.map(([g,i,l])=>`<p class="eyebrow" style="margin:12px 0 2px">${i+1}. ${esc(g)} · ${l.length}</p>${l.sort((a,b)=>(a.em||'').localeCompare(b.em||'')).map(f=>linFluxo(f,dia)).join('')}`).join(''):`<p class="meta" style="margin:4px 0">Nenhum e-mail em andamento no ${esc(x)}. Clique em <b>+ Selecionar e-mail</b> para incluir um e-mail do contas a pagar e escolher a etapa.</p>`}
+ ${C.length?`<details style="margin-top:10px"><summary class="meta">Concluídos em ${fmt(dia)} · ${C.length}</summary>${C.map(f=>linFluxo(f,dia)).join('')}</details>`:''}</div>`}
+function fluxoNovo(){FORM={tipo:'_fluxo'};const usados=new Set(D.fluxo.filter(f=>f.st!=='concluido').map(f=>f.ref));
+ const em=D.emails.filter(e=>daCaixa(e)&&e.st!=='ignorado'&&!usados.has('email:'+e.id)).sort((a,b)=>(b.recebido||'').localeCompare(a.recebido||'')).slice(0,200);
+ const ch=D.chamados.filter(c=>c.st!=='Concluído'&&!usados.has('chamado:'+c.id)).sort((a,b)=>(b.aberto||'').localeCompare(a.aberto||''));
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma · ${esc(sisAtual())}</p><h2 id="sheet-title">Selecionar e-mail</h2><p class="sub" style="font-size:13px">Escolha o e-mail (ou chamado) e em qual etapa ele está. Depois é só mudar a etapa conforme avança e concluir no final.</p></div>
+ <div class="fgrid one"><div><label class="lbl" for="fx_q">Buscar</label><input class="inp" id="fx_q" data-nodraft="1" placeholder="Assunto ou remetente" oninput="fluxoFiltra()"></div>
+ <div><label class="lbl" for="fx_ref">E-mail ou chamado</label><select class="inp" id="fx_ref" size="8">${em.length?`<optgroup label="E-mails do contas a pagar">${em.map(e=>`<option value="email:${esc(e.id)}" data-q="${esc(norm((e.assunto||'')+' '+(e.deNome||'')+' '+(e.de||'')))}">${esc(fmt((e.recebido||'').slice(0,10)))} · ${esc(e.deNome||e.de||'')} · ${esc(e.assunto||'')}</option>`).join('')}</optgroup>`:''}${ch.length?`<optgroup label="Chamados em aberto">${ch.map(c=>`<option value="chamado:${esc(c.id)}" data-q="${esc(norm((c.assunto||'')+' '+(c.proto||'')+' '+depNome(c.dep)))}">${esc(c.proto||'')} · ${esc(depNome(c.dep))} · ${esc(c.assunto||'')}</option>`).join('')}</optgroup>`:''}</select><p class="ferr" id="fxe_ref">${em.length||ch.length?'':'Nenhum e-mail ainda. Clique em Verificar agora em Chamados > E-mails para revisar.'}</p></div>
+ <div class="fgrid" style="margin:0"><div><label class="lbl" for="fx_et">Etapa</label><select class="inp" id="fx_et">${procs().map(e=>`<option>${esc(e)}</option>`).join('')}</select></div>
+ <div><label class="lbl" for="fx_sis">Sistema</label><select class="inp" id="fx_sis">${sists().map(x=>`<option ${x===sisAtual()?'selected':''}>${esc(x)}</option>`).join('')}</select></div></div></div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="fluxoSalvaNovo()">Incluir no processo</button></div></div>`;
+ document.getElementById('ov').hidden=false;setTimeout(()=>document.getElementById('fx_q')?.focus(),30)}
+function fluxoFiltra(){const q=norm(val('fx_q'));document.querySelectorAll('#fx_ref option').forEach(o=>{o.hidden=!!q&&!(o.dataset.q||'').includes(q)})}
+async function fluxoSalvaNovo(){const ref=val('fx_ref');errEl('fxe_ref','');if(!ref){errEl('fxe_ref','Escolha um e-mail ou chamado na lista.');return}
+ const isEm=ref.startsWith('email:'),r=isEm?D.emails.find(e=>e.id===ref.slice(6)):D.chamados.find(c=>c.id===ref.slice(8));if(!r)return;
+ const etapa=val('fx_et'),sis=val('fx_sis'),agora=new Date().toISOString(),quem=quemNome();
+ const doc={ref,t:isEm?(r.assunto||''):`${r.proto||''} · ${r.assunto||''}`,de:isEm?(r.deNome||r.de||''):depNome(r.dep),recebido:isEm?(r.recebido||''):(r.aberto||''),sis,etapa,st:'andamento',em:agora,por:quem,hist:[{etapa,em:agora,por:quem}]};
+ if(await salvar('fluxo',null,doc,'Incluído no processo',`Incluiu "${doc.t}" no processo (${etapa} · ${sis})`)){if(sis!==sisAtual()){S.cSis=sis}fechar()}}
+async function fluxoEtapa(id,etapa){const f=D.fluxo.find(x=>x.id===id);if(!f||f.etapa===etapa)return;const agora=new Date().toISOString(),quem=quemNome();
+ await patch('fluxo',id,{etapa,hist:[...(f.hist||[]),{etapa,em:agora,por:quem}]},`${etapa}`,`Moveu "${f.t}" para ${etapa} (${f.sis||''})`)}
+async function fluxoConcluir(id){const f=D.fluxo.find(x=>x.id===id);if(!f)return;const agora=new Date().toISOString(),quem=quemNome();
+ await patch('fluxo',id,{st:'concluido',concluidoEm:agora,concluidoPor:quem,hist:[...(f.hist||[]),{etapa:'Concluído',em:agora,por:quem}]},'Concluído',`Concluiu "${f.t}" (${f.etapa} · ${f.sis||''})`)}
+async function fluxoReabrir(id){const f=D.fluxo.find(x=>x.id===id);if(!f)return;const agora=new Date().toISOString(),quem=quemNome();
+ await patch('fluxo',id,{st:'andamento',concluidoEm:'',concluidoPor:'',hist:[...(f.hist||[]),{etapa:f.etapa,em:agora,por:quem,reaberto:true}]},'Reaberto',`Reabriu "${f.t}"`)}
+async function fluxoTirar(id){const f=D.fluxo.find(x=>x.id===id);if(!f)return;if(S.fxDel!==id){S.fxDel=id;toast('Clique no × de novo para tirar do processo.');setTimeout(()=>{if(S.fxDel===id)S.fxDel=null},4000);return}S.fxDel=null;
+ try{await DB.collection('fluxo').doc(id).delete();log(`Tirou "${f.t}" do processo`);toast('Retirado do processo')}catch(e){toast('Não foi possível retirar.')}}
+
 /* ---------- prazos e compromissos: fixos (toda semana, todo mês) ou de uma vez ---------- */
 const TIPOS_EV=['Reunião','Obrigação','Fechamento','Outro'];
 const REP_EV=[['unica','Uma vez só'],['semanal','Toda semana'],['mensal','Todo mês']];
@@ -1770,7 +1810,7 @@ async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FOR
  const e=D.eventos.find(x=>x.id===FORM.id);try{await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
 
 /* ---------- telas ---------- */
-const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['chamados','Chamados'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
+const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
 const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
 const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
