@@ -1571,7 +1571,7 @@ function cfgCron(){FORM={tipo:'_cfgcron',listas:{et:[...procs()],sis:[...sists()
  <div><span class="lbl">Sistemas</span>${chipsEd('sis','Ex.: Internet banking')}</div>
  <div><span class="lbl">Sistemas em teste</span>${chipsEd('teste','Ex.: Protheus')}<p class="meta" style="margin:4px 0 0">Aparecem com a marca "em teste". Tire daqui quando o sistema passar a valer de vez.</p></div>
  <div><span class="lbl">Guardados para depois (ligue quando quiser usar)</span>${MODS.map(([k,n,d])=>`<label class="perm"><input type="checkbox" id="md_${k}" ${modOn(k)?'checked':''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>
- <div><span class="lbl">Modelo pronto</span><div style="display:flex;gap:8px;flex-wrap:wrap">${D.cronograma.length?`<button class="btn" type="button" onclick="organizarModelo()">Organizar com o modelo atualizado</button>`:`<button class="btn" type="button" onclick="montarModelo()">Montar o cronograma</button>`}</div><p class="meta" style="margin:4px 0 0">D-5 sempre, pagamento D-2 em novembro e D-1 a partir de dezembro, com Natalia, Jeferson e Natasha. Atualiza as rotinas existentes sem apagar nada.</p></div></div>
+ <div><span class="lbl">Modelo pronto</span><div style="display:flex;gap:8px;flex-wrap:wrap">${D.cronograma.length?`<button class="btn" type="button" onclick="organizarModelo()">Organizar com o modelo atualizado</button>`:`<button class="btn" type="button" onclick="montarModelo()">Montar o cronograma</button>`}</div><p class="meta" style="margin:4px 0 0">D-5 sempre, pagamento D-2 em novembro e D-1 a partir de dezembro, com Natalia, Jeferson e Natasha. Natalia faz Lançamento e Baixa no WAE e no Protheus. Atualiza as rotinas existentes sem apagar nada.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgCron()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
 async function salvaCfgCron(){const L=FORM.listas;if(!L.et.length||!L.sis.length){toast('Deixe ao menos uma etapa e um sistema.');return}
@@ -1588,15 +1588,15 @@ function gerirDeps(){FORM={tipo:'_deps'};
 /* modelo do departamento. "chave" identifica cada rotina para atualizações futuras sem duplicar */
 /* modelo do departamento, uma rotina por sistema (WAE e Protheus lado a lado).
    "chave" identifica cada rotina; "alias" são as chaves e títulos das versões anteriores, para atualizar no lugar */
-const MODELO_VER=3;
+const MODELO_VER=4;
 function modeloCron({NA,JN}){const EV='Evandro (Protheus)',N0='2026-11-01',N1='2026-11-30',DZ='2026-12-01',L=[];
  const r=(chave,etapa,t,sis,rs,x,alias)=>L.push({chave,etapa,t,sis:[sis],rs,apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:N0,fim:'',ativo:true,mv:MODELO_VER,...(x||{}),_alias:alias||[]});
  const W='WAE',P='Protheus',pe={apoio:EV};
  for(const [x,suf] of [[W,'wae'],[P,'pro']]){const w=x===W,old=a=>w?a:[];
   r('ident-'+suf,'Identificação','Identificar as contas a pagar (D-5)',x,JN,{obs:'D-5: contas que vencem daqui a 5 dias úteis. Vale sempre.'},old(['ident','Identificar as contas a pagar (D-5)','Identificar as contas que vencem em 5 dias úteis (D-5)','Identificar as contas que vencem no próximo dia útil']));
   r('confer-'+suf,'Conferência','Conferir documentos, valores, vencimentos e centro de custo',x,JN,{obs:'Contas identificadas no D-5.'},old(['confer','Conferir documentos, valores, vencimentos e centro de custo']));
-  r('lanc-'+suf,'Lançamento',`Lançamento no ${x}`,x,w?NA:JN,w?{}:pe,[`Lançamento no ${x}`]);
-  r('baixa-'+suf,'Baixa',`Baixa no ${x}`,x,w?NA:JN,w?{}:pe,[`Baixa no ${x}`]);
+  r('lanc-'+suf,'Lançamento',`Lançamento no ${x}`,x,w?NA:[...NA,...JN],w?{}:{...pe,somarRs:NA},[`Lançamento no ${x}`]);
+  r('baixa-'+suf,'Baixa',`Baixa no ${x}`,x,w?NA:[...NA,...JN],w?{}:{...pe,somarRs:NA},[`Baixa no ${x}`]);
   r('pagnov-'+suf,'Pagamento','Pagamento · todas as contas (D-2 em novembro)',x,JN,{fim:N1,obs:'Regra: 10h todas as contas. Novembro: pagamento adiantado para 2 dias úteis antes do vencimento (D-2), porque trabalhamos no WAE e no Protheus.'},old(['pag-nov','Pagamento · todas as contas (D-2 em novembro)','Pagamento · todas as contas']));
   r('pagd1-'+suf,'Pagamento','Pagamento · todas as contas (D-1)',x,JN,{ini:DZ,obs:'Regra: 10h todas as contas. Pagamento 1 dia útil antes do vencimento (D-1).'},old(['pag','Pagamento · todas as contas (D-1)']));
   if(w)r('pag1430-wae','Pagamento','Pagamento · WAE',W,JN,{obs:'Regra: WAE a partir das 14:30. Segue o D-1 (D-2 em novembro).'},['pag-wae','Pagamento · WAE','Pagamento · WAE a partir das 14:30']);
@@ -1619,7 +1619,7 @@ async function pessoasModelo(faltam){
 async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode montar o cronograma.');return}
  if(D.cronograma.length){return organizarModelo()}
  const faltam=[],M=modeloCron(await pessoasModelo(faltam)),hoje=HJ;let k=0;
- for(const {_alias,...r} of M){const x={...r,ini:r.ini&&r.ini<hoje?hoje:r.ini,criado:HJ};if(await salvar('cronograma',null,x,false,false))k++}
+ for(const {_alias,somarRs,...r} of M){const x={...r,ini:r.ini&&r.ini<hoje?hoje:r.ini,criado:HJ};if(await salvar('cronograma',null,x,false,false))k++}
  log(`Montou o cronograma do departamento com ${k} rotinas`);
  toast(faltam.length?`${k} rotinas criadas. Cadastre ${faltam.join(', ')} e defina nas rotinas.`:`${k} rotinas criadas. Ajuste o que precisar.`);
  if(FORM)fechar();S.cTab='rotinas';ir('rotinas')}
@@ -1627,10 +1627,10 @@ async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode mont
 async function organizarModelo(sil){if(!podeCron()){if(!sil)toast('Só quem cadastra pode organizar o cronograma.');return}
  if(!sil&&!S.confOrg){S.confOrg=true;toast('Clique de novo para confirmar. As rotinas são atualizadas sem apagar nada.');setTimeout(()=>S.confOrg=false,6000);return}
  S.confOrg=false;const faltam=[],ids=await pessoasModelo(faltam),M=modeloCron(ids),usados=new Set(),quem=pessoa(S.perfil)?.n||quemSou(),agora=new Date().toISOString();let up=0,cr=0;
- for(const {_alias,...sp} of M){const al=_alias.map(norm),sis0=sp.sis[0];
+ for(const {_alias,somarRs,...sp} of M){const al=_alias.map(norm),sis0=sp.sis[0];
   const ant=D.cronograma.find(r=>!usados.has(r.id)&&r.chave===sp.chave)||D.cronograma.find(r=>!usados.has(r.id)&&(r.mv||0)<MODELO_VER&&r.chave&&_alias.includes(r.chave))||D.cronograma.find(r=>!usados.has(r.id)&&(r.mv||0)<MODELO_VER&&!r.chave&&al.includes(norm(r.t))&&(!(r.sis||[]).length||(r.sis||[]).includes(sis0)));
   if(ant){usados.add(ant.id);const {id,...b}=ant;
-   if(await salvar('cronograma',id,{...b,...sp,rs:rsDe(ant).length?ant.rs:sp.rs,hora:ant.horaEditada?ant.hora:sp.hora,horaLimpa:true,apoio:ant.apoio||sp.apoio,ini:ant.ini&&ant.ini<sp.ini&&!sp.fim&&!sp.ini.startsWith('2026-12')?ant.ini:sp.ini,editadoPor:quem,editadoEm:agora},false,false))up++}
+   if(await salvar('cronograma',id,{...b,...sp,rs:rsDe(ant).length?[...new Set([...(ant.rs||[]),...(somarRs||[])])]:sp.rs,hora:ant.horaEditada?ant.hora:sp.hora,horaLimpa:true,apoio:ant.apoio||sp.apoio,ini:ant.ini&&ant.ini<sp.ini&&!sp.fim&&!sp.ini.startsWith('2026-12')?ant.ini:sp.ini,editadoPor:quem,editadoEm:agora},false,false))up++}
   else if(await salvar('cronograma',null,{...sp,criado:HJ},false,false))cr++}
  log(`Organizou o cronograma: ${up} rotinas atualizadas e ${cr} criadas`);
  if(!sil)toast(`${up} rotinas atualizadas e ${cr} criadas.${faltam.length?` Cadastre ${faltam.join(', ')}.`:''}`);
