@@ -386,3 +386,12 @@ div.opc{cursor:default;flex-wrap:wrap}.opc.and{background:var(--accent-soft);bor
 @media (max-width:980px){.dgrid{grid-template-columns:1fr}}
 
 .porg{display:flex;justify-content:flex-end;margin:-6px 0 -8px}
+
+/* análise com IA */
+.iamini{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--accent-soft)}
+.iamini>div:first-child{flex:1;min-width:240px}.iamini p{margin:4px 0;font-size:13px;color:var(--ink)}
+.iabox{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;padding-right:4px}
+.iabox ul{margin:4px 0;padding-left:18px}.iabox li{margin:2px 0}
+.iadep{border:1px solid var(--line);border-radius:10px;padding:12px 14px}.iadep p{margin:6px 0}
+.iabox blockquote{margin:4px 0 0;padding:10px 12px;background:var(--line-soft);border-left:3px solid var(--accent);border-radius:6px;white-space:pre-wrap;font-size:13px}
+.dash>p.meta{white-space:normal;overflow-wrap:anywhere}
