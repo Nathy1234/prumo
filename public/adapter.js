@@ -377,11 +377,11 @@
     // Renova antes de vencer, enquanto o portal está aberto.
     setInterval(() => { for (const tipo of ['equipe', 'eu']) { try { const s = JSON.parse(sessionStorage.getItem(CH[tipo]) || 'null'); if (s && s.exp - Date.now() < 10 * 60e3) { sessionStorage.removeItem(CH[tipo]); renovar(tipo); } } catch (e) {} } }, 5 * 60e3);
     async function graph(metodo, url, corpo, extras) {
-      const tipo = /\/sendMail$/.test(url) ? 'eu' : 'equipe', t = await token(tipo);
+      const tipo = extras?._tipo || (/\/sendMail$/.test(url) ? 'eu' : 'equipe'), t = await token(tipo);
       if (!t) { let ja = false; try { ja = localStorage.getItem('ms_conectou') === '1'; } catch (e) {} throw { code: ja ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' }; }
       let r;
       try {
-        r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...Object.fromEntries(Object.entries(extras || {}).filter(([k]) => k !== '_tentou')) }, body: corpo ? JSON.stringify(corpo) : undefined });
+        r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...Object.fromEntries(Object.entries(extras || {}).filter(([k]) => !k.startsWith('_'))) }, body: corpo ? JSON.stringify(corpo) : undefined });
       } catch (e) { throw { code: 'server_unavailable', retryable: true, message: 'O Outlook não respondeu.' }; }
       if (r.status === 401) {
         try { sessionStorage.removeItem(CH[tipo]); } catch (e) {}
@@ -435,7 +435,7 @@
       },
       async outlook_send_mail(i) {
         const end = l => (l || []).map(a => ({ emailAddress: { address: a } }));
-        await graph('POST', '/me/sendMail', { message: { subject: i.subject, body: { contentType: i.bodyType === 'html' ? 'HTML' : 'Text', content: i.body }, toRecipients: end(i.to), ccRecipients: end(i.cc), bccRecipients: end(i.bcc) }, saveToSentItems: true });
+        await graph('POST', '/me/sendMail', { message: { subject: i.subject, body: { contentType: i.bodyType === 'html' ? 'HTML' : 'Text', content: i.body }, toRecipients: end(i.to), ccRecipients: end(i.cc), bccRecipients: end(i.bcc) }, saveToSentItems: true }, i.comoEquipe ? { _tipo: 'equipe' } : undefined);
         return { ok: true };
       },
       // Lê um e-mail inteiro para abrir dentro do portal. Pede o corpo em

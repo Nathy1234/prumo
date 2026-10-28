@@ -865,7 +865,7 @@ function iniciarAutoSync(){
  const status=async()=>{if(!real()||!pode('email')||!window.portalMsStatus)return;const j=await window.portalMsStatus();if(j){const mud=JSON.stringify(j)!==JSON.stringify(S.msEq);S.msEq=j;if(mud&&['chamados','triagem'].includes(S.tela))render()}};
  window.addEventListener('prumo-ms-equipe',()=>{status();toast('E-mail conectado para a equipe toda. Ele se renova sozinho.')});
  const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=!!S.msEq?.equipe;try{ok=ok||localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};
- setTimeout(status,3000);setInterval(status,10*6e4);setTimeout(tick,8000);setInterval(tick,60000)}
+ setTimeout(status,3000);setInterval(status,10*6e4);setTimeout(tick,8000);setInterval(tick,60000);setTimeout(resumoTick,15000);setInterval(resumoTick,60000)}
 
 /* ---------- ferramentas ---------- */
 const okUrl=u=>/^https?:\/\/\S+$/i.test(u||'');
@@ -1695,6 +1695,7 @@ const AV_K=()=>'avisos_'+(ME.uid||'')+S.perfil+'_'+HJ;
 function avJa(){try{return JSON.parse(localStorage.getItem(AV_K())||'[]')}catch(e){return S._avJa||[]}}
 function avMarca(k){const l=avJa();l.push(k);try{localStorage.setItem(AV_K(),JSON.stringify(l.slice(-300)))}catch(e){S._avJa=l}}
 function avisosDevidos(){if(solic()||S.perfil==='pendente')return [];const mn=t=>{const [h,m]=String(t).split(':').map(Number);return h*60+(m||0)},ag=mn(agoraHM()),L=[];
+ if(dir()){const c=cfgRes();if(resumoHoje(c)&&agoraHM()>=(c.hora||'08:00')){const r=dadosResumo(c),tot=r.secoes.reduce((a,x)=>a+(x.k==='ia'?0:x.total),0);if(tot||!c.soSeHouver)L.push({k:'resumo_'+HJ,t:tot?`Resumo do dia: ${tot} ${tot>1?'pendências':'pendência'}`:'Resumo do dia: tudo em dia',s:r.secoes.filter(x=>x.k!=='ia').map(x=>x.t).slice(0,3).join(' · '),ir:'painel'})}}
  const hoje=proxPrazos(30,true).filter(x=>x.d===HJ);if(hoje.length)L.push({k:'dia',t:`Hoje: ${hoje.length} ${hoje.length>1?'prazos':'prazo'}`,s:hoje.slice(0,3).map(x=>(x.h?x.h+' ':'')+x.t).join(' · '),ir:'painel'});
  D.eventos.filter(e=>paraMimEv(e)&&e.hora&&evOcorre(e,HJ)).forEach(e=>{const d=mn(e.hora)-ag;if(d<=15&&d>=-5)L.push({k:'ev_'+e.id,t:`${e.hora} · ${e.t}`,s:d>0?`Começa em ${d} min`:'Começando agora',ir:'calendario'})});
  D.cronograma.filter(r=>vejoRot(r)&&r.hora&&ocorre(r,HJ)&&exDe(r.id,HJ)?.s!=='feita').forEach(r=>{const d=mn(r.hora)-ag;
@@ -1876,6 +1877,82 @@ async function gerarIA(){if(S.iaRodando)return;const de=val('ia_de'),ate=val('ia
 function copiarIA(){const a=ultimaIA(FORM?.de,FORM?.ate)||ultimaIA(),an=a?.analise;if(!an)return;
  const t=[`Análise dos chamados · ${a.periodo||''}`,'',an.resumo,'',...(an.destaques||[]).map(x=>'• '+x),'',...(an.departamentos||[]).flatMap(d=>[`${d.nome} (${d.situacao})`,d.diagnostico,...(d.melhorias||[]).map(x=>'  - '+x),d.exemplo_mensagem?'  Mensagem: '+d.exemplo_mensagem:'','']),'O que a contabilidade pode melhorar:',...(an.acoes_contabilidade||[]).map(x=>'• '+x)].join('\n');
  navigator.clipboard?.writeText(t).then(()=>toast('Texto copiado'),()=>toast('Não foi possível copiar.'))}
+/* ---------- resumo para o diretor: e-mail + aviso no sino, na data e hora escolhidas ---------- */
+// Para incluir um assunto novo no resumo, basta acrescentar um item nesta lista.
+const ITENS_RESUMO=[
+ ['chegada','Pedidos que chegaram atrasados','Por departamento e remetente, no mês'],
+ ['nossa','Demandas atrasadas','Chamados com o nosso prazo de entrega vencido'],
+ ['semResp','Chamados sem responsável','Ninguém aceitou ainda'],
+ ['triagem','E-mails aguardando revisão','Chegaram e ainda não viraram chamado'],
+ ['rotinas','Rotinas atrasadas do cronograma','De dias anteriores, por pessoa'],
+ ['entregas','Entregas de outros departamentos em atraso','Quando o módulo de entregas está ligado'],
+ ['prazos','Próximos prazos','Obrigações e compromissos dos próximos 7 dias'],
+ ['ia','Última análise com IA','O resumo da análise mais recente']];
+const FREQ_RES=[['util','Todo dia útil'],['semanal','Toda semana'],['mensal','Todo mês'],['datas','Só nas datas que eu escolher']];
+const cfgRes=()=>({ativo:false,freq:'util',dias:[1],n:1,datas:[],hora:'08:00',para:[],soSeHouver:false,itens:{chegada:true,nossa:true,semResp:true,triagem:true,rotinas:true,entregas:true,prazos:false,ia:false},...(CFG.resumoDir||{})});
+function resumoHoje(c){c=c||cfgRes();if(!c.ativo)return false;const dw=new Date(HJ+'T12:00').getDay();
+ if(c.freq==='util')return ehUtil(HJ);if(c.freq==='semanal')return (c.dias||[]).map(Number).includes(dw);
+ if(c.freq==='mensal'){const [y,m]=HJ.split('-').map(Number),ult=new Date(y,m,0).getDate();return +HJ.slice(8,10)===Math.min(+c.n||1,ult)}
+ return (c.datas||[]).includes(HJ)}
+function quandoRes(c){const h=c.hora?` às ${c.hora}`:'';return c.freq==='util'?`Todo dia útil${h}`:c.freq==='semanal'?`Toda ${(c.dias||[]).map(d=>SEM[d]).join(', ')||'—'}${h}`:c.freq==='mensal'?`Todo dia ${c.n||1}${h}`:`${(c.datas||[]).length?(c.datas||[]).map(fmt).join(', '):'nenhuma data'}${h}`}
+function dadosResumo(c){c=c||cfgRes();const it=c.itens||{},S2=[],m=MES_ATUAL,url=location.origin;
+ const add=(k,t,linhas,total)=>{if(it[k]&&total)S2.push({k,t,linhas,total})};
+ if(it.chegada){const L=D.chamados.filter(x=>diaCh(x).slice(0,7)===m),R=resumoCh(L),d=R.deps.filter(x=>x.atr);add('chegada',`Pedidos que chegaram atrasados em ${mesNome(m)}: ${R.atr} de ${R.marcados} (${R.pct}%)`,d.slice(0,8).map(x=>`${x.nome}: ${x.atr} de ${x.tot} atrasados (${x.pct}%)`),R.atr)}
+ if(it.nossa){const L=D.chamados.filter(chAtrasado).sort((a,b)=>(a.prazo||'').localeCompare(b.prazo||''));add('nossa',`Demandas com o nosso prazo vencido: ${L.length}`,L.slice(0,10).map(x=>`${x.proto} · ${x.assunto} · ${respNome(x.resp)} · prazo ${fmtAno(x.prazo)}`),L.length)}
+ if(it.semResp){const L=D.chamados.filter(x=>x.st!=='Concluído'&&!x.resp);add('semResp',`Chamados sem responsável: ${L.length}`,L.slice(0,10).map(x=>`${x.proto} · ${x.assunto} · ${x.dep?depNome(x.dep):remNomeCh(x)}`),L.length)}
+ if(it.triagem){const L=D.emails.filter(e=>e.st==='triagem');add('triagem',`E-mails aguardando revisão: ${L.length}`,L.slice(0,8).map(e=>`${e.deNome||e.de} · ${e.assunto}`),L.length)}
+ if(it.rotinas){const L=atrasosCron().filter(o=>o.dia<HJ),por={};L.forEach(o=>rsDe(o.r).forEach(p=>{por[p]=(por[p]||0)+1}));add('rotinas',`Rotinas atrasadas do cronograma: ${L.length}`,Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([p,q])=>`${nomeDe(p)}: ${q}`),L.length)}
+ if(it.entregas&&modOn('entregas')){const L=D.entregas.filter(entAtrasada);add('entregas',`Entregas de outros departamentos em atraso: ${L.length}`,L.slice(0,10).map(e=>`${depNome(e.dep)} · ${e.item} · prazo ${fmtAno(e.prazo)}`),L.length)}
+ if(it.prazos){const L=proxPrazos(30).filter(x=>x.d<=addDia(HJ,7));add('prazos',`Próximos prazos (7 dias): ${L.length}`,L.slice(0,10).map(x=>`${fmt(x.d)}${x.h?' '+x.h:''} · ${x.t}`),L.length)}
+ if(it.ia){const a=ultimaIA();if(a?.analise)add('ia',`Última análise com IA (${a.periodo||''})`,[a.analise.resumo],1)}
+ return {secoes:S2,url}}
+function htmlResumo(r){const e=esc;
+ return `<div style="font-family:Segoe UI,Arial,sans-serif;color:#1C2321;max-width:640px"><h2 style="margin:0 0 4px;font-size:18px">Resumo do Prumo · ${e(hojeTxt())}</h2><p style="margin:0 0 16px;color:#5B6663;font-size:13px">Financeiro e Contábil</p>
+ ${r.secoes.length?r.secoes.map(x=>`<div style="border:1px solid #E3E6E5;border-radius:10px;padding:12px 14px;margin:0 0 10px"><b style="font-size:14px">${e(x.t)}</b>${x.linhas.length?`<ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${x.linhas.map(l=>`<li style="margin:2px 0">${e(l)}</li>`).join('')}</ul>`:''}</div>`).join(''):'<p>Nada atrasado ou pendente nos itens escolhidos. Tudo em dia.</p>'}
+ <p style="margin:16px 0 0;font-size:13px"><a href="${e(r.url)}" style="color:#2E7D6B">Abrir o Prumo</a></p><p style="color:#8A9491;font-size:11.5px;margin-top:14px">Resumo automático do Prumo. Para mudar a data, o horário ou os itens, use Painel › Resumo para o diretor.</p></div>`}
+async function enviarResumoDir(manual){const c=cfgRes(),para=(c.para||[]).filter(emailOk);
+ if(!para.length){if(manual)toast('Informe pelo menos um e-mail para receber o resumo.');return false}
+ if(!MCP){if(manual)toast(msgErro({code:'sem_mcp'}));return false}
+ const r=dadosResumo(c);if(!manual&&c.soSeHouver&&!r.secoes.length)return 'vazio';
+ const tot=r.secoes.reduce((a,x)=>a+(x.k==='ia'?0:x.total),0);
+ try{await MCP.callTool(SRV,'outlook_send_mail',{to:para,subject:`Resumo do Prumo · ${fmt(HJ)}/${HJ.slice(0,4)}${tot?` · ${tot} ${tot>1?'pendências':'pendência'}`:' · tudo em dia'}`,bodyType:'html',body:htmlResumo(r),comoEquipe:true},{cache:false});
+  log(`${manual?'Enviou':'O Prumo enviou'} o resumo para o diretor (${para.join(', ')})`);if(manual)toast('Resumo enviado');return true}
+ catch(e){if(manual)toast(msgErro(e));return false}}
+async function resumoTick(){const c=cfgRes();if(!real()||S.sim||!DB||!MCP||S.resEnv||!resumoHoje(c)||agoraHM()<(c.hora||'08:00'))return;
+ let st=null;try{const d=await DB.doc('sync/resumo').get();st=d.exists?d.data():null}catch(e){return}
+ if(st?.dia===HJ)return;
+ try{const l=await DB.doc('sync/resumolock').acquire({holder:ME.uid||'x',ttlMs:180000});if(!l.acquired)return}catch(e){}
+ S.resEnv=true;try{const ok=await enviarResumoDir(false);if(ok)await DB.doc('sync/resumo').set({dia:HJ,em:new Date().toISOString(),por:ME.uid||null,res:ok===true?'enviado':'nada'})}finally{S.resEnv=false}}
+function cfgResumo(){const c=cfgRes();FORM={tipo:'_resumo',datas:[...(c.datas||[])]};
+ const dw=[1,2,3,4,5,6].map(d=>`<label class="ck"><input type="checkbox" id="rs_d_${d}" ${(c.dias||[]).map(Number).includes(d)?'checked':''}> ${SEM[d]}</label>`).join('');
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Avisos</p><h2 id="sheet-title">Resumo para o diretor</h2><p class="sub" style="font-size:13px">Um e-mail com o que está atrasado ou pendente, no dia e na hora que você escolher. O diretor também recebe o aviso no sino do Prumo.</p></div>
+ <div class="fgrid">
+  <label class="perm full"><input type="checkbox" id="rs_on" ${c.ativo?'checked':''}><span><b>Ligar o resumo automático</b><small>${esc(quandoRes(c))}</small></span></label>
+  <div><label class="lbl" for="rs_freq">Quando</label><select class="inp" id="rs_freq" onchange="resVis()">${FREQ_RES.map(([k,l])=>`<option value="${k}" ${k===c.freq?'selected':''}>${l}</option>`).join('')}</select></div>
+  <div><label class="lbl" for="rs_hora">Horário</label><input class="inp" id="rs_hora" type="time" value="${esc(c.hora||'08:00')}"></div>
+  <div class="full" id="rsw_sem"><span class="lbl">Dias da semana</span><div class="cks">${dw}</div></div>
+  <div id="rsw_mes"><label class="lbl" for="rs_n">Dia do mês</label><input class="inp" id="rs_n" type="number" min="1" max="31" value="${+c.n||1}"></div>
+  <div class="full" id="rsw_datas"><span class="lbl">Datas</span><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center" id="rs_lista"></div><div style="display:flex;gap:6px;margin-top:6px"><input class="inp" id="rs_nova" type="date" min="${HJ}" style="width:auto"><button class="btn" type="button" onclick="resAddData()">Adicionar data</button></div></div>
+  <div class="full"><label class="lbl" for="rs_para">Enviar para</label><input class="inp" id="rs_para" placeholder="diretor@fatecie.edu.br" value="${esc((c.para||[]).join(', ')||(dir()&&ME.email?ME.email:''))}"><p class="meta" style="margin:4px 0 0">Separe vários e-mails por vírgula. Sai pela conta de e-mail conectada da equipe.</p><p class="ferr" id="rse_para"></p></div>
+  <div class="full"><span class="lbl">O que entra no resumo</span><div class="perms">${ITENS_RESUMO.map(([k,l,d])=>`<label class="perm"><input type="checkbox" id="rs_i_${k}" ${(c.itens||{})[k]?'checked':''}><span><b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
+  <label class="perm full"><input type="checkbox" id="rs_so" ${c.soSeHouver?'checked':''}><span><b>Só enviar quando houver algo atrasado ou pendente</b><small>Nos dias em que estiver tudo em dia, o e-mail não sai.</small></span></label>
+ </div>
+ <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="verResumo()">Ver como fica</button><button class="btn ghost" onclick="salvaResumo(true)">Salvar e enviar agora</button></div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaResumo()">Salvar</button></div></div>`;
+ document.getElementById('ov').hidden=false;resVis();resDatas()}
+function resVis(){const f=val('rs_freq'),sh=(i,v)=>{const el=document.getElementById(i);if(el)el.hidden=!v};sh('rsw_sem',f==='semanal');sh('rsw_mes',f==='mensal');sh('rsw_datas',f==='datas')}
+function resDatas(){const el=document.getElementById('rs_lista');if(!el)return;const L=[...FORM.datas].sort();el.innerHTML=L.length?L.map(d=>`<span class="chip">${fmtAno(d)} <button type="button" class="lnk" onclick="FORM.datas=FORM.datas.filter(x=>x!=='${d}');resDatas()" aria-label="Tirar ${fmtAno(d)}">×</button></span>`).join(''):'<span class="meta">Nenhuma data escolhida.</span>'}
+function resAddData(){const v=val('rs_nova');if(!v)return;if(!FORM.datas.includes(v))FORM.datas.push(v);document.getElementById('rs_nova').value='';resDatas()}
+function lerResumoForm(){const para=listaEnd(val('rs_para')).map(x=>x.toLowerCase());
+ return {ativo:!!document.getElementById('rs_on')?.checked,freq:val('rs_freq'),hora:val('rs_hora')||'08:00',dias:[1,2,3,4,5,6].filter(d=>document.getElementById('rs_d_'+d)?.checked),n:Math.min(31,Math.max(1,Math.round(+val('rs_n')||1))),datas:[...FORM.datas].sort(),para,soSeHouver:!!document.getElementById('rs_so')?.checked,itens:Object.fromEntries(ITENS_RESUMO.map(([k])=>[k,!!document.getElementById('rs_i_'+k)?.checked]))}}
+function verResumo(){const c=lerResumoForm(),r=dadosResumo(c);const w=window.open('','_blank');if(!w){toast('Libere as janelas pop-up para ver a prévia.');return}w.document.write(`<!doctype html><meta charset="utf-8"><title>Prévia do resumo</title><body style="padding:24px;background:#F6F7F7">${htmlResumo(r)}</body>`);w.document.close()}
+async function salvaResumo(enviar){errEl('rse_para','');const c=lerResumoForm();
+ if(c.para.some(x=>!emailOk(x))){errEl('rse_para','Confira os endereços.');return}
+ if((c.ativo||enviar)&&!c.para.length){errEl('rse_para','Informe pelo menos um e-mail.');return}
+ if(c.ativo&&c.freq==='semanal'&&!c.dias.length){toast('Escolha pelo menos um dia da semana.');return}
+ if(c.ativo&&c.freq==='datas'&&!c.datas.length){toast('Adicione pelo menos uma data.');return}
+ try{await DB.doc('config/estrutura').set({...CFG,resumoDir:c});CFG={...CFG,resumoDir:c};log(`Configurou o resumo para o diretor: ${c.ativo?quandoRes(c):'desligado'}`);toast(c.ativo?`Resumo ligado: ${quandoRes(c)}`:'Resumo salvo (desligado)')}
+ catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar o resumo.':'Não foi possível salvar.');return}
+ if(enviar)await enviarResumoDir(true);fechar()}
 /* ---------- metas e a fazer do mês: departamento e cada pessoa ---------- */
 const ST_META=[['afazer','A fazer','ne'],['andamento','Em andamento','ac'],['feito','Feito','ok']];
 const stMeta=k=>ST_META.find(x=>x[0]===k)||ST_META[0];
@@ -2259,7 +2336,7 @@ logs(){const q=(S.fLog||'').toLowerCase(),l=D.logs.filter(x=>!q||((x.acao||'')+'
  <div class="panel" id="loglist">${logRows()}</div>`+note('Mostra as 300 ações mais recentes. O nome vem da conta de cada pessoa; ações feitas simulando outro perfil aparecem marcadas.')},
 alertas(){const A=alertas();
  return (avPodePedir()?`<div class="banner"><span>Receba avisos no canto da tela do computador quando um prazo ou rotina estiver chegando.</span><button class="btn pri" onclick="ativarAvisos()">Ativar avisos</button></div>`:'')+head('Central de notificações','Alertas',modOn('outros')?(dir()?'Atrasos do cronograma, rotinas e pendências que dependem de você.':'Alertas das rotinas sob sua responsabilidade.'):(dir()?'Rotinas do cronograma atrasadas e rotinas de atenção do departamento.':'Rotinas do cronograma sob sua responsabilidade.'))+
- `<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma rotina do cronograma atrasar ou tiver prioridade Atenção, ela aparece aqui.')}</div>`+
+ (dir()||podeAdmin()?`<div class="porg"><button class="btn ghost" onclick="cfgResumo()">Resumo para o diretor por e-mail${cfgRes().ativo?' · '+esc(quandoRes(cfgRes())):''}</button></div>`:'')+`<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma rotina do cronograma atrasar ou tiver prioridade Atenção, ela aparece aqui.')}</div>`+
  note('Os alertas são recalculados sozinhos todos os dias a partir dos prazos. O diretor vê tudo; cada pessoa vê o que está sob sua responsabilidade.')},
 
 entregas(){const deps=D.departamentos,l=minhasEnt().filter(e=>!S.fDep||e.dep===S.fDep).sort((a,b)=>(!!a.recebido)-(!!b.recebido)||((a.prazo||'')<(b.prazo||'')?-1:1));
@@ -2319,7 +2396,7 @@ painel(){
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>`,
  estrutura:()=>`<div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
    <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div></div>`};
- return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+`<div class="porg"><button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}">${h}</section>`:''}).join('')}</div>`},
+ return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo por e-mail${cfgRes().ativo?' · ligado':''}</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}">${h}</section>`:''}).join('')}</div>`},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  return head('Reconhecimento','Destaques do mês','Conquistas, metas batidas e reconhecimentos da equipe.',mesNav('mesDest')+(pode('feedbacks')?novo('destaque','Registrar destaque'):''))+
