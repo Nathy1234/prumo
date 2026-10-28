@@ -730,7 +730,7 @@ async function sincronizar(manual){
  if(ME.uid){try{const l=await DB.doc('sync/lock').acquire({holder:ME.uid,ttlMs:180000});if(!l.acquired){if(manual)toast('Outra pessoa está verificando o e-mail agora. Tente em instantes.');return}}catch(e){}}
  S.sync=true;S.syncErr=null;render();
  const mesmaCaixa=norm(SYNC.caixa||'')===norm(CFG.caixa||'')&&(SYNC.caixa!==undefined||!CFG.caixa)&&(SYNC.desde||'')===(CFG.emailDesde||'');
- const desde=SYNC.ultima&&mesmaCaixa?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
+ const desde=S.reler?(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-30*864e5).toISOString()):SYNC.ultima&&mesmaCaixa?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
  let novos=0,auto=0,lidos=0,env=0;S._novosAtr=[];
  const buscar=async(inp,filtro,fn)=>{let offset=0;
   for(let pg=0;pg<(todos?8:4);pg++){
@@ -748,7 +748,8 @@ async function sincronizar(manual){
   if(novos||auto)log(`Verificou o Outlook: ${novos} e-mails na triagem e ${auto} registrados automaticamente`);
   try{localStorage.setItem('autoSync_'+(ME.uid||'demo'),'1')}catch(e){}
  }catch(e){S.syncErr=e;DB.doc('sync/estado').set({...SYNC,erro:e?.code||'erro',erroEm:new Date().toISOString()}).catch(()=>{});if(manual)toast(msgErro(e))}
- finally{S.sync=false;render()}}
+ finally{S.sync=false;S.reler=false;render()}}
+function relerEmails(){if(S.sync){toast('Já estou verificando. Tente em instantes.');return}S.reler=true;toast(`Buscando de novo os e-mails desde ${CFG.emailDesde?fmt(CFG.emailDesde):'30 dias atrás'}. Os que já estão no Prumo não se repetem.`);sincronizar(true)}
 /* só conta e mostra os e-mails da caixa configurada (ex.: contas a pagar); os de outra caixa ficam de fora */
 const daCaixa=e=>!CFG.caixa||norm(e.caixa||'')===norm(CFG.caixa);
 const desdeOk=e=>!CFG.emailDesde||!e.recebido||e.recebido.slice(0,10)>=CFG.emailDesde;
@@ -2292,7 +2293,7 @@ triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="row">
  const sem=lerTodos()?[]:D.departamentos.filter(d=>!listaEmails(d).length);
  const conhecidos=[...D.remetentes].sort((a,b)=>(a.nome||a.email||'').localeCompare(b.nome||b.email||''));
  return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+
- chAbas('em')+chEmail()+(oc||limpa?`<details class="dmais" style="margin-top:18px" ${S.limpaAb?'open':''} ontoggle="S.limpaAb=this.open"><summary>Limpar e-mails do Prumo</summary>${ocBan}${limpa?`<div class="excl-todos"><button class="btn ${S.confTodos?'danger':''}" onclick="excluirTodosEmails()" title="Apaga só do Prumo. Os e-mails continuam no Outlook.">${S.confTodos?`Confirmar: excluir ${D.emails.filter(e=>!virouChamado(e)).length} e-mails`:'Excluir todos do Prumo'}</button><span class="meta">Só apaga daqui. O Outlook e os chamados não mudam.</span></div>`:''}</details>`:'')+
+ chAbas('em')+chEmail()+(pode('email')?`<details class="dmais" style="margin-top:18px" ${S.limpaAb?'open':''} ontoggle="S.limpaAb=this.open"><summary>Mais opções de e-mail</summary><div class="row"><div class="t" style="white-space:normal"><b>Buscar os e-mails de novo</b><span>Lê de novo a caixa desde ${CFG.emailDesde?fmt(CFG.emailDesde):'30 dias atrás'} e traz de volta para a revisão o que saiu do Prumo. Não apaga nada e não repete os que já estão aqui.</span></div><button class="btn" onclick="relerEmails()">${S.sync?'Buscando…':'Buscar de novo'}</button></div>${ocBan}</details>`:'')+
  (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length} ${pend.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
  ${Object.keys(g).length>3?`<input class="inp" id="fremt" data-nodraft="1" placeholder="Buscar remetente ou setor" value="${esc(S.fRemT||'')}" oninput="S.fRemT=this.value;render()">`:''}
