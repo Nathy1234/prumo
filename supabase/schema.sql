@@ -229,7 +229,7 @@ declare
   v_cols text[] := array['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto',
     'eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias',
     'ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos',
-    'assuntos','remetentes','cronograma','execucoes','cronitens','feitos','metas','fluxo'];
+    'assuntos','remetentes','cronograma','execucoes','cronitens','feitos','metas','fluxo','analises'];
   v_dia  text := to_char((now() at time zone 'America/Sao_Paulo')::date, 'YYYY-MM-DD');
   v_id   text := 'd-' || v_dia;
   v_cfg  jsonb;
@@ -242,6 +242,10 @@ begin
   select data into v_cfg from public.docs where col = 'config' and id = 'estrutura';
   if coalesce((v_cfg->>'bkAuto')::boolean, true) = false then return 'desligado'; end if;
   if exists (select 1 from public.docs where col = 'backups' and id = v_id) then return 'ja existe'; end if;
+  -- Inclui também qualquer área nova que o sistema ganhar depois (menos backups e o registro de atividades).
+  select array(select distinct x from unnest(v_cols || array(
+    select distinct col from public.docs
+     where col not like '%/%' and col not in ('backups','logs','config','sync'))) as x) into v_cols;
 
   select jsonb_build_object(
     'sistema', 'Prumo',
