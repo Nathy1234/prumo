@@ -693,6 +693,12 @@ async function removerOutraCaixa(){const L=deOutraCaixa();if(!L.length)return;
  if(!S.confOC){S.confOC=true;toast(`Clique de novo para remover ${L.length} e-mails que não são da caixa ${CFG.caixa}.`);render();setTimeout(()=>{S.confOC=false;render()},6000);return}S.confOC=false;
  let k=0;for(const e of L){try{await DB.collection('emails').doc(e.id).delete();k++}catch(x){}}
  log(`Removeu do Prumo ${k} e-mails que não eram da caixa ${CFG.caixa}`);toast(`${k} e-mails removidos do Prumo`);render()}
+/* apaga do Prumo (não do Outlook) todos os e-mails que não viraram chamado */
+async function excluirTodosEmails(){if(!(pode('email')||podeAdmin())){toast('Sem permissão.');return}
+ const L=D.emails.filter(e=>e.st!=='aplicado');if(!L.length){toast('Não há e-mails para excluir.');return}
+ if(!S.confTodos){S.confTodos=true;toast(`Clique de novo para excluir ${L.length} e-mails do Prumo. O Outlook não é alterado.`);render();setTimeout(()=>{S.confTodos=false;render()},6000);return}S.confTodos=false;
+ let k=0;for(let i=0;i<L.length;i+=20){const r=await Promise.allSettled(L.slice(i,i+20).map(e=>DB.collection('emails').doc(e.id).delete()));k+=r.filter(x=>x.status==='fulfilled').length}
+ log(`Excluiu do Prumo ${k} e-mails (o Outlook não foi alterado)`);toast(`${k} e-mails excluídos do Prumo. Os chamados não mudaram.`);render()}
 function msgErro(e){const c=e?.code,cx=CFG.caixa||'a caixa configurada';return ({
  sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
@@ -1904,6 +1910,7 @@ triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="banne
  const sem=lerTodos()?[]:D.departamentos.filter(d=>!listaEmails(d).length);
  const conhecidos=[...D.remetentes].sort((a,b)=>(a.nome||a.email||'').localeCompare(b.nome||b.email||''));
  return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+ocBan+
+ ((pode('email')||podeAdmin())&&D.emails.some(e=>e.st!=='aplicado')?`<div class="excl-todos"><button class="btn ${S.confTodos?'danger':''}" onclick="excluirTodosEmails()" title="Apaga só do Prumo. Os e-mails continuam no Outlook.">${S.confTodos?`Confirmar: excluir ${D.emails.filter(e=>e.st!=='aplicado').length} e-mails`:'Excluir todos do Prumo'}</button><span class="meta">Só apaga daqui. O Outlook e os chamados não mudam.</span></div>`:'')+
  chAbas('em')+chEmail()+
  (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length} ${pend.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
