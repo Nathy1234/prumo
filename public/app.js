@@ -667,7 +667,8 @@ async function sincronizar(manual){
  if(!todos&&!deps.length){if(manual)toast('Cadastre os e-mails dos departamentos primeiro.');return}
  if(ME.uid){try{const l=await DB.doc('sync/lock').acquire({holder:ME.uid,ttlMs:180000});if(!l.acquired){if(manual)toast('Outra pessoa está verificando o e-mail agora. Tente em instantes.');return}}catch(e){}}
  S.sync=true;S.syncErr=null;render();
- const desde=SYNC.ultima?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
+ const mesmaCaixa=norm(SYNC.caixa||'')===norm(CFG.caixa||'')&&(SYNC.caixa!==undefined||!CFG.caixa);
+ const desde=SYNC.ultima&&mesmaCaixa?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
  let novos=0,auto=0,lidos=0,env=0;
  const buscar=async(inp,filtro,fn)=>{let offset=0;
   for(let pg=0;pg<(todos?8:4);pg++){
@@ -679,7 +680,7 @@ async function sincronizar(manual){
  try{
   if(todos){await buscar({folder:'inbox'});if(lerEnviados())await buscar({folder:'sentitems'},null,processarEnviado)}
   else for(const d of deps)for(const addr of listaEmails(d))await buscar({sender:addr},m=>{const x=norm(m.sender);return x===addr||x.endsWith(addr)});
-  await DB.doc('sync/estado').set({ultima:new Date().toISOString(),uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
+  await DB.doc('sync/estado').set({ultima:new Date().toISOString(),caixa:CFG.caixa||'',uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
   if(manual||novos||auto)toast(`${lidos} e-mails verificados · ${novos} na triagem · ${env} enviados guardados na conversa${auto?` · ${auto} registrados automaticamente`:''}`);
   if(novos||auto)log(`Verificou o Outlook: ${novos} e-mails na triagem e ${auto} registrados automaticamente`);
   try{localStorage.setItem('autoSync_'+(ME.uid||'demo'),'1')}catch(e){}
@@ -692,6 +693,8 @@ const deOutraCaixa=()=>D.emails.filter(e=>!daCaixa(e)&&e.st!=='aplicado');
 async function removerOutraCaixa(){const L=deOutraCaixa();if(!L.length)return;
  if(!S.confOC){S.confOC=true;toast(`Clique de novo para remover ${L.length} e-mails que não são da caixa ${CFG.caixa}.`);render();setTimeout(()=>{S.confOC=false;render()},6000);return}S.confOC=false;
  let k=0;for(const e of L){try{await DB.collection('emails').doc(e.id).delete();k++}catch(x){}}
+ const sobra=new Set(D.emails.filter(e=>!L.some(x=>x.id===e.id)).map(remDoEmail));
+ for(const r of D.remetentes.filter(r=>!sobra.has(r.id)&&!r.dep&&!r.cat&&!r.ignorar)){try{await DB.collection('remetentes').doc(r.id).delete()}catch(x){}}
  log(`Removeu do Prumo ${k} e-mails que não eram da caixa ${CFG.caixa}`);toast(`${k} e-mails removidos do Prumo`);render()}
 /* apaga do Prumo (não do Outlook) todos os e-mails que não viraram chamado */
 async function excluirTodosEmails(){if(!(pode('email')||podeAdmin())){toast('Sem permissão.');return}
@@ -1903,7 +1906,7 @@ usuarios(){const ped=D.pedidos.filter(p=>!acessoDe(p.id)).sort((a,b)=>a.em<b.em?
  ${!lst.filter(a=>a.id!==ME.uid).length?vazio('Ninguém liberado ainda','Quando alguém abrir o portal pela primeira vez, o pedido de acesso aparece aqui.'):''}</div>
  <div class="panel"><div class="ph"><h2>O que cada perfil pode fazer</h2><span>a equipe pode ter permissões ajustadas pessoa a pessoa</span></div>${matriz()}</div>`+
  note('Quem entra pela primeira vez aparece em Pedidos de acesso. Diretores e administradores liberam, ajustam permissões ou bloqueiam. Bloquear não apaga o histórico.')},
-triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="banner"><span>${oc} ${oc>1?'e-mails vieram':'e-mail veio'} de outra caixa, não do ${esc(CFG.caixa)}. Eles não aparecem mais na revisão. Quer apagar essas cópias do Prumo? Os chamados já criados não mudam.</span><button class="btn ${S.confOC?'danger':''}" onclick="removerOutraCaixa()">${S.confOC?'Confirmar: remover':'Remover do Prumo'}</button></div>`:'';const pend=emPend(),hist=D.emails.filter(e=>e.st==='aplicado'||(e.st==='ignorado'&&!e.auto)).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
+triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="banner"><span>${oc} ${oc>1?'e-mails vieram':'e-mail veio'} de outra caixa, não do ${esc(CFG.caixa)}. Eles não aparecem mais na revisão. Quer apagar essas cópias do Prumo? Os chamados já criados não mudam.</span><button class="btn ${S.confOC?'danger':''}" onclick="removerOutraCaixa()">${S.confOC?'Confirmar: remover':'Remover do Prumo'}</button></div>`:'';const pend=emPend(),hist=D.emails.filter(e=>daCaixa(e)&&(e.st==='aplicado'||(e.st==='ignorado'&&!e.auto))).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
  const g={};pend.forEach(e=>{const k=remDoEmail(e);(g[k]=g[k]||[]).push(e)});
  const q=norm(S.fRemT||'');
  const G=Object.entries(g).map(([k,l])=>{const r=D.remetentes.find(x=>x.id===k);return {k,r,nome:r?.nome||l[0].deNome||l[0].de,email:r?.email||l[0].de,dep:r?r.dep:l[0].dep,l:l.sort((a,b)=>a.recebido<b.recebido?1:-1)}}).filter(x=>!q||norm(x.nome+' '+x.email+' '+depNome(x.dep)).includes(q)).sort((a,b)=>a.l[0].recebido<b.l[0].recebido?1:-1);
