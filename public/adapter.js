@@ -94,6 +94,14 @@
     if (/Password should/i.test(m)) return 'A senha é fraca. Use pelo menos 8 caracteres, misturando letras e números.';
     return 'Não foi possível concluir. ' + m;
   }
+  // Chama a função ms-token do Supabase com o login da pessoa.
+  async function msFuncao(corpo, jwt) {
+    if (!jwt) { const { data } = await sb.auth.getSession(); jwt = data?.session?.access_token; }
+    if (!jwt) return null;
+    const r = await fetch(CFG.supabaseUrl.replace(/\/+$/, '') + '/functions/v1/ms-token', { method: 'POST', headers: { Authorization: 'Bearer ' + jwt, apikey: CFG.supabaseAnonKey, 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    if (!r.ok) return null;
+    return r.json();
+  }
   function entrarMicrosoft() {
     sb.auth.signInWithOAuth({ provider: 'azure', options: { scopes: MS_SCOPES, redirectTo: location.origin } });
   }
@@ -130,6 +138,8 @@
     if (sessao?.provider_token) {
       try { sessionStorage.setItem('ms_token', JSON.stringify({ t: sessao.provider_token, exp: Date.now() + 55 * 60e3 })); localStorage.setItem('ms_conectou', '1'); } catch (e) {}
     }
+    // A chave de renovação só vem logo depois de entrar pela Microsoft: guarda no servidor para renovar sozinho.
+    if (sessao?.provider_refresh_token) msFuncao({ acao: 'guardar', refresh_token: sessao.provider_refresh_token }, sessao.access_token).catch(() => {});
     if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && sessao && !logado) aposLogin(sessao);
     if (ev === 'INITIAL_SESSION' && !sessao) checarMicrosoft().then(() => { if (!logado) telaLogin('entrar'); });
   });
@@ -338,19 +348,38 @@
      Outlook pelo Microsoft Graph, com a permissão de quem está logado
      ------------------------------------------------------------------ */
   function criarMcp() {
+    let renovando = null, falhouAte = 0;
+    // Pede uma chave nova à função ms-token (o secret do app fica só no Supabase).
+    function renovar() {
+      if (Date.now() < falhouAte) return Promise.resolve(null);
+      if (!renovando) renovando = msFuncao({ acao: 'renovar' }).then(j => {
+        if (!j?.access_token) { falhouAte = Date.now() + 2 * 60e3; return null; }
+        try { sessionStorage.setItem('ms_token', JSON.stringify({ t: j.access_token, exp: Date.now() + Math.max(60, (+j.expires_in || 3600) - 300) * 1000 })); localStorage.setItem('ms_conectou', '1'); } catch (e) {}
+        return j.access_token;
+      }).catch(() => null).finally(() => { setTimeout(() => { renovando = null; }, 0); });
+      return renovando;
+    }
     async function token() {
       try { const s = JSON.parse(sessionStorage.getItem('ms_token') || 'null'); if (s && s.exp > Date.now()) return s.t; } catch (e) {}
+      const novo = await renovar();
+      if (novo) return novo;
       const { data } = await sb.auth.getSession();
       return data?.session?.provider_token || null;
     }
+    // Renova antes de vencer, enquanto o portal está aberto.
+    setInterval(() => { try { const s = JSON.parse(sessionStorage.getItem('ms_token') || 'null'); if (s && s.exp - Date.now() < 10 * 60e3) { sessionStorage.removeItem('ms_token'); renovar(); } } catch (e) {} }, 5 * 60e3);
     async function graph(metodo, url, corpo, extras) {
       const t = await token();
       if (!t) { let ja = false; try { ja = localStorage.getItem('ms_conectou') === '1'; } catch (e) {} throw { code: ja ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' }; }
       let r;
       try {
-        r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(extras || {}) }, body: corpo ? JSON.stringify(corpo) : undefined });
+        r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...Object.fromEntries(Object.entries(extras || {}).filter(([k]) => k !== '_tentou')) }, body: corpo ? JSON.stringify(corpo) : undefined });
       } catch (e) { throw { code: 'server_unavailable', retryable: true, message: 'O Outlook não respondeu.' }; }
-      if (r.status === 401) { try { sessionStorage.removeItem('ms_token'); } catch (e) {} throw { code: 'needs_reauth', message: 'A conexão com o Outlook expirou.' }; }
+      if (r.status === 401) {
+        try { sessionStorage.removeItem('ms_token'); } catch (e) {}
+        if (!extras?._tentou) { const n = await renovar(); if (n) return graph(metodo, url, corpo, { ...(extras || {}), _tentou: true }); }
+        throw { code: 'needs_reauth', message: 'A conexão com o Outlook expirou.' };
+      }
       const det = async () => { try { const j = await r.json(); return [j.error?.code, j.error?.message].filter(Boolean).join(': '); } catch (e) { return ''; } };
       const outra = /^\/users\//.test(url);
       if (r.status === 403) throw { code: outra ? 'sem_acesso_caixa' : 'blocked_by_policy', message: await det() || 'Sem permissão no Outlook.' };

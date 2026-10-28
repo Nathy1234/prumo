@@ -301,3 +301,16 @@ begin
     alter publication supabase_realtime add table public.docs;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- 7. Conexão com o Outlook sem cair
+--    Guarda a chave de renovação da Microsoft de cada pessoa. Só a função
+--    ms-token (com a chave de serviço) lê e grava; ninguém acessa pelo site.
+-- ---------------------------------------------------------------------
+create table if not exists public.ms_tokens (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  refresh_token text not null,
+  atualizado timestamptz not null default now()
+);
+alter table public.ms_tokens enable row level security;
+revoke all on table public.ms_tokens from anon, authenticated;
