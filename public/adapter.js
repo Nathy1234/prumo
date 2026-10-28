@@ -103,7 +103,7 @@
   let msAtivo = !!CFG.microsoft, msChecado = null;
   function checarMicrosoft() {
     if (!msChecado) msChecado = fetch(CFG.supabaseUrl + '/auth/v1/settings', { headers: { apikey: CFG.supabaseAnonKey } })
-      .then(r => r.json()).then(j => { msAtivo = msAtivo || !!j?.external?.azure; return msAtivo; }).catch(() => msAtivo);
+      .then(r => r.json()).then(j => { msAtivo = msAtivo || !!j?.external?.azure; if (!msAtivo) msChecado = null; return msAtivo; }).catch(() => { msChecado = null; return msAtivo; });
     return msChecado;
   }
   window.portalMicrosoftAtivo = () => checarMicrosoft();
@@ -128,7 +128,7 @@
     if (ev === 'PASSWORD_RECOVERY') { telaLogin('nova'); return; }
     if (ev === 'SIGNED_OUT') { location.replace(location.origin); return; }
     if (sessao?.provider_token) {
-      try { sessionStorage.setItem('ms_token', JSON.stringify({ t: sessao.provider_token, exp: Date.now() + 55 * 60e3 })); } catch (e) {}
+      try { sessionStorage.setItem('ms_token', JSON.stringify({ t: sessao.provider_token, exp: Date.now() + 55 * 60e3 })); localStorage.setItem('ms_conectou', '1'); } catch (e) {}
     }
     if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && sessao && !logado) aposLogin(sessao);
     if (ev === 'INITIAL_SESSION' && !sessao) checarMicrosoft().then(() => { if (!logado) telaLogin('entrar'); });
@@ -345,7 +345,7 @@
     }
     async function graph(metodo, url, corpo, extras) {
       const t = await token();
-      if (!t) throw { code: msAtivo ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' };
+      if (!t) { let ja = false; try { ja = localStorage.getItem('ms_conectou') === '1'; } catch (e) {} throw { code: ja ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' }; }
       let r;
       try {
         r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(extras || {}) }, body: corpo ? JSON.stringify(corpo) : undefined });
