@@ -866,7 +866,7 @@ function iniciarAutoSync(){
  // Conexão da equipe: se alguém conectou, todo mundo com a permissão E-mails recebidos busca sozinho, sem conectar.
  const status=async()=>{if(!real()||!pode('email')||!window.portalMsStatus)return;const j=await window.portalMsStatus();if(j){const mud=JSON.stringify(j)!==JSON.stringify(S.msEq);S.msEq=j;if(mud&&['chamados','triagem'].includes(S.tela))render()}};
  window.addEventListener('prumo-ms-equipe',()=>{status();toast('E-mail conectado para a equipe toda. Ele se renova sozinho.')});
- const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=!!S.msEq?.equipe;try{ok=ok||localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};
+ const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync)return;let ok=!!S.msEq?.equipe;try{ok=ok||localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};
  setTimeout(status,3000);setInterval(status,10*6e4);setTimeout(tick,8000);setInterval(tick,60000);setTimeout(resumoTick,15000);setInterval(resumoTick,60000);setTimeout(avisoTick,20000);setInterval(avisoTick,60000)}
 
 /* ---------- ferramentas ---------- */
