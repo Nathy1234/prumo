@@ -717,6 +717,7 @@ async function processar(m){
  const em={dep:d?.id||'',de,deNome:limparTxt(m.senderName).slice(0,80),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),chegada:pz.st,prazoEnv:pz.data||'',prazoTrecho:limparTxt(pz.trecho||'').slice(0,80),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',sug:c,criado:new Date().toISOString(),por:ME.uid||null,msgId:m.id||'',caixa:CFG.caixa||'',rem:rid};
  if(!rem)rem=await novoContato(de,em.deNome,d?.id||'');
  if(rem.ignorar){await DB.collection('emails').doc(id).set({...em,st:'ignorado',auto:true,res:''});return 'dup'}
+ if(em.chegada==='atrasado'&&Array.isArray(S._novosAtr))S._novosAtr.push(em);
  D.emails.push({id,...em,st:'processando'});
  const auto=CFG.emailModo==='auto'&&((c.acao==='entrega'&&c.conf==='alta')||c.acao==='chamado');
  if(auto){const r=await aplicar(em,c,true);await DB.collection('emails').doc(id).set({...em,st:r==='erro'?'triagem':'aplicado',res:r,auto:true});return r==='erro'?'novo':'auto'}
@@ -730,7 +731,7 @@ async function sincronizar(manual){
  S.sync=true;S.syncErr=null;render();
  const mesmaCaixa=norm(SYNC.caixa||'')===norm(CFG.caixa||'')&&(SYNC.caixa!==undefined||!CFG.caixa)&&(SYNC.desde||'')===(CFG.emailDesde||'');
  const desde=SYNC.ultima&&mesmaCaixa?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
- let novos=0,auto=0,lidos=0,env=0;
+ let novos=0,auto=0,lidos=0,env=0;S._novosAtr=[];
  const buscar=async(inp,filtro,fn)=>{let offset=0;
   for(let pg=0;pg<(todos?8:4);pg++){
    const q={...inp,afterDateTime:desde,limit:25};if(CFG.caixa)q.mailboxOwnerEmail=CFG.caixa;if(CFG.caixaPasta&&q.folder!=='sentitems'){delete q.folder;q.folderId=CFG.caixaPasta}if(offset)q.offset=offset;
@@ -741,6 +742,7 @@ async function sincronizar(manual){
  try{
   if(todos){await buscar({folder:'inbox'});if(lerEnviados()){try{await buscar({folder:'sentitems'},null,processarEnviado)}catch(e){if(manual)toast('Caixa de entrada lida. A pasta de enviados não está liberada para leitura.')}}}
   else for(const d of deps)for(const addr of listaEmails(d))await buscar({sender:addr},m=>{const x=norm(m.sender);return x===addr||x.endsWith(addr)});
+  if(S._novosAtr?.length){const L=S._novosAtr;S._novosAtr=[];avisarDiretor('emailAtrasado',L.length>1?`${L.length} e-mails chegaram atrasados`:'Chegou e-mail atrasado',L.map(e=>`${e.deNome||e.de}${e.dep?' ('+depNome(e.dep)+')':''} · ${e.assunto}${e.prazoEnv?` · pediu para ${fmt(e.prazoEnv)}`:' · sem data no e-mail'}`)).catch(()=>{})}
   await DB.doc('sync/estado').set({ultima:new Date().toISOString(),caixa:CFG.caixa||'',desde:CFG.emailDesde||'',uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
   if(manual||novos||auto)toast(`${lidos} e-mails verificados · ${novos} na triagem · ${env} enviados guardados na conversa${auto?` · ${auto} registrados automaticamente`:''}`);
   if(novos||auto)log(`Verificou o Outlook: ${novos} e-mails na triagem e ${auto} registrados automaticamente`);
@@ -865,7 +867,7 @@ function iniciarAutoSync(){
  const status=async()=>{if(!real()||!pode('email')||!window.portalMsStatus)return;const j=await window.portalMsStatus();if(j){const mud=JSON.stringify(j)!==JSON.stringify(S.msEq);S.msEq=j;if(mud&&['chamados','triagem'].includes(S.tela))render()}};
  window.addEventListener('prumo-ms-equipe',()=>{status();toast('E-mail conectado para a equipe toda. Ele se renova sozinho.')});
  const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=!!S.msEq?.equipe;try{ok=ok||localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};
- setTimeout(status,3000);setInterval(status,10*6e4);setTimeout(tick,8000);setInterval(tick,60000);setTimeout(resumoTick,15000);setInterval(resumoTick,60000)}
+ setTimeout(status,3000);setInterval(status,10*6e4);setTimeout(tick,8000);setInterval(tick,60000);setTimeout(resumoTick,15000);setInterval(resumoTick,60000);setTimeout(avisoTick,20000);setInterval(avisoTick,60000)}
 
 /* ---------- ferramentas ---------- */
 const okUrl=u=>/^https?:\/\/\S+$/i.test(u||'');
@@ -1910,24 +1912,25 @@ function htmlResumo(r){const e=esc;
  return `<div style="font-family:Segoe UI,Arial,sans-serif;color:#1C2321;max-width:640px"><h2 style="margin:0 0 4px;font-size:18px">Resumo do Prumo · ${e(hojeTxt())}</h2><p style="margin:0 0 16px;color:#5B6663;font-size:13px">Financeiro e Contábil</p>
  ${r.secoes.length?r.secoes.map(x=>`<div style="border:1px solid #E3E6E5;border-radius:10px;padding:12px 14px;margin:0 0 10px"><b style="font-size:14px">${e(x.t)}</b>${x.linhas.length?`<ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${x.linhas.map(l=>`<li style="margin:2px 0">${e(l)}</li>`).join('')}</ul>`:''}</div>`).join(''):'<p>Nada atrasado ou pendente nos itens escolhidos. Tudo em dia.</p>'}
  <p style="margin:16px 0 0;font-size:13px"><a href="${e(r.url)}" style="color:#2E7D6B">Abrir o Prumo</a></p><p style="color:#8A9491;font-size:11.5px;margin-top:14px">Resumo automático do Prumo. Para mudar a data, o horário ou os itens, use Painel › Resumo para o diretor.</p></div>`}
-async function enviarResumoDir(manual){const c=cfgRes(),para=(c.para||[]).filter(emailOk);
- if(!para.length){if(manual)toast('Informe pelo menos um e-mail para receber o resumo.');return false}
- if(!MCP){if(manual)toast(msgErro({code:'sem_mcp'}));return false}
+async function enviarResumoDir(manual){const c=cfgRes(),av=cfgAv(),para=c.ativo||manual?(c.para||[]).filter(emailOk):[],zap=av.resumoWhats&&(av.whatsNums||[]).length;
  const r=dadosResumo(c);if(!manual&&c.soSeHouver&&!r.secoes.length)return 'vazio';
  const tot=r.secoes.reduce((a,x)=>a+(x.k==='ia'?0:x.total),0);
+ if(zap){const NL='\n',txt=`*Resumo do Prumo · ${fmt(HJ)}*${NL}${r.secoes.length?r.secoes.map(x=>`*${x.t}*${x.k==='ia'||!x.linhas.length?'':NL+x.linhas.slice(0,4).map(l=>'• '+l).join(NL)}`).join(NL+NL):'Tudo em dia nos itens escolhidos.'}${NL}${location.origin}`;const w=await mandarWhats(txt);if(manual)toast(w.ok?'Resumo enviado no WhatsApp':(ERR_WHATS[w.erro]||'WhatsApp não enviado.'));if(!para.length)return w.ok}
+ if(!para.length){if(manual&&!zap)toast('Informe pelo menos um e-mail para receber o resumo.');return false}
+ if(!MCP){if(manual)toast(msgErro({code:'sem_mcp'}));return false}
  try{await MCP.callTool(SRV,'outlook_send_mail',{to:para,subject:`Resumo do Prumo · ${fmt(HJ)}/${HJ.slice(0,4)}${tot?` · ${tot} ${tot>1?'pendências':'pendência'}`:' · tudo em dia'}`,bodyType:'html',body:htmlResumo(r),comoEquipe:true},{cache:false});
   log(`${manual?'Enviou':'O Prumo enviou'} o resumo para o diretor (${para.join(', ')})`);if(manual)toast('Resumo enviado');return true}
  catch(e){if(manual)toast(msgErro(e));return false}}
-async function resumoTick(){const c=cfgRes();if(!real()||S.sim||!DB||!MCP||S.resEnv||!resumoHoje(c)||agoraHM()<(c.hora||'08:00'))return;
+async function resumoTick(){const c=cfgRes(),av=cfgAv(),ligado={...c,ativo:c.ativo||av.resumoWhats};if(!real()||S.sim||!DB||S.resEnv||!resumoHoje(ligado)||agoraHM()<(c.hora||'08:00'))return;if(!MCP&&!av.resumoWhats)return;
  let st=null;try{const d=await DB.doc('sync/resumo').get();st=d.exists?d.data():null}catch(e){return}
  if(st?.dia===HJ)return;
  try{const l=await DB.doc('sync/resumolock').acquire({holder:ME.uid||'x',ttlMs:180000});if(!l.acquired)return}catch(e){}
  S.resEnv=true;try{const ok=await enviarResumoDir(false);if(ok)await DB.doc('sync/resumo').set({dia:HJ,em:new Date().toISOString(),por:ME.uid||null,res:ok===true?'enviado':'nada'})}finally{S.resEnv=false}}
 function cfgResumo(){const c=cfgRes();FORM={tipo:'_resumo',datas:[...(c.datas||[])]};
  const dw=[1,2,3,4,5,6].map(d=>`<label class="ck"><input type="checkbox" id="rs_d_${d}" ${(c.dias||[]).map(Number).includes(d)?'checked':''}> ${SEM[d]}</label>`).join('');
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Avisos</p><h2 id="sheet-title">Resumo para o diretor</h2><p class="sub" style="font-size:13px">Um e-mail com o que está atrasado ou pendente, no dia e na hora que você escolher. O diretor também recebe o aviso no sino do Prumo.</p></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Avisos</p><h2 id="sheet-title">Resumo e avisos do diretor</h2><p class="sub" style="font-size:13px">Avisos na hora pelo WhatsApp e um resumo do que está atrasado no dia e hora que você escolher. O diretor também vê tudo no sino do Prumo.</p></div>
  <div class="fgrid">
-  <label class="perm full"><input type="checkbox" id="rs_on" ${c.ativo?'checked':''}><span><b>Ligar o resumo automático</b><small>${esc(quandoRes(c))}</small></span></label>
+  <label class="perm full"><input type="checkbox" id="rs_on" ${c.ativo?'checked':''}><span><b>Ligar o resumo do dia por e-mail</b><small>${esc(quandoRes(c))}</small></span></label>
   <div><label class="lbl" for="rs_freq">Quando</label><select class="inp" id="rs_freq" onchange="resVis()">${FREQ_RES.map(([k,l])=>`<option value="${k}" ${k===c.freq?'selected':''}>${l}</option>`).join('')}</select></div>
   <div><label class="lbl" for="rs_hora">Horário</label><input class="inp" id="rs_hora" type="time" value="${esc(c.hora||'08:00')}"></div>
   <div class="full" id="rsw_sem"><span class="lbl">Dias da semana</span><div class="cks">${dw}</div></div>
@@ -1935,7 +1938,8 @@ function cfgResumo(){const c=cfgRes();FORM={tipo:'_resumo',datas:[...(c.datas||[
   <div class="full" id="rsw_datas"><span class="lbl">Datas</span><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center" id="rs_lista"></div><div style="display:flex;gap:6px;margin-top:6px"><input class="inp" id="rs_nova" type="date" min="${HJ}" style="width:auto"><button class="btn" type="button" onclick="resAddData()">Adicionar data</button></div></div>
   <div class="full"><label class="lbl" for="rs_para">Enviar para</label><input class="inp" id="rs_para" placeholder="diretor@fatecie.edu.br" value="${esc((c.para||[]).join(', ')||(dir()&&ME.email?ME.email:''))}"><p class="meta" style="margin:4px 0 0">Separe vários e-mails por vírgula. Sai pela conta de e-mail conectada da equipe.</p><p class="ferr" id="rse_para"></p></div>
   <div class="full"><span class="lbl">O que entra no resumo</span><div class="perms">${ITENS_RESUMO.map(([k,l,d])=>`<label class="perm"><input type="checkbox" id="rs_i_${k}" ${(c.itens||{})[k]?'checked':''}><span><b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
-  <label class="perm full"><input type="checkbox" id="rs_so" ${c.soSeHouver?'checked':''}><span><b>Só enviar quando houver algo atrasado ou pendente</b><small>Nos dias em que estiver tudo em dia, o e-mail não sai.</small></span></label>
+  <label class="perm full"><input type="checkbox" id="rs_so" ${c.soSeHouver?'checked':''}><span><b>Só enviar quando houver algo atrasado ou pendente</b><small>Nos dias em que estiver tudo em dia, o resumo não sai.</small></span></label>
+ ${blocoAvisos()}
  </div>
  <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" onclick="verResumo()">Ver como fica</button><button class="btn ghost" onclick="salvaResumo(true)">Salvar e enviar agora</button></div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaResumo()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false;resVis();resDatas()}
@@ -1945,14 +1949,56 @@ function resAddData(){const v=val('rs_nova');if(!v)return;if(!FORM.datas.include
 function lerResumoForm(){const para=listaEnd(val('rs_para')).map(x=>x.toLowerCase());
  return {ativo:!!document.getElementById('rs_on')?.checked,freq:val('rs_freq'),hora:val('rs_hora')||'08:00',dias:[1,2,3,4,5,6].filter(d=>document.getElementById('rs_d_'+d)?.checked),n:Math.min(31,Math.max(1,Math.round(+val('rs_n')||1))),datas:[...FORM.datas].sort(),para,soSeHouver:!!document.getElementById('rs_so')?.checked,itens:Object.fromEntries(ITENS_RESUMO.map(([k])=>[k,!!document.getElementById('rs_i_'+k)?.checked]))}}
 function verResumo(){const c=lerResumoForm(),r=dadosResumo(c);const w=window.open('','_blank');if(!w){toast('Libere as janelas pop-up para ver a prévia.');return}w.document.write(`<!doctype html><meta charset="utf-8"><title>Prévia do resumo</title><body style="padding:24px;background:#F6F7F7">${htmlResumo(r)}</body>`);w.document.close()}
-async function salvaResumo(enviar){errEl('rse_para','');const c=lerResumoForm();
+async function salvaResumo(enviar){errEl('rse_para','');const c=lerResumoForm(),av=lerAvForm();
+ if(av.whatsNums.some(n=>!foneOk(n))){toast('Confira o WhatsApp: 55 + DDD + número, só algarismos.');return}
+ if((av.ativo||av.resumoWhats)&&!av.whatsNums.length){toast('Cadastre o WhatsApp do diretor.');return}
  if(c.para.some(x=>!emailOk(x))){errEl('rse_para','Confira os endereços.');return}
- if((c.ativo||enviar)&&!c.para.length){errEl('rse_para','Informe pelo menos um e-mail.');return}
+ if((c.ativo||(enviar&&!av.resumoWhats))&&!c.para.length){errEl('rse_para','Informe pelo menos um e-mail.');return}
  if(c.ativo&&c.freq==='semanal'&&!c.dias.length){toast('Escolha pelo menos um dia da semana.');return}
  if(c.ativo&&c.freq==='datas'&&!c.datas.length){toast('Adicione pelo menos uma data.');return}
- try{await DB.doc('config/estrutura').set({...CFG,resumoDir:c});CFG={...CFG,resumoDir:c};log(`Configurou o resumo para o diretor: ${c.ativo?quandoRes(c):'desligado'}`);toast(c.ativo?`Resumo ligado: ${quandoRes(c)}`:'Resumo salvo (desligado)')}
+ try{await DB.doc('config/estrutura').set({...CFG,resumoDir:c,avisosDir:av});CFG={...CFG,resumoDir:c,avisosDir:av};log(`Configurou o resumo e os avisos do diretor: resumo ${c.ativo?quandoRes(c):'desligado'}; WhatsApp ${av.ativo?'ligado':'desligado'}`);toast(av.ativo?'Avisos pelo WhatsApp ligados':c.ativo?`Resumo ligado: ${quandoRes(c)}`:'Salvo')}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar o resumo.':'Não foi possível salvar.');return}
  if(enviar)await enviarResumoDir(true);fechar()}
+/* ---------- avisos na hora para o diretor (WhatsApp) ---------- */
+// Para criar um aviso novo, acrescente um item aqui e chame avisarDiretor('chave', ...) onde o fato acontece.
+const EVENTOS_AVISO=[
+ ['emailAtrasado','Chegou e-mail atrasado','Assim que a busca encontra um pedido sem data ou com menos de D-8'],
+ ['demandaAtrasada','Demanda passou do nosso prazo','Quando um chamado aceito vence sem ser concluído'],
+ ['semResp','Chamado sem responsável há mais de 1 dia útil','Ninguém aceitou o pedido']];
+const cfgAv=()=>({ativo:false,whats:true,email:false,whatsNums:[],eventos:{emailAtrasado:true,demandaAtrasada:true,semResp:false},resumoWhats:false,...(CFG.avisosDir||{})});
+const foneOk=x=>/^\d{12,13}$/.test(String(x||'').replace(/\D/g,''));
+async function mandarWhats(texto,nums){const c=cfgAv(),para=(nums||c.whatsNums||[]).filter(foneOk);if(!para.length)return {ok:false,erro:'sem_numero'};
+ const sb=window.portalSupabase;if(!sb?.functions)return {ok:false,erro:'sem_login'};
+ try{const {data,error}=await sb.functions.invoke('whats-enviar',{body:{para,texto}});if(error){let j=null;try{j=await error.context?.json()}catch(e){}return {ok:false,erro:j?.erro||(error.name==='FunctionsFetchError'||String(error.message||'').includes('Failed to send')?'sem_funcao':'falhou'),det:j?.res}}return {ok:!!data?.ok,res:data?.res}}
+ catch(e){return {ok:false,erro:'falhou'}}}
+const ERR_WHATS={sem_numero:'Cadastre o WhatsApp do diretor no Resumo e avisos.',sem_login:'O WhatsApp só funciona no sistema publicado, com login.',sem_funcao:'A função whats-enviar ainda não foi criada no Supabase.',sem_provedor:'Falta configurar o CallMeBot ou a API da Meta no Supabase.',sem_permissao:'Seu acesso não pode disparar avisos.',falhou:'Não foi possível enviar pelo WhatsApp.'};
+async function avisarDiretor(ev,titulo,linhas){const c=cfgAv();if(!c.ativo||!c.eventos?.[ev])return false;
+ const txt=`*Prumo · ${titulo}*\n${(linhas||[]).slice(0,8).map(l=>'• '+l).join('\n')}${(linhas||[]).length>8?`\n• e mais ${linhas.length-8}`:''}\n${location.origin}`;
+ let ok=false;if(c.whats){const r=await mandarWhats(txt);ok=r.ok;if(!r.ok)S.avErr=r.erro}
+ if(c.email){const para=(cfgRes().para||[]).filter(emailOk);if(para.length&&MCP){try{await MCP.callTool(SRV,'outlook_send_mail',{to:para,subject:`Prumo · ${titulo}`,bodyType:'html',body:`<p><b>${esc(titulo)}</b></p><ul>${(linhas||[]).map(l=>`<li>${esc(l)}</li>`).join('')}</ul><p><a href="${esc(location.origin)}">Abrir o Prumo</a></p>`,comoEquipe:true},{cache:false});ok=true}catch(e){}}}
+ if(ok)log(`Avisou o diretor: ${titulo}`);return ok}
+// demandas que venceram e chamados parados: confere a cada minuto, avisa uma vez só por chamado
+async function avisoTick(){const c=cfgAv();if(!c.ativo||!real()||S.sim||!DB||S.avRod)return;const ev=c.eventos||{};
+ const venc=ev.demandaAtrasada?D.chamados.filter(x=>chAtrasado(x)&&x.avisoAtraso!==x.prazo):[];
+ const lim=(()=>{let d=HJ;for(let i=0;i<1;i++){d=addDia(d,-1);while(!ehUtil(d))d=addDia(d,-1)}return d})();
+ const parados=ev.semResp?D.chamados.filter(x=>x.st!=='Concluído'&&!x.resp&&!x.avisoSemResp&&diaCh(x)&&diaCh(x)<lim):[];
+ if(!venc.length&&!parados.length)return;
+ try{const l=await DB.doc('sync/avisolock').acquire({holder:ME.uid||'x',ttlMs:120000});if(!l.acquired)return}catch(e){}
+ S.avRod=true;
+ try{if(venc.length&&await avisarDiretor('demandaAtrasada',venc.length>1?`${venc.length} demandas passaram do nosso prazo`:'Demanda passou do nosso prazo',venc.map(x=>`${x.proto} · ${x.assunto} · ${respNome(x.resp)} · prazo ${fmt(x.prazo)}`)))for(const x of venc)await patch('chamados',x.id,{avisoAtraso:x.prazo},null,false);
+  if(parados.length&&await avisarDiretor('semResp',parados.length>1?`${parados.length} chamados sem responsável`:'Chamado sem responsável',parados.map(x=>`${x.proto} · ${x.assunto} · ${x.dep?depNome(x.dep):remNomeCh(x)} · desde ${fmt(diaCh(x))}`)))for(const x of parados)await patch('chamados',x.id,{avisoSemResp:HJ},null,false)}
+ finally{S.avRod=false}}
+async function testarWhats(){const nums=listaEnd(val('av_nums')).map(x=>x.replace(/\D/g,'')).filter(Boolean);if(!nums.length||nums.some(n=>!foneOk(n))){toast('Use o número com 55 + DDD + número, ex.: 5544999990000.');return}
+ const c=lerAvForm();try{await DB.doc('config/estrutura').set({...CFG,avisosDir:c});CFG={...CFG,avisosDir:c}}catch(e){toast('Salve primeiro (só diretor ou administrador).');return}
+ toast('Enviando teste…');const r=await mandarWhats('*Prumo* · teste de aviso. Se chegou, os avisos pelo WhatsApp estão funcionando.',nums);
+ toast(r.ok?'Teste enviado. Confira o WhatsApp.':(ERR_WHATS[r.erro]||'Não foi possível enviar.')+(r.res?.[0]?.erro?` (${r.res[0].erro})`:''))}
+function lerAvForm(){return {ativo:!!document.getElementById('av_on')?.checked,whats:true,email:!!document.getElementById('av_email')?.checked,whatsNums:listaEnd(val('av_nums')).map(x=>x.replace(/\D/g,'')).filter(Boolean),resumoWhats:!!document.getElementById('av_rw')?.checked,eventos:Object.fromEntries(EVENTOS_AVISO.map(([k])=>[k,!!document.getElementById('av_e_'+k)?.checked]))}}
+const blocoAvisos=()=>{const a=cfgAv();return `<div class="full" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px"><span class="lbl">Avisos na hora pelo WhatsApp</span><p class="meta" style="margin:0 0 8px">Chega no WhatsApp do diretor assim que acontece, sem esperar o resumo.</p></div>
+  <label class="perm full"><input type="checkbox" id="av_on" ${a.ativo?'checked':''}><span><b>Ligar os avisos pelo WhatsApp</b><small>${a.whatsNums.length?esc(a.whatsNums.join(', ')):'Nenhum número cadastrado ainda'}</small></span></label>
+  <div class="full"><label class="lbl" for="av_nums">WhatsApp do diretor</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="av_nums" style="flex:1;min-width:220px" placeholder="5544999990000" value="${esc((a.whatsNums||[]).join(', '))}"><button class="btn" type="button" onclick="testarWhats()">Enviar teste</button></div><p class="meta" style="margin:4px 0 0">55 + DDD + número, só algarismos. Vários números separados por vírgula.</p></div>
+  <div class="full"><span class="lbl">Avisar quando</span><div class="perms">${EVENTOS_AVISO.map(([k,l,d])=>`<label class="perm"><input type="checkbox" id="av_e_${k}" ${a.eventos?.[k]?'checked':''}><span><b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
+  <label class="perm full"><input type="checkbox" id="av_rw" ${a.resumoWhats?'checked':''}><span><b>Mandar o resumo do dia também pelo WhatsApp</b><small>No mesmo dia e horário do resumo acima</small></span></label>
+  <label class="perm full"><input type="checkbox" id="av_email" ${a.email?'checked':''}><span><b>Mandar os avisos também por e-mail</b><small>Desligado por enquanto. Usa os e-mails do resumo.</small></span></label>`};
 /* ---------- metas e a fazer do mês: departamento e cada pessoa ---------- */
 const ST_META=[['afazer','A fazer','ne'],['andamento','Em andamento','ac'],['feito','Feito','ok']];
 const stMeta=k=>ST_META.find(x=>x[0]===k)||ST_META[0];
@@ -2336,7 +2382,7 @@ logs(){const q=(S.fLog||'').toLowerCase(),l=D.logs.filter(x=>!q||((x.acao||'')+'
  <div class="panel" id="loglist">${logRows()}</div>`+note('Mostra as 300 ações mais recentes. O nome vem da conta de cada pessoa; ações feitas simulando outro perfil aparecem marcadas.')},
 alertas(){const A=alertas();
  return (avPodePedir()?`<div class="banner"><span>Receba avisos no canto da tela do computador quando um prazo ou rotina estiver chegando.</span><button class="btn pri" onclick="ativarAvisos()">Ativar avisos</button></div>`:'')+head('Central de notificações','Alertas',modOn('outros')?(dir()?'Atrasos do cronograma, rotinas e pendências que dependem de você.':'Alertas das rotinas sob sua responsabilidade.'):(dir()?'Rotinas do cronograma atrasadas e rotinas de atenção do departamento.':'Rotinas do cronograma sob sua responsabilidade.'))+
- (dir()||podeAdmin()?`<div class="porg"><button class="btn ghost" onclick="cfgResumo()">Resumo para o diretor por e-mail${cfgRes().ativo?' · '+esc(quandoRes(cfgRes())):''}</button></div>`:'')+`<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma rotina do cronograma atrasar ou tiver prioridade Atenção, ela aparece aqui.')}</div>`+
+ (dir()||podeAdmin()?`<div class="porg"><button class="btn ghost" onclick="cfgResumo()">Resumo e avisos do diretor${cfgAv().ativo?' · WhatsApp ligado':''}${cfgRes().ativo?' · resumo '+esc(quandoRes(cfgRes())):''}</button></div>`:'')+`<div class="panel">${A.length?A.map(a=>`<div class="row"><span class="av ${a.c}">${ic(a.ic).replace('aria-hidden','style="width:17px;height:17px" aria-hidden')}</span><div class="t"><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div>${a.id&&pode('entregas')?`<button class="btn" onclick="cobrar('${esc(a.id)}')">Cobrar</button>`:''}<button class="btn" onclick="ir('${a.ir}')">Abrir</button></div>`).join(''):vazio('Nenhum alerta agora','Quando uma rotina do cronograma atrasar ou tiver prioridade Atenção, ela aparece aqui.')}</div>`+
  note('Os alertas são recalculados sozinhos todos os dias a partir dos prazos. O diretor vê tudo; cada pessoa vê o que está sob sua responsabilidade.')},
 
 entregas(){const deps=D.departamentos,l=minhasEnt().filter(e=>!S.fDep||e.dep===S.fDep).sort((a,b)=>(!!a.recebido)-(!!b.recebido)||((a.prazo||'')<(b.prazo||'')?-1:1));
@@ -2396,7 +2442,7 @@ painel(){
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>`,
  estrutura:()=>`<div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
    <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div></div>`};
- return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo por e-mail${cfgRes().ativo?' · ligado':''}</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}">${h}</section>`:''}).join('')}</div>`},
+ return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}">${h}</section>`:''}).join('')}</div>`},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  return head('Reconhecimento','Destaques do mês','Conquistas, metas batidas e reconhecimentos da equipe.',mesNav('mesDest')+(pode('feedbacks')?novo('destaque','Registrar destaque'):''))+
