@@ -686,8 +686,8 @@ async function sincronizar(manual){
  }catch(e){S.syncErr=e;DB.doc('sync/estado').set({...SYNC,erro:e?.code||'erro',erroEm:new Date().toISOString()}).catch(()=>{});if(manual)toast(msgErro(e))}
  finally{S.sync=false;render()}}
 function msgErro(e){const c=e?.code,cx=CFG.caixa||'a caixa configurada';return ({
- sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.`,
- caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.`,
+ sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
+ caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  not_found:'O Outlook não encontrou a pasta ou o e-mail. Confira em Configurar caixa ou link.',
  server_not_connected:'O e-mail ainda não está conectado. Clique em Conectar e-mail.',
  needs_reauth:'A conexão com o e-mail venceu. Clique em Conectar e-mail para continuar.',
