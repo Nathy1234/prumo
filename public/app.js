@@ -706,6 +706,7 @@ function msgErro(e){const c=e?.code,cx=CFG.caixa||'a caixa configurada';return (
  sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  not_found:'O Outlook não encontrou a pasta ou o e-mail. Confira em Configurar caixa ou link.',
+ pasta_sem_raiz:`A Caixa de Entrada do ${cx} está compartilhada com você, mas a Microsoft não deixa localizá-la. Na conta do contas a pagar, clique com o botão direito no nome da conta (acima da Caixa de Entrada) > Permissões e dê a você "Revisor" (ou peça à TI "Acesso total"). Depois clique em Conectar e-mail e em Verificar agora.${e?.message?` Detalhe: ${String(e.message).slice(0,160)}`:''}`,
  server_not_connected:'O e-mail ainda não está conectado. Clique em Conectar e-mail.',
  needs_reauth:'A conexão com o e-mail venceu. Clique em Conectar e-mail para continuar.',
  

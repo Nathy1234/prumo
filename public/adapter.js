@@ -360,6 +360,20 @@
       return r.status === 202 || r.status === 204 ? {} : r.json();
     }
     const aspas = s => String(s || '').replace(/'/g, "''");
+    /* Caixa compartilhada só por pasta: a Microsoft não acha "Inbox" pelo nome padrão.
+       Então lista as pastas da caixa e usa o código interno da Caixa de Entrada / Itens Enviados. */
+    const NOMES_PASTA = { inbox: ['caixa de entrada', 'inbox', 'entrada'], sentitems: ['itens enviados', 'sent items', 'enviados', 'mensagens enviadas'] };
+    const cachePasta = {};
+    async function pastaPorNome(dono, tipo) {
+      const k = dono + '|' + tipo; if (cachePasta[k]) return cachePasta[k];
+      let r;
+      try { r = await graph('GET', dono + '/mailFolders?$top=100&$select=id,displayName'); }
+      catch (e) { throw { code: 'pasta_sem_raiz', message: (e && e.message) || '' }; }
+      const nomes = NOMES_PASTA[tipo] || [], tira = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      const f = (r.value || []).find(p => nomes.some(n => tira(p.displayName) === tira(n)));
+      if (!f) throw { code: 'pasta_sem_raiz', message: 'Pasta "' + (nomes[0] || tipo) + '" não apareceu na lista de pastas compartilhadas.' };
+      return (cachePasta[k] = f.id);
+    }
     const ferramentas = {
       async outlook_email_search(i) {
         const dono = i.mailboxOwnerEmail ? `/users/${encodeURIComponent(i.mailboxOwnerEmail)}` : '/me';
@@ -372,7 +386,13 @@
         if (filtros.length) qs.set('$filter', filtros.join(' and '));
         if (!i.sender) qs.set('$orderby', 'receivedDateTime desc');
         if (skip) qs.set('$skip', String(skip));
-        const r = await graph('GET', base + '?' + qs.toString(), null, { Prefer: 'IdType="ImmutableId"' });
+        let r;
+        try { r = await graph('GET', base + '?' + qs.toString(), null, { Prefer: 'IdType="ImmutableId"' }); }
+        catch (e) {
+          if (!(i.mailboxOwnerEmail && !i.folderId && (i.folder === 'inbox' || i.folder === 'sentitems') && /default folder|not found/i.test((e && e.message) || ''))) throw e;
+          const id = await pastaPorNome(dono, i.folder);
+          r = await graph('GET', dono + '/mailFolders/' + encodeURIComponent(id) + '/messages?' + qs.toString(), null, { Prefer: 'IdType="ImmutableId"' });
+        }
         const value = (r.value || []).map(m => ({ id: m.id, internetMessageId: m.internetMessageId, subject: m.subject, sender: m.from?.emailAddress?.address || '', senderName: m.from?.emailAddress?.name || '', to: (m.toRecipients || []).concat(m.ccRecipients || []).map(a => ({ address: a.emailAddress?.address || '', name: a.emailAddress?.name || '' })).filter(a => a.address), receivedDateTime: m.receivedDateTime, summary: m.bodyPreview || '', hasAttachments: !!m.hasAttachments, webLink: m.webLink }));
         return { value, ...(r['@odata.nextLink'] ? { nextOffset: skip + value.length } : {}) };
       },
