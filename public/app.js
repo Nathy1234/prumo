@@ -667,7 +667,7 @@ async function sincronizar(manual){
  if(!todos&&!deps.length){if(manual)toast('Cadastre os e-mails dos departamentos primeiro.');return}
  if(ME.uid){try{const l=await DB.doc('sync/lock').acquire({holder:ME.uid,ttlMs:180000});if(!l.acquired){if(manual)toast('Outra pessoa está verificando o e-mail agora. Tente em instantes.');return}}catch(e){}}
  S.sync=true;S.syncErr=null;render();
- const mesmaCaixa=norm(SYNC.caixa||'')===norm(CFG.caixa||'')&&(SYNC.caixa!==undefined||!CFG.caixa);
+ const mesmaCaixa=norm(SYNC.caixa||'')===norm(CFG.caixa||'')&&(SYNC.caixa!==undefined||!CFG.caixa)&&(SYNC.desde||'')===(CFG.emailDesde||'');
  const desde=SYNC.ultima&&mesmaCaixa?new Date(Date.parse(SYNC.ultima)-36e5).toISOString():(CFG.emailDesde?CFG.emailDesde+'T00:00:00Z':new Date(Date.now()-14*864e5).toISOString());
  let novos=0,auto=0,lidos=0,env=0;
  const buscar=async(inp,filtro,fn)=>{let offset=0;
@@ -680,7 +680,7 @@ async function sincronizar(manual){
  try{
   if(todos){await buscar({folder:'inbox'});if(lerEnviados()){try{await buscar({folder:'sentitems'},null,processarEnviado)}catch(e){if(manual)toast('Caixa de entrada lida. A pasta de enviados não está liberada para leitura.')}}}
   else for(const d of deps)for(const addr of listaEmails(d))await buscar({sender:addr},m=>{const x=norm(m.sender);return x===addr||x.endsWith(addr)});
-  await DB.doc('sync/estado').set({ultima:new Date().toISOString(),caixa:CFG.caixa||'',uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
+  await DB.doc('sync/estado').set({ultima:new Date().toISOString(),caixa:CFG.caixa||'',desde:CFG.emailDesde||'',uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
   if(manual||novos||auto)toast(`${lidos} e-mails verificados · ${novos} na triagem · ${env} enviados guardados na conversa${auto?` · ${auto} registrados automaticamente`:''}`);
   if(novos||auto)log(`Verificou o Outlook: ${novos} e-mails na triagem e ${auto} registrados automaticamente`);
   try{localStorage.setItem('autoSync_'+(ME.uid||'demo'),'1')}catch(e){}
@@ -688,8 +688,10 @@ async function sincronizar(manual){
  finally{S.sync=false;render()}}
 /* só conta e mostra os e-mails da caixa configurada (ex.: contas a pagar); os de outra caixa ficam de fora */
 const daCaixa=e=>!CFG.caixa||norm(e.caixa||'')===norm(CFG.caixa);
-const emPend=()=>D.emails.filter(e=>e.st==='triagem'&&daCaixa(e));
-const deOutraCaixa=()=>D.emails.filter(e=>!daCaixa(e)&&e.st!=='aplicado');
+const desdeOk=e=>!CFG.emailDesde||!e.recebido||e.recebido.slice(0,10)>=CFG.emailDesde;
+const emPend=()=>D.emails.filter(e=>e.st==='triagem'&&daCaixa(e)&&desdeOk(e));
+const virouChamado=e=>e.st==='aplicado'||String(e.res||'').startsWith('chamado:')||D.chamados.some(c=>c.emailId===e.id||(e.msgId&&c.msgId===e.msgId));
+const deOutraCaixa=()=>D.emails.filter(e=>!daCaixa(e)&&!virouChamado(e));
 async function removerOutraCaixa(){const L=deOutraCaixa();if(!L.length)return;
  if(!S.confOC){S.confOC=true;toast(`Clique de novo para remover ${L.length} e-mails que não são da caixa ${CFG.caixa}.`);render();setTimeout(()=>{S.confOC=false;render()},6000);return}S.confOC=false;
  let k=0;for(const e of L){try{await DB.collection('emails').doc(e.id).delete();k++}catch(x){}}
@@ -698,7 +700,7 @@ async function removerOutraCaixa(){const L=deOutraCaixa();if(!L.length)return;
  log(`Removeu do Prumo ${k} e-mails que não eram da caixa ${CFG.caixa}`);toast(`${k} e-mails removidos do Prumo`);render()}
 /* apaga do Prumo (não do Outlook) todos os e-mails que não viraram chamado */
 async function excluirTodosEmails(){if(!(pode('email')||podeAdmin())){toast('Sem permissão.');return}
- const L=D.emails.filter(e=>e.st!=='aplicado');if(!L.length){toast('Não há e-mails para excluir.');return}
+ const L=D.emails.filter(e=>!virouChamado(e));if(!L.length){toast('Não há e-mails para excluir.');return}
  if(!S.confTodos){S.confTodos=true;toast(`Clique de novo para excluir ${L.length} e-mails do Prumo. O Outlook não é alterado.`);render();setTimeout(()=>{S.confTodos=false;render()},6000);return}S.confTodos=false;
  let k=0;for(let i=0;i<L.length;i+=20){const r=await Promise.allSettled(L.slice(i,i+20).map(e=>DB.collection('emails').doc(e.id).delete()));k+=r.filter(x=>x.status==='fulfilled').length}
  log(`Excluiu do Prumo ${k} e-mails (o Outlook não foi alterado)`);toast(`${k} e-mails excluídos do Prumo. Os chamados não mudaram.`);render()}
@@ -768,7 +770,7 @@ function cfgEmail(){FORM={tipo:'_cfgmail'};
   <div class="full"><label class="lbl" for="g_todos">Quais e-mails ler</label><select class="inp" id="g_todos"><option value="todos" ${lerTodos()?'selected':''}>Todos os e-mails da caixa de entrada, agrupados por remetente</option><option value="dep" ${lerTodos()?'':'selected'}>Só os e-mails cadastrados nos departamentos</option></select></div>
   <label class="perm full"><input type="checkbox" id="g_env" ${CFG.emailEnviados!==false?'checked':''}><span><b>Ler também os e-mails enviados</b><small>As respostas de vocês entram na conversa de cada contato. Não vão para a triagem.</small></span></label>
   <div class="full"><label class="lbl" for="g_caixa">Caixa ou pasta compartilhada · link ou e-mail · opcional</label><input class="inp" id="g_caixa" type="text" autocomplete="off" spellcheck="false" placeholder="https://outlook.office.com/mail/financeiro@empresa.com.br/inbox  ou  financeiro@empresa.com.br" value="${esc(CFG.caixaLink||CFG.caixa||'')}" oninput="mostraCaixa()"><p class="ferr" id="ge_caixa"></p><p class="meta" id="g_caixa_info" style="margin:4px 0 0">${caixaInfo(CFG.caixaLink||CFG.caixa||'')}</p></div>
-  <div><label class="lbl" for="g_desde">Buscar e-mails a partir de</label><input class="inp" id="g_desde" type="date" value="${esc(CFG.emailDesde||isoD(new Date(Date.now()-14*864e5)))}"></div>
+  <div><label class="lbl" for="g_desde">Buscar e-mails a partir de</label><input class="inp" id="g_desde" type="date" value="${esc(CFG.emailDesde||isoD(new Date(Date.now()-14*864e5)))}"><p class="meta" style="margin:4px 0 0">Ao mudar, a próxima verificação busca a partir desta data e a revisão mostra só daqui em diante. Nada é apagado e os e-mails que viraram chamado continuam.</p></div>
   <div><label class="lbl" for="g_int">Verificar a cada (minutos)</label><input class="inp" id="g_int" type="number" min="5" max="240" value="${+CFG.emailIntervalo||15}"><p class="ferr" id="ge_int"></p></div></div>
  ${note('A verificação automática roda enquanto alguém com a permissão E-mails recebidos estiver com o portal aberto.')}
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgEmail()">Salvar</button></div></div>`;
@@ -795,7 +797,7 @@ function mostraCaixa(){const el=document.getElementById('g_caixa_info');if(el)el
 async function salvaCfgEmail(){const bruto=(document.getElementById('g_caixa')?.value||'').trim(),cx=lerCaixa(bruto),caixa=cx.email,it=+val('g_int');errEl('ge_caixa','');errEl('ge_int','');
  if(bruto&&!cx.email&&!cx.pasta){errEl('ge_caixa','Não encontrei um e-mail nem uma pasta nesse link. Cole o link da pasta no Outlook na web ou o endereço da caixa.');return}
  if(!(it>=5&&it<=240)){errEl('ge_int','Use um valor entre 5 e 240.');return}
- try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),emailTodos:val('g_todos')!=='dep',emailEnviados:!!document.getElementById('g_env')?.checked,caixa,caixaLink:/https?:/i.test(bruto)?bruto:'',caixaPasta:cx.pasta||'',emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast('Configuração salva');fechar()}
+ try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),emailTodos:val('g_todos')!=='dep',emailEnviados:!!document.getElementById('g_env')?.checked,caixa,caixaLink:/https?:/i.test(bruto)?bruto:'',caixaPasta:cx.pasta||'',emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast(val('g_desde')&&val('g_desde')!==(SYNC.desde||'')?`Salvo. Na próxima verificação, o Prumo busca a partir de ${fmt(val('g_desde'))}. Nada é apagado.`:'Configuração salva');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar essa configuração.':'Não foi possível salvar.')}}
 function iniciarAutoSync(){const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=false;try{ok=localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};setTimeout(tick,5000);setInterval(tick,60000)}
 
@@ -1954,7 +1956,7 @@ triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="banne
  const sem=lerTodos()?[]:D.departamentos.filter(d=>!listaEmails(d).length);
  const conhecidos=[...D.remetentes].sort((a,b)=>(a.nome||a.email||'').localeCompare(b.nome||b.email||''));
  return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+ocBan+
- ((pode('email')||podeAdmin())&&D.emails.some(e=>e.st!=='aplicado')?`<div class="excl-todos"><button class="btn ${S.confTodos?'danger':''}" onclick="excluirTodosEmails()" title="Apaga só do Prumo. Os e-mails continuam no Outlook.">${S.confTodos?`Confirmar: excluir ${D.emails.filter(e=>e.st!=='aplicado').length} e-mails`:'Excluir todos do Prumo'}</button><span class="meta">Só apaga daqui. O Outlook e os chamados não mudam.</span></div>`:'')+
+ ((pode('email')||podeAdmin())&&D.emails.some(e=>!virouChamado(e))?`<div class="excl-todos"><button class="btn ${S.confTodos?'danger':''}" onclick="excluirTodosEmails()" title="Apaga só do Prumo. Os e-mails continuam no Outlook.">${S.confTodos?`Confirmar: excluir ${D.emails.filter(e=>!virouChamado(e)).length} e-mails`:'Excluir todos do Prumo'}</button><span class="meta">Só apaga daqui. O Outlook e os chamados não mudam.</span></div>`:'')+
  chAbas('em')+chEmail()+
  (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length} ${pend.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
