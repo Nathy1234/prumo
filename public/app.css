@@ -93,7 +93,10 @@ button.tag{cursor:pointer}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
 .kanban{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:12px;overflow-x:auto;padding-bottom:4px}
 .col{background:var(--side);border-radius:12px;padding:12px;min-height:240px;display:flex;flex-direction:column;gap:8px}
-.col h3{font-size:12px;font-weight:600;margin:0 0 4px;display:flex;justify-content:space-between;color:var(--ink-2)}
+.col h3{font-size:12px;font-weight:600;margin:0 0 4px;display:flex;justify-content:space-between;align-items:center;gap:6px;color:var(--ink-2);min-height:24px}
+.col h3 .cn{overflow:hidden;text-overflow:ellipsis}.col h3 .cdir{display:flex;align-items:center;gap:6px;flex:none}
+.cact{display:flex;gap:1px;opacity:.35;transition:opacity .15s}.col:hover .cact,.cact:focus-within{opacity:1}
+.cact button{border:0;background:transparent;color:var(--ink-2);padding:2px 5px;border-radius:5px;cursor:pointer;font-size:12px}.cact button:hover:not([disabled]){background:var(--line);color:var(--ink)}.cact button[disabled]{opacity:.3;cursor:default}
 .kcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;width:100%}
 .kcard b{display:block;font-weight:500;font-size:13px;overflow-wrap:anywhere}
 .kcard span{font-size:12px;color:var(--ink-3)}
