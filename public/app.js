@@ -248,6 +248,12 @@ const solic=()=>S.perfil.startsWith('sol:');
 const solDep=()=>solic()?S.perfil.slice(4):null;
 const quemSou=()=>S.perfil==='pendente'?'Sem perfil':dir()?(real()&&!S.sim&&papelReal()==='admin'?'Administrador':'Diretor'):solic()?`Solicitante · ${depNome(solDep())}`:(pessoa(S.perfil)?.n||'—');
 const DMIN=()=>+CFG.diasMin||3;
+// Antecedência mínima dos e-mails: a data pedida precisa estar pelo menos N dias depois da chegada (padrão D-8, dias corridos).
+const CHEG_MIN=()=>CFG.chegadaMin===0?0:(+CFG.chegadaMin||8);
+const CHEG_UTEIS=()=>CFG.chegadaUteis===true;
+const chegTxt=()=>`${CHEG_MIN()} ${CHEG_UTEIS()?'dias úteis':'dias'}`;
+function antecDias(recebido,prazo){const r=String(recebido||'').slice(0,10);if(!r||!prazo)return null;if(CHEG_UTEIS())return prazo>r?diasUteis(r,prazo):-diasUteis(prazo,r);return Math.round((new Date(prazo+'T12:00')-new Date(r+'T12:00'))/864e5)}
+const chegPorData=(prazo,recebido)=>{if(!prazo)return 'atrasado';const a=antecDias(recebido,prazo);return a!==null&&a>=CHEG_MIN()?'prazo':'atrasado'};
 function diasUteis(a,b){let n=0;const d=new Date(a+'T12:00'),f=new Date(b+'T12:00');if(f<=d)return 0;while(d<f){d.setDate(d.getDate()+1);if(util(d))n++}return n}
 const stCh={'Aberto':'ac','Em análise':'wa','Pendência com solicitante':'bad','Programado':'ok','Concluído':'ne'};
 const CHK=['Documento (NF, recibo ou boleto) salvo no repositório oficial','Aprovado pelo gestor do departamento','Centro de custo e vencimento conferidos'];
@@ -297,7 +303,7 @@ function detalheCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;FORM={
  const linha=(l,v)=>v?`<div class="row"><div class="t"><span>${l}</span><b>${esc(v)}</b></div></div>`:'';
  const sp=stPrazo(c),eq=!solic()&&pode('chamados'),le=pode('ler_email');
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(nomeEt(c.st))}${c.sub?' · '+esc(c.sub):''}</span>${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}</div>
- ${pode('chamados')||dir()?`<div class="chegada"><span class="lbl" style="margin:0">Chegou ao financeiro</span><button class="chip ${chegadaDe(c)==='prazo'?'on':''}" onclick="marcaChegada('${esc(c.id)}','prazo')">Em dia</button><button class="chip ${chegadaDe(c)==='atrasado'?'on bad':''}" onclick="marcaChegada('${esc(c.id)}','atrasado')">Atrasado</button><span class="meta">${!c.chegada&&c.origem==='email'?'automático pelo texto do e-mail':c.chegadaAuto?(c.prazoEnv?`automático · prazo no e-mail: ${fmtAno(c.prazoEnv)}`:'automático · o e-mail não trazia data de prazo'):c.chegada?`marcado por ${esc(c.chegadaPor||'—')}`:''}</span></div>`:''}</div>
+ ${pode('chamados')||dir()?`<div class="chegada"><span class="lbl" style="margin:0">Chegou ao financeiro</span><button class="chip ${chegadaDe(c)==='prazo'?'on':''}" onclick="marcaChegada('${esc(c.id)}','prazo')">Em dia</button><button class="chip ${chegadaDe(c)==='atrasado'?'on bad':''}" onclick="marcaChegada('${esc(c.id)}','atrasado')">Atrasado</button><span class="meta">${!c.chegada&&c.origem==='email'?'automático pelo texto do e-mail':c.chegadaAuto?(c.prazoEnv?`automático · pedido para ${fmtAno(c.prazoEnv)}, chegou ${antecDias(c.recebidoEm||c.abertoEm,c.prazoEnv)} ${CHEG_UTEIS()?'dias úteis':'dias'} antes (mínimo ${chegTxt()})`:'automático · o e-mail não trazia data de prazo'):c.chegada?`marcado por ${esc(c.chegadaPor||'—')}`:''}</span></div>`:''}</div>
  ${c.pend?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>Pendência: ${esc(c.pend)}</span></div>`:''}
  <div>${linha('Tipo',c.tipo)}${linha('Assunto',c.cat||c.subcat?catTxt(c):'Sem assunto')}${linha('Setor',c.dep?depNome(c.dep):'Não definido')}${linha(c.origem==='email'?'Remetente':'Solicitante',c.solicitante)}${linha('Chegou em',c.recebidoEm?fmtHora(c.recebidoEm)+'/'+c.recebidoEm.slice(0,4):fmtAno(c.aberto))}${linha('Fornecedor ou favorecido',c.favorecido)}${linha('NF ou documento',c.nf)}${linha('Vencimento do pagamento',c.venc?fmtAno(c.venc):'')}${linha('Centro de custo',c.cc)}${linha('Gestor que aprovou',c.aprovador)}${linha('Responsável no financeiro',c.resp?respNome(c.resp):'Ninguém aceitou ainda')}${linha('Prazo de entrega',c.prazo?fmtAno(c.prazo):'')}${linha('Aceita por',c.aceitoEm?`${c.aceitoNome||'—'} · ${fmtHora(c.aceitoEm)}`:'')}${linha('Realizada por',c.st==='Concluído'?`${quemFezNome(c)} · ${c.conclEm?fmtHora(c.conclEm):fmt(c.concl)}`:'')}${linha('No cronograma',[...D.cronitens.filter(x=>x.chamadoId===c.id).map(x=>`${D.cronograma.find(r=>r.id===x.rot)?.t||'Rotina'} · ${fmt(x.dia)}${x.feito?' · feito':''}`),...D.cronograma.filter(r=>r.chamadoId===c.id).map(r=>`${r.t} · ${fmt(r.data)}`)].join(' | '))}${linha('Descrição',c.desc)}
  ${c.origem==='email'&&le&&(c.msgId||c.emailLink)?`<div class="row"><div class="t"><span>E-mail de origem</span></div>${c.msgId?`<button class="btn" onclick="lerEmail('c:${esc(c.id)}')">Ler aqui</button>`:''}${c.emailLink?`<a class="btn ghost" href="${esc(c.emailLink)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}${c.doc&&/^https?:\/\//.test(c.doc)?`<div class="row"><div class="t"><span>Documento</span></div><a class="btn" href="${esc(c.doc)}" target="_blank" rel="noopener">Abrir documento</a></div>`:''}</div>
@@ -318,7 +324,7 @@ function avCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;const nx=pr
  const pz=nx==='Concluído'&&c.prazo?(HJ>c.prazo?' com atraso':' no prazo'):'';
  patch('chamados',id,mud,nx==='Concluído'?`Concluído${pz}. Foi para Demandas realizadas.`:`Movido para ${nomeEt(nx)}`,nx==='Concluído'?`Concluiu o chamado ${c.proto}${pz}`:`Moveu o chamado ${c.proto} para ${nomeEt(nx)}`)}
 function cardCh(c,interno){const du=c.venc?diasAte(c.venc):null,sp=stPrazo(c),subs=subEtapas(c.st),nx=proxEtapa(c);
- return `<div class="kcard${interno&&chAtrasado(c)?' late':''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${chegadaTag(c,true)||(c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':'')}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(c.dep?depNome(c.dep):'Setor não definido')}</span>
+ return `<div class="kcard${interno&&chAtrasado(c)?' late':''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${chegadaTag(c,true)||(c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':'')}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(c.dep?depNome(c.dep):c.origem==='email'&&(c.rem||c.solicitante)?remNomeCh(c)+' · sem setor':'Setor não definido')}</span>
  <div class="ktags">${c.cat||c.subcat?`<span class="tag ac">${esc(catTxt(c))}</span>`:''}${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${bloqueioForn(c.favorecido)&&!['Programado','Concluído'].includes(c.st)?'<span class="tag bad">Dados bancários em verificação</span>':''}${c.origem==='email'?`<span class="tag ne">${c.aceitoEm?'Via e-mail':'Via e-mail · conferir'}</span>`:''}</div>
  ${c.origem==='email'&&(c.solicitante||c.rem)?(interno&&c.rem?`<button class="lnk" style="display:block;font-size:12px" onclick="S.fRem='${esc(c.rem)}';render();window.scrollTo({top:0})" title="Ver tudo deste remetente">De: ${esc(remNomeCh(c))}</button>`:`<span style="display:block">De: ${esc(remNomeCh(c))}</span>`):''}
  ${c.venc?`<span style="display:block;color:${du!==null&&du<=1&&c.st!=='Concluído'&&c.st!=='Programado'?'var(--bad)':'var(--ink-3)'}">Pagamento vence ${fmt(c.venc)}${du!==null&&du>=0&&c.st!=='Concluído'?` · ${du===0?'hoje':du===1?'amanhã':`em ${du} dias`}`:''}</span>`:''}
@@ -651,12 +657,12 @@ function prazoNoTexto(txt,recebido){
  for(const m of norm(t).matchAll(/(?<!\d)(\d{1,2})\s*(?:de\s+)?(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\b(?:\s*(?:de\s+)?(\d{4}))?/g))add(m[1],MES_NUM[m[2]],m[3],m.index,m[0].length);
  const fut=achados.filter(a=>a.iso>=rec),chaveF=fut.filter(a=>a.chave),chaveP=achados.filter(a=>a.chave&&a.iso<rec);
  const ok=chaveF[0]||fut[0];
- if(ok)return {st:'prazo',data:ok.iso,trecho:ok.trecho};
+ if(ok)return {st:chegPorData(ok.iso,isoD(base)),data:ok.iso,trecho:ok.trecho};
  if(chaveP[0])return {st:'atrasado',data:chaveP[0].iso,trecho:chaveP[0].trecho};
  return {st:'atrasado'}}
 // Situação de chegada de um chamado: a marcação manual vale; se não houver, usa a leitura automática do e-mail.
-function chegadaDe(c){if(!c)return '';if(c.chegada)return c.chegada;if(c.origem!=='email')return '';return prazoNoTexto(`${c.assunto||''}\n${(c.desc||'').replace(/^Recebido por e-mail de .*? em [^.]*\.\s*/,'')}`,c.recebidoEm||c.abertoEm).st}
-const chegadaTag=(c,peq)=>{const v=chegadaDe(c),auto=!c.chegada||c.chegadaAuto,fs=peq?' style="font-size:10.5px"':'',dica=c.prazoEnv?` title="Prazo encontrado no e-mail: ${fmtAno(c.prazoEnv)}"`:auto&&v==='atrasado'?' title="O e-mail não trazia data de prazo"':'';
+function chegadaDe(c){if(!c)return '';if(c.chegada&&c.chegadaAuto&&c.origem==='email')return chegPorData(c.prazoEnv,c.recebidoEm||c.abertoEm);if(c.chegada)return c.chegada;if(c.origem!=='email')return '';return prazoNoTexto(`${c.assunto||''}\n${(c.desc||'').replace(/^Recebido por e-mail de .*? em [^.]*\.\s*/,'')}`,c.recebidoEm||c.abertoEm).st}
+const chegadaTag=(c,peq)=>{const v=chegadaDe(c),auto=!c.chegada||c.chegadaAuto,fs=peq?' style="font-size:10.5px"':'',an=c.prazoEnv?antecDias(c.recebidoEm||c.abertoEm,c.prazoEnv):null,dica=c.prazoEnv?` title="Pedido para ${fmtAno(c.prazoEnv)} · chegou ${an} ${CHEG_UTEIS()?'dias úteis':'dias'} antes · mínimo ${chegTxt()}"`:auto&&v==='atrasado'?' title="O e-mail não trazia data de prazo"':'';
  return v==='atrasado'?`<span class="tag bad"${fs}${dica}>Chegou atrasado${auto?' · auto':''}</span>`:v==='prazo'?`<span class="tag ok"${fs}${dica}>Chegou em dia${auto?' · auto':''}</span>`:''};
 async function prazoDoEmail(m){const r0=prazoNoTexto((m.subject||'')+'\n'+(m.summary||''),m.receivedDateTime);if(r0.st==='prazo'||!MCP||!m.id)return r0;
  try{const r=await MCP.callTool(SRV,'outlook_get_message',{id:m.id,...(CFG.caixa?{mailboxOwnerEmail:CFG.caixa}:{})},{cache:false});const b=(r?.payload||r?.structuredContent||{}).body||'';
@@ -769,7 +775,7 @@ async function triar(id,acao){const em=D.emails.find(x=>x.id===id);if(!em||S.tri
 function resTxt(e){const r=e.res||'';return (e.st==='ignorado'?'Ignorado':r.startsWith('entrega:')?`Entrega "${esc(D.entregas.find(x=>x.id===r.slice(8))?.item||'')}" recebida`:r.startsWith('chamado:')?`Virou o chamado ${esc(r.slice(8))}`:'Processado')+(e.auto?' automaticamente':'')}
 function cardEmail(e){const s=e.sug||{},ents=D.entregas.filter(x=>x.dep===e.dep&&!x.recebido).sort((a,b)=>a.prazo<b.prazo?-1:1),ref=D.entregas.find(x=>x.id===s.ref),le=pode('ler_email');
  const sug=s.acao==='entrega'&&ref?`Parece ser a entrega "${esc(ref.item)}"`:s.acao==='chamado'?`Parece um pedido: ${esc(s.tipo)}`:'Escolha o que fazer.';
- return `<div class="mail"><div class="mh"><div class="t"><b>${esc(e.assunto)} ${chegadaTag({chegada:e.chegada||prazoNoTexto(e.assunto+'\n'+(e.trecho||''),e.recebido).st,chegadaAuto:true,prazoEnv:e.prazoEnv},true)}</b><span>Recebido ${fmtHora(e.recebido)}${e.prazoEnv?` · prazo pedido: ${fmtAno(e.prazoEnv)}`:''}${e.anexos?' · com anexo':''}${e.dep?' · '+esc(depNome(e.dep)):''}</span></div>${le?`<div style="display:flex;gap:6px;flex-wrap:wrap">${e.msgId?`<button class="btn" onclick="lerEmail('e:${e.id}')">Ler aqui</button>`:''}${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}</div>
+ return `<div class="mail"><div class="mh"><div class="t"><b>${esc(e.assunto)} ${chegadaTag({origem:'email',chegada:e.prazoEnv?chegPorData(e.prazoEnv,e.recebido):(e.chegada||prazoNoTexto(e.assunto+'\n'+(e.trecho||''),e.recebido).st),chegadaAuto:true,prazoEnv:e.prazoEnv,recebidoEm:e.recebido},true)}</b><span>Recebido ${fmtHora(e.recebido)}${e.prazoEnv?` · prazo pedido: ${fmtAno(e.prazoEnv)}`:''}${e.anexos?' · com anexo':''}${e.dep?' · '+esc(depNome(e.dep)):''}</span></div>${le?`<div style="display:flex;gap:6px;flex-wrap:wrap">${e.msgId?`<button class="btn" onclick="lerEmail('e:${e.id}')">Ler aqui</button>`:''}${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}</div>
  ${e.trecho?`<p class="trecho">${esc(e.trecho)}</p>`:''}
  <div class="sug"><span class="tag ${s.conf==='alta'?'ok':s.conf==='media'?'ac':'ne'}">${s.conf==='alta'?'Confiança alta':s.conf==='media'?'Confiança média':'Revisar'}</span><span>${sug}</span>${s.assunto&&assDe(s.assunto)?`<span class="tag ac">Assunto: ${esc(assNome(s.assunto))}</span>`:''}</div>
  <div class="acts2">${pode('chamados')?`<button class="btn ${s.acao!=='entrega'?'pri':''}" onclick="aceitarSheet({email:'${e.id}'})">Aceitar como demanda</button>`:''}
@@ -804,7 +810,7 @@ const ERR_CONECTAR=['needs_reauth','server_not_connected','not_in_manifest','app
 function statusSync(ac=''){
  if(!MCP)return `<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>${esc(msgErro({code:'sem_mcp'}))}</span>${ac}</div>`;
  if(S.syncErr)return `<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${esc(msgErro(S.syncErr))}</span>${ERR_CONECTAR.includes(S.syncErr?.code)?`<button class="btn pri" onclick="conectarEmail()">Conectar e-mail</button>`:`<button class="btn" onclick="sincronizar(true)">Tentar de novo</button>`}${ac}</div>`;
- return `<div class="banner"><span>${SYNC.ultima?`Última verificação ${fmtHora(SYNC.ultima)} · ${SYNC.lidos||0} e-mails lidos · ${SYNC.novos||0} para triagem · ${SYNC.env||0} enviados · ${SYNC.auto||0} automáticos`:'Nenhuma verificação ainda. Clique em Conectar e-mail e depois em Verificar agora.'} · ${CFG.emailModo==='auto'?'modo automático':'modo com triagem'} · ${CFG.caixa||CFG.caixaPasta?(CFG.caixaPasta&&!PASTAS_FIXAS[CFG.caixaPasta.toLowerCase()]?'pasta compartilhada':'caixa')+(CFG.caixa?' '+esc(CFG.caixa):''):'sua caixa de entrada'} · ${lerTodos()?(lerEnviados()?'recebidos e enviados, agrupados por contato':'recebidos, agrupados por remetente'):'só e-mails dos departamentos'}</span>${ac}</div>`}
+ return `<div class="banner"><span>${S.msEq?.equipe?`Conectado para a equipe por ${esc(S.msEq.equipe.email||'—')} · renova sozinho · `:''}${SYNC.ultima?`Última verificação ${fmtHora(SYNC.ultima)} · ${SYNC.lidos||0} e-mails lidos · ${SYNC.novos||0} para triagem · ${SYNC.env||0} enviados · ${SYNC.auto||0} automáticos`:'Nenhuma verificação ainda. Clique em Conectar e-mail e depois em Verificar agora.'} · ${CFG.emailModo==='auto'?'modo automático':'modo com triagem'} · ${CFG.caixa||CFG.caixaPasta?(CFG.caixaPasta&&!PASTAS_FIXAS[CFG.caixaPasta.toLowerCase()]?'pasta compartilhada':'caixa')+(CFG.caixa?' '+esc(CFG.caixa):''):'sua caixa de entrada'} · ${lerTodos()?(lerEnviados()?'recebidos e enviados, agrupados por contato':'recebidos, agrupados por remetente'):'só e-mails dos departamentos'}</span>${ac}</div>`}
 function cfgEmail(){FORM={tipo:'_cfgmail'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Integração com o Outlook</p><h2 id="sheet-title">Configurar leitura de e-mails</h2><p class="sub" style="font-size:13px">Cada pessoa lê com a própria conta Microsoft, então só vê o que já tem permissão de ver no Outlook.</p></div>
  <div class="fgrid">
@@ -841,7 +847,12 @@ async function salvaCfgEmail(){const bruto=(document.getElementById('g_caixa')?.
  if(!(it>=5&&it<=240)){errEl('ge_int','Use um valor entre 5 e 240.');return}
  try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),emailTodos:val('g_todos')!=='dep',emailEnviados:!!document.getElementById('g_env')?.checked,caixa,caixaLink:/https?:/i.test(bruto)?bruto:'',caixaPasta:cx.pasta||'',emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast(val('g_desde')&&val('g_desde')!==(SYNC.desde||'')?`Salvo. Na próxima verificação, o Prumo busca a partir de ${fmt(val('g_desde'))}. Nada é apagado.`:'Configuração salva');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar essa configuração.':'Não foi possível salvar.')}}
-function iniciarAutoSync(){const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=false;try{ok=localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};setTimeout(tick,5000);setInterval(tick,60000)}
+function iniciarAutoSync(){
+ // Conexão da equipe: se alguém conectou, todo mundo com a permissão E-mails recebidos busca sozinho, sem conectar.
+ const status=async()=>{if(!real()||!pode('email')||!window.portalMsStatus)return;const j=await window.portalMsStatus();if(j){const mud=JSON.stringify(j)!==JSON.stringify(S.msEq);S.msEq=j;if(mud&&['chamados','triagem'].includes(S.tela))render()}};
+ window.addEventListener('prumo-ms-equipe',()=>{status();toast('E-mail conectado para a equipe toda. Ele se renova sozinho.')});
+ const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=!!S.msEq?.equipe;try{ok=ok||localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};
+ setTimeout(status,3000);setInterval(status,10*6e4);setTimeout(tick,8000);setInterval(tick,60000)}
 
 /* ---------- ferramentas ---------- */
 const okUrl=u=>/^https?:\/\/\S+$/i.test(u||'');
@@ -1706,7 +1717,8 @@ function chegadaPainel(){if(!(dir()||pode('ver_tudo')||pode('chamados')))return 
  const doMes=mm=>D.chamados.filter(c=>(c.recebidoEm||c.aberto||'').slice(0,7)===mm);
  const L=doMes(m),mar=L.filter(c=>chegadaDe(c)),at=mar.filter(c=>chegadaDe(c)==='atrasado').length,ok=mar.length-at,pc=v=>mar.length?Math.round(v/mar.length*100):0;
  const nossa=L.filter(c=>c.prazo&&(chAtrasado(c)||(c.st==='Concluído'&&c.concl&&c.concl>c.prazo))).length;
- const deps=[...new Set(mar.map(c=>c.dep||''))].map(d=>{const l=mar.filter(c=>(c.dep||'')===d),a=l.filter(c=>chegadaDe(c)==='atrasado').length;return {n:d?depNome(d):'Setor não definido',tot:l.length,at:a,ok:l.length-a,pct:Math.round(a/l.length*100)}}).sort((x,y)=>y.at-x.at||y.pct-x.pct||y.tot-x.tot);
+ const grp=c=>c.dep||('rem:'+(c.rem||remNomeCh(c)));
+ const deps=[...new Set(mar.map(grp))].map(d=>{const l=mar.filter(c=>grp(c)===d),a=l.filter(c=>chegadaDe(c)==='atrasado').length;return {n:d.startsWith('rem:')?`${remNomeCh(l[0])} · sem setor`:depNome(d),tot:l.length,at:a,ok:l.length-a,pct:Math.round(a/l.length*100)}}).sort((x,y)=>y.at-x.at||y.pct-x.pct||y.tot-x.tot);
  const mx=Math.max(1,...deps.map(d=>d.tot)),top=deps.slice(0,8),resto=deps.slice(8);
  const nav=`<div class="seg"><button onclick="S.chM=addMes('${m}',-1);render()" aria-label="Mês anterior">‹</button><span>${mesNome(m)}</span><button onclick="S.chM=addMes('${m}',1);render()" aria-label="Próximo mês">›</button></div>`;
  const leg=`<div class="dleg"><span><i style="background:var(--ok)"></i>Chegou em dia</span><span><i style="background:var(--bad)"></i>Chegou atrasado</span></div>`;
@@ -1723,11 +1735,28 @@ function chegadaPainel(){if(!(dir()||pode('ver_tudo')||pode('chamados')))return 
  return `<div class="panel dash"><div class="ph"><div><h2>Pedidos dos departamentos</h2><span>Chegaram em dia ou atrasados para a contabilidade</span></div>${nav}</div>
  <div class="stats"><div class="stat"><p>Recebidos no mês</p><strong>${mar.length}</strong><small>${L.length-mar.length?`${L.length-mar.length} sem marcação`:'por e-mail e chamados'}</small></div>
  <div class="stat"><p>Chegaram em dia</p><strong style="color:var(--ok)">${ok}</strong><small>${pc(ok)}% do total</small></div>
- <div class="stat"><p>Chegaram atrasados</p><strong style="color:${at?'var(--bad)':'var(--ink)'}">${at}</strong><small>${pc(at)}% · sem data de prazo no e-mail</small></div>
+ <div class="stat"><p>Chegaram atrasados</p><strong style="color:${at?'var(--bad)':'var(--ink)'}">${at}</strong><small>${pc(at)}% · sem data ou com menos de ${chegTxt()}</small></div>
  <div class="stat"><p>Nossa entrega atrasada</p><strong style="color:${nossa?'var(--bad)':'var(--ink)'}">${nossa}</strong><small>passou do prazo combinado</small></div></div>
  <div class="dgrid"><div><div class="dh"><h3>Por departamento</h3>${leg}</div>${barras}</div><div><div class="dh"><h3>% que chegou atrasado</h3><span class="meta">últimos 6 meses</span></div>${svg}</div></div>
- ${tabela}<p class="meta" style="margin:4px 0 0">Automático: e-mail com data de prazo ou de envio no texto chegou em dia; sem data, chegou atrasado. A equipe pode corrigir no detalhe do chamado.</p></div>`}
+ ${tabela}<p class="meta" style="margin:4px 0 0">Automático: chegou em dia o e-mail que traz a data pedida com pelo menos ${chegTxt()} de antecedência (D-${CHEG_MIN()}). Sem data, ou com menos tempo, chegou atrasado. A equipe pode corrigir no detalhe do chamado.</p></div>`}
 
+/* ---------- painel do diretor: cada um organiza a ordem dos blocos ---------- */
+const BLOCOS_PAINEL=[['chegada','Pedidos dos departamentos · em dia ou atrasados'],['numeros','Números do dia'],['andamento','Andamento do dia no cronograma'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas dos departamentos'],['atencao','Precisa da sua atenção e destaques'],['prazos','Próximos prazos e estruturação']];
+function prefPainel(){const p=S.prefs||{};let l={};try{l=JSON.parse(localStorage.getItem('painel_'+(ME.uid||S.perfil))||'{}')}catch(e){}return {ordem:p.painel||l.ordem||[],oculto:p.painelOculto||l.oculto||[]}}
+function painelOrdem(){const o=prefPainel().ordem.filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k));return [...new Set([...o,...BLOCOS_PAINEL.map(b=>b[0])])]}
+const painelOculto=()=>prefPainel().oculto;
+function orgPainel(){FORM={tipo:'_painel',ordem:painelOrdem(),oculto:[...painelOculto()]};desenhaOrg();document.getElementById('ov').hidden=false}
+function desenhaOrg(){const f=FORM;if(f?.tipo!=='_painel')return;const nome=k=>(BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1];
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Painel</p><h2 id="sheet-title">Organizar painel</h2><p class="sub" style="font-size:13px">Use as setas para mudar a ordem. Desmarque o que não quer ver. Vale só para o seu painel.</p></div>
+ <div class="sbox">${f.ordem.map((k,i)=>`<div class="row" style="gap:8px"><label class="ck" style="flex:1"><input type="checkbox" ${f.oculto.includes(k)?'':'checked'} onchange="orgVer('${k}',this.checked)"> ${esc(nome(k))}</label><button class="btn ghost" ${i?'':'disabled'} onclick="orgMove(${i},-1)" aria-label="Subir ${esc(nome(k))}">↑</button><button class="btn ghost" ${i<f.ordem.length-1?'':'disabled'} onclick="orgMove(${i},1)" aria-label="Descer ${esc(nome(k))}">↓</button></div>`).join('')}</div>
+ <div class="foot"><button class="btn ghost" onclick="FORM.ordem=BLOCOS_PAINEL.map(b=>b[0]);FORM.oculto=[];desenhaOrg()">Voltar ao padrão</button><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaOrg()">Salvar</button></div></div>`}
+function orgMove(i,d){const o=FORM.ordem,j=i+d;if(j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];desenhaOrg()}
+function orgVer(k,v){FORM.oculto=FORM.oculto.filter(x=>x!==k);if(!v)FORM.oculto.push(k)}
+async function salvaOrg(){const ordem=[...FORM.ordem],oculto=[...FORM.oculto];
+ try{localStorage.setItem('painel_'+(ME.uid||S.perfil),JSON.stringify({ordem,oculto}))}catch(e){}
+ S.prefs={...(S.prefs||{}),painel:ordem,painelOculto:oculto};
+ if(DB&&ME.uid&&!S.sim){try{await DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs)}catch(e){}}
+ toast('Painel organizado');fechar();render()}
 /* ---------- metas e a fazer do mês: departamento e cada pessoa ---------- */
 const ST_META=[['afazer','A fazer','ne'],['andamento','Em andamento','ac'],['feito','Feito','ok']];
 const stMeta=k=>ST_META.find(x=>x[0]===k)||ST_META[0];
@@ -2147,20 +2176,20 @@ painel(){
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2></div>${dm.length?`<div class="hl">${dm.map(cardDest).join('')}</div>`:vazio('Nenhum destaque neste mês','')}</div>`+note('No perfil de colaborador você vê só as suas tarefas, as suas horas e o seu feedback.')}
  const ea=modOn('entregas')?D.entregas.filter(entAtrasada):[],porDep={};const cd=contaDia(HJ),cAtr=atrasosCron();ea.forEach(e=>porDep[depNome(e.dep)]=(porDep[depNome(e.dep)]||0)+1);
  const alertaTop=ea.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${ic('alertas').replace('aria-hidden','style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden')}Em atraso: ${Object.entries(porDep).map(([n,q])=>`${esc(n)} (${q})`).join(', ')}</span><button class="btn" onclick="ir('alertas')">Ver alertas</button></div>`:'';
- return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+comecarBtn()+andamento(S.pDia||HJ,'pDia')+
- `<div class="stats">
+ const B={andamento:()=>comecarBtn()+andamento(S.pDia||HJ,'pDia'),
+ numeros:()=>`<div class="stats">
   <div class="stat"><p>Cronograma de hoje</p><strong>${cd.ok}/${cd.tot}</strong><small>${cd.tot?Math.round(cd.ok/cd.tot*100):0}% concluído</small></div>
   <div class="stat"><p>Em andamento</p><strong style="color:${cd.and?'var(--accent)':'var(--ink)'}">${cd.and}</strong><small>rotinas começadas</small></div>
   <div class="stat"><p>Rotinas atrasadas</p><strong style="color:${cAtr.length+atr.length?'var(--bad)':'var(--ink)'}">${cAtr.length+atr.length}</strong><small>${atr.length?`${atr.length} tarefas avulsas`:'cronograma'}</small></div>
   ${modOn('entregas')?`<div class="stat"><p>Entregas em atraso</p><strong style="color:${ea.length?'var(--bad)':'var(--ink)'}">${ea.length}</strong><small>${ea.length?[...new Set(ea.map(e=>depNome(e.dep)))].length+' departamentos':'outros departamentos'}</small></div>`:''}
-  <div class="stat"><p>Demandas atrasadas</p><strong style="color:${D.chamados.filter(chAtrasado).length?'var(--bad)':'var(--ink)'}">${D.chamados.filter(chAtrasado).length}</strong><small>prazo de entrega vencido</small></div></div>
- ${chegadaPainel()}${cronPainel()}${resumoMetas(MES_ATUAL)}${modOn('fechamento')&&pode('fechamento')?fechResumo():''}${demResumo()}
- ${modOn('entregas')?`<div class="grid2">
+  <div class="stat"><p>Demandas atrasadas</p><strong style="color:${D.chamados.filter(chAtrasado).length?'var(--bad)':'var(--ink)'}">${D.chamados.filter(chAtrasado).length}</strong><small>prazo de entrega vencido</small></div></div>`,
+ chegada:()=>chegadaPainel(),cron:()=>cronPainel(),metas:()=>resumoMetas(MES_ATUAL),fech:()=>modOn('fechamento')&&pode('fechamento')?fechResumo():'',dem:()=>demResumo(),
+ entregas:()=>`${modOn('entregas')?`<div class="grid2">
   <div class="panel"><div class="ph"><h2>Entregas por departamento</h2><button class="btn ghost" onclick="ir('entregas')">Ver entregas</button></div>${painelDep()}</div>
   <div class="panel"><div class="ph"><h2>Atrasos de departamentos</h2><span>${ea.length}</span></div>
    ${ea.length?ea.sort((a,b)=>a.prazo<b.prazo?-1:1).slice(0,5).map(e=>`<div class="row"><div class="t"><b>${esc(depNome(e.dep))}</b><span>${esc(e.item)} · ${-diasAte(e.prazo)} ${diasAte(e.prazo)<-1?'dias':'dia'} de atraso</span></div><button class="btn" onclick="cobrar('${esc(e.id)}')">Cobrar</button></div>`).join(''):vazio('Nenhum departamento em atraso','Todas as entregas estão dentro do prazo.')}
-  </div></div>`:''}
- <div class="grid2">
+  </div></div>`:''}`,
+ atencao:()=>`<div class="grid2">
   <div class="panel"><div class="ph"><h2>Precisa da sua atenção</h2></div>
    ${cAtr.length?`<div class="row"><div class="t"><b>${cAtr.length} ${cAtr.length>1?'rotinas do cronograma atrasadas':'rotina do cronograma atrasada'}</b><span>${esc([...new Set(cAtr.flatMap(o=>rsDe(o.r)))].map(nomeDe).join(', '))}</span></div><button class="btn" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Ver</button></div>`:''}
    ${atr.map(x=>`<div class="row"><div class="t"><b>${esc(x.t)}</b><span>${esc(nomeDe(x.r))} · venceu ${fmt(x.prazo)}</span></div><span class="tag bad">Atrasada</span></div>`).join('')}
@@ -2172,13 +2201,14 @@ painel(){
   </div>
   <div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2><button class="btn ghost" onclick="ir('destaques')">Ver todos</button></div>
    ${dm.length?dm.slice(0,3).map(d=>`<div class="row"><div class="t"><b>${esc(d.t)}</b><span>${esc(d.tipo)}${d.pessoa?' · '+esc(nomeDe(d.pessoa)):''}</span></div></div>`).join(''):vazio('Nenhum destaque neste mês','Registre conquistas e reconhecimentos.','destaque','Registrar destaque')}
-  </div></div>
- <div class="grid2">
+  </div></div>`,
+ prazos:()=>`<div class="grid2">
   <div class="panel"><div class="ph"><h2>Próximos prazos</h2><button class="btn ghost" onclick="ir('calendario')">Calendário</button></div>
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>
   <div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
    <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div>
-  </div></div>`},
+  </div></div>`};
+ return head(hojeTxt(),`Bom dia, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+`<div class="porg"><button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>B[k]()).join('')},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  return head('Reconhecimento','Destaques do mês','Conquistas, metas batidas e reconhecimentos da equipe.',mesNav('mesDest')+(pode('feedbacks')?novo('destaque','Registrar destaque'):''))+
@@ -2336,19 +2366,20 @@ async function limparEx(){
 function logRows(){const q=(S.fLog||'').toLowerCase(),l=D.logs.filter(x=>!q||((x.acao||'')+' '+quemLog(x)).toLowerCase().includes(q));
  return l.length?l.map(x=>`<div class="row"><span class="meta" style="width:96px">${fmtHora(x.em)}</span><div class="t"><b style="font-weight:400">${esc(x.acao)}</b><span>${esc(quemLog(x))}</span></div></div>`).join(''):vazio(q?'Nada encontrado':'Nenhuma atividade registrada ainda',q?'Tente outro termo.':'Cada registro, alteração e exclusão aparece aqui automaticamente.')}
 function cfgPrazo(){FORM={tipo:'_cfg'};
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Política de chamados</p><h2 id="sheet-title">Prazo mínimo para pagamentos</h2><p class="sub" style="font-size:13px">Quantos dias úteis antes do vencimento os departamentos precisam abrir o chamado.</p></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Política de chamados</p><h2 id="sheet-title">Regras de prazo</h2><p class="sub" style="font-size:13px">Quantos dias úteis antes do vencimento os departamentos precisam abrir o chamado.</p></div>
  <div><label class="lbl" for="f_dm">Dias úteis</label><input class="inp" id="f_dm" type="number" min="0" max="30" value="${DMIN()}"><p class="ferr" id="e_dm"></p></div>
+ <div><span class="lbl">E-mails dos departamentos · chegou em dia</span><p class="meta" style="margin:0 0 6px">O e-mail precisa trazer a data pedida e chegar com esta antecedência. Sem data, ou com menos tempo, conta como atrasado.</p><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>D-</span><input class="inp" id="f_cm" type="number" min="0" max="60" style="width:90px" value="${CHEG_MIN()}"><select class="inp" id="f_cu" style="width:auto"><option value="c" ${CHEG_UTEIS()?'':'selected'}>dias corridos</option><option value="u" ${CHEG_UTEIS()?'selected':''}>dias úteis</option></select></div><p class="ferr" id="e_cm"></p></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfg()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
-async function salvaCfg(){const v=+document.getElementById('f_dm').value;if(!(v>=0&&v<=30)){document.getElementById('e_dm').textContent='Informe um número entre 0 e 30.';return}
+async function salvaCfg(){const v=+document.getElementById('f_dm').value,cm=+document.getElementById('f_cm').value,cu=document.getElementById('f_cu').value==='u';if(!(v>=0&&v<=30)){document.getElementById('e_dm').textContent='Informe um número entre 0 e 30.';return}if(!(cm>=0&&cm<=60)){document.getElementById('e_cm').textContent='Informe um número entre 0 e 60.';return}
  if(!DB)return toast('O armazenamento não está disponível nesta visualização.');
- try{await DB.doc('config/estrutura').set({...CFG,diasMin:v});log(`Alterou a regra de prazo de chamados para ${v} dias úteis`);toast('Regra atualizada');fechar()}catch(e){toast('Não foi possível salvar.')}}
+ try{await DB.doc('config/estrutura').set({...CFG,diasMin:v,chegadaMin:cm,chegadaUteis:cu});log(`Alterou a regra de prazo de chamados para ${v} dias úteis e a antecedência dos e-mails para D-${cm} ${cu?'dias úteis':'dias corridos'}`);toast('Regra atualizada');fechar()}catch(e){toast('Não foi possível salvar.')}}
 /* ---------- conectar o e-mail da Microsoft ---------- */
 async function conectarEmail(){FORM={tipo:'_conectar'};const sh=document.getElementById('sheet');
  sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar e-mail</h2></div><p class="meta">Verificando…</p>`;document.getElementById('ov').hidden=false;
  const ativo=window.portalMicrosoftAtivo?await window.portalMicrosoftAtivo():null;if(FORM?.tipo!=='_conectar')return;
  const cb=(window.PORTAL_CONFIG||{}).supabaseUrl?(window.PORTAL_CONFIG.supabaseUrl.replace(/\/+$/,'')+'/auth/v1/callback'):'https://SEU-PROJETO.supabase.co/auth/v1/callback';
- if(ativo){sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar o e-mail da empresa</h2><p class="sub" style="font-size:13px">O Prumo lê os e-mails com a sua própria conta Microsoft. Ele nunca vê a sua senha.</p></div>
+ if(ativo){sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar o e-mail da empresa</h2><p class="sub" style="font-size:13px">A conta que você conectar vira a <b>conexão da equipe</b>: o Prumo busca os e-mails sozinho para todos, e a conexão se renova sozinha. Ele nunca vê a sua senha.${S.msEq?.equipe?` Hoje a equipe está conectada por <b>${esc(S.msEq.equipe.email||'—')}</b>.`:''}</p></div>
   <ol class="passos"><li>Clique em <b>Ir para a Microsoft</b>.</li><li>Entre com o e-mail da empresa${ME.email?` (o mesmo do Prumo: <b>${esc(ME.email)}</b>)`:''}.</li><li>Clique em <b>Aceitar</b>.</li><li>Se aparecer <b>Precisa de aprovação do administrador</b>, escreva o motivo e clique em <b>Solicitar aprovação</b>. O pedido vai para a TI. Depois que a TI aprovar, volte aqui e clique em Conectar e-mail de novo.</li></ol>
   ${note('A conexão dura cerca de 1 hora por vez. Quando vencer, o portal avisa e você clica em Conectar e-mail de novo, normalmente sem digitar senha.')}
   <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="window.portalReconectarMicrosoft()">Ir para a Microsoft</button></div></div>`;return}

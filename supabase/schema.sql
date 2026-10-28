@@ -314,3 +314,15 @@ create table if not exists public.ms_tokens (
 );
 alter table public.ms_tokens enable row level security;
 revoke all on table public.ms_tokens from anon, authenticated;
+
+-- Conexão da equipe: a conta que clicou em "Conectar e-mail". Todo mundo com a
+-- permissão E-mails recebidos lê a caixa por ela, sem precisar conectar.
+create table if not exists public.ms_equipe (
+  id int primary key default 1 check (id = 1),
+  user_id uuid references auth.users(id) on delete set null,
+  email text,
+  refresh_token text not null,
+  atualizado timestamptz not null default now()
+);
+alter table public.ms_equipe enable row level security;
+revoke all on table public.ms_equipe from anon, authenticated;

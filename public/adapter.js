@@ -102,10 +102,12 @@
     if (!r.ok) return null;
     return r.json();
   }
-  function entrarMicrosoft() {
+  // equipe=true: veio do botão Conectar e-mail; essa conta passa a ser a conexão da equipe para ler a caixa.
+  function entrarMicrosoft(equipe) {
+    try { if (equipe === true) localStorage.setItem('ms_conectar_equipe', '1'); else localStorage.removeItem('ms_conectar_equipe'); } catch (e) {}
     sb.auth.signInWithOAuth({ provider: 'azure', options: { scopes: MS_SCOPES, redirectTo: location.origin } });
   }
-  window.portalReconectarMicrosoft = entrarMicrosoft;
+  window.portalReconectarMicrosoft = () => entrarMicrosoft(true);
 
   // Descobre sozinho se a conexão com a Microsoft já foi ligada no Supabase.
   let msAtivo = !!CFG.microsoft, msChecado = null;
@@ -139,7 +141,10 @@
       try { sessionStorage.setItem('ms_token', JSON.stringify({ t: sessao.provider_token, exp: Date.now() + 55 * 60e3 })); localStorage.setItem('ms_conectou', '1'); } catch (e) {}
     }
     // A chave de renovação só vem logo depois de entrar pela Microsoft: guarda no servidor para renovar sozinho.
-    if (sessao?.provider_refresh_token) msFuncao({ acao: 'guardar', refresh_token: sessao.provider_refresh_token }, sessao.access_token).catch(() => {});
+    if (sessao?.provider_refresh_token) {
+      let eq = false; try { eq = localStorage.getItem('ms_conectar_equipe') === '1'; localStorage.removeItem('ms_conectar_equipe'); sessionStorage.removeItem('ms_token_eq'); } catch (e) {}
+      msFuncao({ acao: 'guardar', refresh_token: sessao.provider_refresh_token, equipe: eq }, sessao.access_token).then(j => { if (j?.equipe) window.dispatchEvent(new Event('prumo-ms-equipe')); }).catch(() => {});
+    }
     if ((ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION') && sessao && !logado) aposLogin(sessao);
     if (ev === 'INITIAL_SESSION' && !sessao) checarMicrosoft().then(() => { if (!logado) telaLogin('entrar'); });
   });
@@ -163,8 +168,8 @@
     const box = document.createElement('div'); box.id = 'sairbox';
     box.innerHTML = '<button class="btn" type="button" id="btn_sair">Sair</button>' + (msAtivo ? '<button class="btn ghost" type="button" id="btn_ms" title="Use se a leitura do Outlook pedir para conectar de novo">Conectar e-mail</button>' : '');
     aside.insertBefore(box, aside.querySelector('.secure'));
-    document.getElementById('btn_sair').onclick = async () => { try { sessionStorage.removeItem('ms_token'); localStorage.removeItem('prumo_rasc'); } catch (e) {} await sb.auth.signOut(); };
-    const bm = document.getElementById('btn_ms'); if (bm) bm.onclick = entrarMicrosoft;
+    document.getElementById('btn_sair').onclick = async () => { try { sessionStorage.removeItem('ms_token'); sessionStorage.removeItem('ms_token_eq'); localStorage.removeItem('prumo_rasc'); } catch (e) {} await sb.auth.signOut(); };
+    const bm = document.getElementById('btn_ms'); if (bm) bm.onclick = () => entrarMicrosoft(true);
   }
 
   /* ------------------------------------------------------------------
@@ -348,36 +353,39 @@
      Outlook pelo Microsoft Graph, com a permissão de quem está logado
      ------------------------------------------------------------------ */
   function criarMcp() {
-    let renovando = null, falhouAte = 0;
+    // Duas chaves: "equipe" (ler a caixa, a conta que clicou em Conectar e-mail) e "eu" (enviar em meu nome).
+    const CH = { equipe: 'ms_token_eq', eu: 'ms_token' }, renovando = {}, falhouAte = {};
+    const lerCache = tipo => { try { const s = JSON.parse(sessionStorage.getItem(CH[tipo]) || 'null'); if (s && s.exp > Date.now()) return s.t; } catch (e) {} return null; };
     // Pede uma chave nova à função ms-token (o secret do app fica só no Supabase).
-    function renovar() {
-      if (Date.now() < falhouAte) return Promise.resolve(null);
-      if (!renovando) renovando = msFuncao({ acao: 'renovar' }).then(j => {
-        if (!j?.access_token) { falhouAte = Date.now() + 2 * 60e3; return null; }
-        try { sessionStorage.setItem('ms_token', JSON.stringify({ t: j.access_token, exp: Date.now() + Math.max(60, (+j.expires_in || 3600) - 300) * 1000 })); localStorage.setItem('ms_conectou', '1'); } catch (e) {}
+    function renovar(tipo) {
+      if (Date.now() < (falhouAte[tipo] || 0)) return Promise.resolve(null);
+      if (!renovando[tipo]) renovando[tipo] = msFuncao({ acao: 'renovar', tipo }).then(j => {
+        if (!j?.access_token) { falhouAte[tipo] = Date.now() + 2 * 60e3; return null; }
+        try { sessionStorage.setItem(CH[tipo], JSON.stringify({ t: j.access_token, exp: Date.now() + Math.max(60, (+j.expires_in || 3600) - 300) * 1000 })); localStorage.setItem('ms_conectou', '1'); } catch (e) {}
         return j.access_token;
-      }).catch(() => null).finally(() => { setTimeout(() => { renovando = null; }, 0); });
-      return renovando;
+      }).catch(() => null).finally(() => { setTimeout(() => { renovando[tipo] = null; }, 0); });
+      return renovando[tipo];
     }
-    async function token() {
-      try { const s = JSON.parse(sessionStorage.getItem('ms_token') || 'null'); if (s && s.exp > Date.now()) return s.t; } catch (e) {}
-      const novo = await renovar();
-      if (novo) return novo;
+    async function token(tipo) {
+      const c = lerCache(tipo); if (c) return c;
+      const novo = await renovar(tipo); if (novo) return novo;
+      if (tipo === 'equipe') { const meu = lerCache('eu') || await renovar('eu'); if (meu) return meu; }
       const { data } = await sb.auth.getSession();
       return data?.session?.provider_token || null;
     }
+    window.portalMsStatus = () => msFuncao({ acao: 'status' }).catch(() => null);
     // Renova antes de vencer, enquanto o portal está aberto.
-    setInterval(() => { try { const s = JSON.parse(sessionStorage.getItem('ms_token') || 'null'); if (s && s.exp - Date.now() < 10 * 60e3) { sessionStorage.removeItem('ms_token'); renovar(); } } catch (e) {} }, 5 * 60e3);
+    setInterval(() => { for (const tipo of ['equipe', 'eu']) { try { const s = JSON.parse(sessionStorage.getItem(CH[tipo]) || 'null'); if (s && s.exp - Date.now() < 10 * 60e3) { sessionStorage.removeItem(CH[tipo]); renovar(tipo); } } catch (e) {} } }, 5 * 60e3);
     async function graph(metodo, url, corpo, extras) {
-      const t = await token();
+      const tipo = /\/sendMail$/.test(url) ? 'eu' : 'equipe', t = await token(tipo);
       if (!t) { let ja = false; try { ja = localStorage.getItem('ms_conectou') === '1'; } catch (e) {} throw { code: ja ? 'needs_reauth' : 'server_not_connected', message: 'Sem conexão com o Outlook.' }; }
       let r;
       try {
         r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...Object.fromEntries(Object.entries(extras || {}).filter(([k]) => k !== '_tentou')) }, body: corpo ? JSON.stringify(corpo) : undefined });
       } catch (e) { throw { code: 'server_unavailable', retryable: true, message: 'O Outlook não respondeu.' }; }
       if (r.status === 401) {
-        try { sessionStorage.removeItem('ms_token'); } catch (e) {}
-        if (!extras?._tentou) { const n = await renovar(); if (n) return graph(metodo, url, corpo, { ...(extras || {}), _tentou: true }); }
+        try { sessionStorage.removeItem(CH[tipo]); } catch (e) {}
+        if (!extras?._tentou) { const n = await renovar(tipo); if (n) return graph(metodo, url, corpo, { ...(extras || {}), _tentou: true }); }
         throw { code: 'needs_reauth', message: 'A conexão com o Outlook expirou.' };
       }
       const det = async () => { try { const j = await r.json(); return [j.error?.code, j.error?.message].filter(Boolean).join(': '); } catch (e) { return ''; } };
