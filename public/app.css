@@ -165,7 +165,7 @@ img.av{object-fit:cover;padding:0}
 .favi{width:30px;height:30px;border-radius:8px;background:var(--side);color:var(--accent-ink);display:grid;place-items:center;font-weight:600;font-size:13px;flex:none}
 #simbox[hidden]{display:none}
 @media (max-width:860px){.perms{grid-template-columns:1fr}.mh{flex-direction:column}}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px;overflow-x:auto}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px;overflow-x:auto;overflow-y:hidden}
 .tabs button{border:0;background:transparent;padding:8px 12px;font-size:13px;color:var(--ink-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:500}.tabs.big button{font-size:14px;padding:10px 14px}
 .edgrid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:22px;align-items:start}
