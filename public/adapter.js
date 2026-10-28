@@ -351,8 +351,10 @@
         r = await fetch('https://graph.microsoft.com/v1.0' + url, { method: metodo, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', ...(extras || {}) }, body: corpo ? JSON.stringify(corpo) : undefined });
       } catch (e) { throw { code: 'server_unavailable', retryable: true, message: 'O Outlook não respondeu.' }; }
       if (r.status === 401) { try { sessionStorage.removeItem('ms_token'); } catch (e) {} throw { code: 'needs_reauth', message: 'A conexão com o Outlook expirou.' }; }
-      if (r.status === 403) throw { code: 'blocked_by_policy', message: 'Sem permissão no Outlook.' };
-      if (r.status === 404) throw { code: 'not_found', message: 'E-mail não encontrado nesta caixa.' };
+      const det = async () => { try { const j = await r.json(); return [j.error?.code, j.error?.message].filter(Boolean).join(': '); } catch (e) { return ''; } };
+      const outra = /^\/users\//.test(url);
+      if (r.status === 403) throw { code: outra ? 'sem_acesso_caixa' : 'blocked_by_policy', message: await det() || 'Sem permissão no Outlook.' };
+      if (r.status === 404) throw { code: outra ? 'caixa_nao_encontrada' : 'not_found', message: await det() || 'Não encontrado.' };
       if (r.status === 429 || r.status >= 500) throw { code: 'server_unavailable', retryable: true, message: 'O Outlook está ocupado.' };
       if (!r.ok) { let m = ''; try { m = (await r.json()).error?.message; } catch (e) {} throw { code: 'tool_error', message: m || 'Erro ' + r.status }; }
       return r.status === 202 || r.status === 204 ? {} : r.json();

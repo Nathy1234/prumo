@@ -685,7 +685,10 @@ async function sincronizar(manual){
   try{localStorage.setItem('autoSync_'+(ME.uid||'demo'),'1')}catch(e){}
  }catch(e){S.syncErr=e;DB.doc('sync/estado').set({...SYNC,erro:e?.code||'erro',erroEm:new Date().toISOString()}).catch(()=>{});if(manual)toast(msgErro(e))}
  finally{S.sync=false;render()}}
-function msgErro(e){const c=e?.code;return ({
+function msgErro(e){const c=e?.code,cx=CFG.caixa||'a caixa configurada';return ({
+ sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.`,
+ caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.`,
+ not_found:'O Outlook não encontrou a pasta ou o e-mail. Confira em Configurar caixa ou link.',
  server_not_connected:'O e-mail ainda não está conectado. Clique em Conectar e-mail.',
  needs_reauth:'A conexão com o e-mail venceu. Clique em Conectar e-mail para continuar.',
  
@@ -694,7 +697,7 @@ function msgErro(e){const c=e?.code;return ({
  blocked_by_policy:'A política da sua organização bloqueia a leitura do Outlook por aqui. Fale com a TI.',
  server_unavailable:'O Outlook não respondeu agora. O portal tenta de novo na próxima verificação.',
  tool_error:'O Outlook recusou a busca: '+String(e?.message||'').slice(0,160),
- sem_mcp:'A leitura do Outlook não está disponível. Entre com a conta Microsoft da empresa.'}[c]||'Não foi possível ler os e-mails agora. Tente de novo em alguns minutos.')}
+ sem_mcp:'A leitura do Outlook não está disponível. Entre com a conta Microsoft da empresa.'}[c]||('Não foi possível ler os e-mails agora.'+(e?.message||e?.code?` Detalhe: ${String(e.message||e.code).slice(0,180)}`:' Tente de novo em alguns minutos.')))}
 async function triar(id,acao){const em=D.emails.find(x=>x.id===id);if(!em||S.triando)return;S.triando=true;
  try{if(acao==='ignorar'){await patch('emails',id,{st:'ignorado',triadoPor:ME.uid||null,triadoEm:new Date().toISOString()},'E-mail ignorado',`Ignorou o e-mail "${em.assunto}" de ${depNome(em.dep)}`);return}
   let c;if(acao==='entrega'){const ref=val('tr_'+id);if(!ref){toast('Escolha qual entrega chegou.');return}c={acao:'entrega',ref}}
