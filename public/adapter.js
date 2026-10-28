@@ -99,7 +99,13 @@
     if (!jwt) { const { data } = await sb.auth.getSession(); jwt = data?.session?.access_token; }
     if (!jwt) return null;
     const r = await fetch(CFG.supabaseUrl.replace(/\/+$/, '') + '/functions/v1/ms-token', { method: 'POST', headers: { Authorization: 'Bearer ' + jwt, apikey: CFG.supabaseAnonKey, 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      // Guarda o motivo para o portal mostrar (ex.: sem_renovacao, nao_salvou, invalid_client).
+      let j = {}; try { j = await r.json(); } catch (e) {}
+      window.portalMsErro = { acao: corpo.acao, tipo: corpo.tipo || '', status: r.status, erro: j.erro || j.code || j.message || ('http_' + r.status), detalhe: String(j.detalhe || '').slice(0, 300), quando: new Date().toISOString() };
+      return null;
+    }
+    if (corpo.acao !== 'status') window.portalMsErro = null;
     return r.json();
   }
   // equipe=true: veio do botão Conectar e-mail; essa conta passa a ser a conexão da equipe para ler a caixa.

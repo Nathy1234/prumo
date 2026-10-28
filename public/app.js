@@ -768,13 +768,23 @@ async function excluirTodosEmails(){if(!(pode('email')||podeAdmin())){toast('Sem
  if(!S.confTodos){S.confTodos=true;toast(`Clique de novo para excluir ${L.length} e-mails do Prumo. O Outlook não é alterado.`);render();setTimeout(()=>{S.confTodos=false;render()},6000);return}S.confTodos=false;
  let k=0;for(let i=0;i<L.length;i+=20){const r=await Promise.allSettled(L.slice(i,i+20).map(e=>DB.collection('emails').doc(e.id).delete()));k+=r.filter(x=>x.status==='fulfilled').length}
  log(`Excluiu do Prumo ${k} e-mails (o Outlook não foi alterado)`);toast(`${k} e-mails excluídos do Prumo. Os chamados não mudaram.`);render()}
+const MS_MOTIVO={sem_renovacao:'o servidor não tem a chave de renovação guardada. Clique em Conectar e-mail uma vez (com a função ms-token já publicada) para guardá-la.',
+ nao_salvou:'o servidor não conseguiu guardar a chave. Falta criar as tabelas ms_tokens e ms_equipe (rode o trecho do fim do schema.sql no SQL Editor do Supabase).',
+ invalid_client:'a Microsoft recusou o segredo do app. Confira AZURE_CLIENT_SECRET (o Valor, não o ID do segredo) e AZURE_CLIENT_ID nos Secrets das Edge Functions.',
+ unauthorized_client:'o app do Azure não está liberado para renovar. Confira AZURE_CLIENT_ID e AZURE_TENANT_ID nos Secrets das Edge Functions.',
+ invalid_grant:'a Microsoft não aceitou mais a chave guardada (senha trocada ou acesso revogado). Clique em Conectar e-mail de novo.',
+ invalid_request:'a Microsoft recusou o pedido de renovação. Confira AZURE_TENANT_ID e AZURE_CLIENT_ID nos Secrets das Edge Functions.',
+ sem_permissao:'sua conta não tem a permissão E-mails recebidos para usar a conexão da equipe.',
+ sem_login:'o login no Prumo expirou. Saia e entre de novo.',
+ NOT_FOUND:'a função ms-token não está publicada no Supabase.',http_404:'a função ms-token não está publicada no Supabase.'};
+function motivoMs(){const m=window.portalMsErro;if(!m)return '';const t=MS_MOTIVO[m.erro]||`erro "${m.erro}"${m.detalhe?': '+m.detalhe:''}.`;return ` Motivo: ${t} (${m.acao}${m.tipo?' '+m.tipo:''}, ${fmtHora(m.quando)})`}
 function msgErro(e){const c=e?.code,cx=CFG.caixa||'a caixa configurada';return ({
  sem_acesso_caixa:`Sua conta não tem acesso à caixa ${cx}. Peça à TI "Acesso total" a essa caixa para o seu e-mail.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  caixa_nao_encontrada:`Não encontrei a caixa ${cx}, ou sua conta não tem acesso a ela. Confira o endereço em Configurar caixa ou link e, se estiver certo, peça à TI "Acesso total" a essa caixa.${e?.message?` Detalhe da Microsoft: ${String(e.message).slice(0,200)}`:''}`,
  not_found:'O Outlook não encontrou a pasta ou o e-mail. Confira em Configurar caixa ou link.',
  pasta_sem_raiz:`A Caixa de Entrada do ${cx} está compartilhada com você, mas a Microsoft não deixa localizá-la. Na conta do contas a pagar, clique com o botão direito no nome da conta (acima da Caixa de Entrada) > Permissões e dê a você "Revisor" (ou peça à TI "Acesso total"). Depois clique em Conectar e-mail e em Verificar agora.${e?.message?` Detalhe: ${String(e.message).slice(0,160)}`:''}`,
- server_not_connected:'O e-mail ainda não está conectado. Clique em Conectar e-mail.',
- needs_reauth:'A conexão com o e-mail venceu. Clique em Conectar e-mail para continuar.',
+ needs_reauth:'A conexão com o e-mail venceu e não renovou sozinha.'+motivoMs(),
+ server_not_connected:'O e-mail ainda não está conectado. Clique em Conectar e-mail.'+motivoMs(),
  
  not_in_manifest:'O Outlook não liberou o acesso. Clique em Conectar e-mail e aceite as permissões.',
  approval_required:'O Outlook precisa da sua aprovação. Clique em Conectar e-mail.',

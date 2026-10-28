@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     if (rt.length < 20 || rt.length > 8000) return resp({ erro: 'token_invalido' }, 400);
     const agora = new Date().toISOString();
     const { error } = await adm.from('ms_tokens').upsert({ user_id: uid, refresh_token: rt, atualizado: agora });
-    if (error) return resp({ erro: 'nao_salvou' }, 500);
+    if (error) return resp({ erro: 'nao_salvou', detalhe: error.message }, 500);
     let equipe = false;
     if (corpo.equipe && podeEquipe) {
       const { data: atual } = await adm.from('ms_equipe').select('user_id').eq('id', 1).maybeSingle();
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       if (daEquipe) await adm.from('ms_equipe').delete().eq('id', 1);
       else await adm.from('ms_tokens').delete().eq('user_id', uid);
     }
-    return resp({ erro: j.error || 'microsoft_recusou' }, 401);
+    return resp({ erro: j.error || 'microsoft_recusou', detalhe: String(j.error_description || '').split(/\r?\n/)[0].slice(0, 300) }, 401);
   }
   if (j.refresh_token) {
     const agora = new Date().toISOString();
