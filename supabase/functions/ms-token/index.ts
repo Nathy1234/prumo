@@ -78,17 +78,21 @@ Deno.serve(async (req) => {
   const daEquipe = corpo.tipo === 'equipe';
   if (daEquipe && !podeEquipe) return resp({ erro: 'sem_permissao' }, 403);
   const { data: linha } = daEquipe
-    ? await adm.from('ms_equipe').select('refresh_token,user_id').eq('id', 1).maybeSingle()
+    ? await adm.from('ms_equipe').select('refresh_token,user_id,email').eq('id', 1).maybeSingle()
     : await adm.from('ms_tokens').select('refresh_token').eq('user_id', uid).maybeSingle();
   if (!linha?.refresh_token) return resp({ erro: 'sem_renovacao' }, 404);
 
-  const tenant = Deno.env.get('AZURE_TENANT_ID') || 'organizations';
+  // Valores colados com espaço ou aspas costumam quebrar o pedido; limpa antes de usar.
+  const sec = (n: string) => (Deno.env.get(n) || '').trim().replace(/^["']|["']$/g, '');
+  // Sem AZURE_TENANT_ID, usa o domínio do e-mail conectado (ex.: fatecie.edu.br), que a Microsoft também aceita.
+  const dominio = String((daEquipe ? (linha as { email?: string }).email : u.user.email) || '').split('@')[1] || '';
+  const tenant = sec('AZURE_TENANT_ID') || dominio || 'organizations';
   const r = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: Deno.env.get('AZURE_CLIENT_ID') || '',
-      client_secret: Deno.env.get('AZURE_CLIENT_SECRET') || '',
+      client_id: sec('AZURE_CLIENT_ID'),
+      client_secret: sec('AZURE_CLIENT_SECRET'),
       grant_type: 'refresh_token',
       refresh_token: linha.refresh_token,
       scope: ESCOPOS,
