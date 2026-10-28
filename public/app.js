@@ -678,7 +678,7 @@ async function sincronizar(manual){
    for(const m of msgs){if(filtro&&!filtro(m))continue;const r=await (fn||processar)(m);if(r==='novo')novos++;if(r==='auto')auto++;if(r==='enviado')env++}
    if(typeof next==='number'&&next>offset&&msgs.length)offset=next;else break}};
  try{
-  if(todos){await buscar({folder:'inbox'});if(lerEnviados())await buscar({folder:'sentitems'},null,processarEnviado)}
+  if(todos){await buscar({folder:'inbox'});if(lerEnviados()){try{await buscar({folder:'sentitems'},null,processarEnviado)}catch(e){if(manual)toast('Caixa de entrada lida. A pasta de enviados não está liberada para leitura.')}}}
   else for(const d of deps)for(const addr of listaEmails(d))await buscar({sender:addr},m=>{const x=norm(m.sender);return x===addr||x.endsWith(addr)});
   await DB.doc('sync/estado').set({ultima:new Date().toISOString(),caixa:CFG.caixa||'',uid:ME.uid||null,papel:quemSou(),lidos,novos,auto,env,erro:''});
   if(manual||novos||auto)toast(`${lidos} e-mails verificados · ${novos} na triagem · ${env} enviados guardados na conversa${auto?` · ${auto} registrados automaticamente`:''}`);
@@ -779,8 +779,8 @@ const PASTAS_ALIAS={inbox:'inbox',caixadeentrada:'inbox',sentitems:'sentitems',s
 function lerCaixa(v){v=String(v||'').trim();if(!v)return {};
  let t=v;try{t=decodeURIComponent(v)}catch(e){}
  const email=((t.match(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)||[])[0]||'').toLowerCase();
- if(!/^https?:\/\//i.test(v))return {email};
- let partes=[];try{const u=new URL(v);partes=u.pathname.split('/').concat((u.searchParams.get('path')||'').split('/'),(u.hash||'').replace(/^#/,'').split('/'))}catch(e){}
+ const lk=(v.match(/https?:\/\/\S+/i)||[])[0];if(!lk)return {email};
+ let partes=[];try{const u=new URL(lk);partes=u.pathname.split('/').concat((u.searchParams.get('path')||'').split('/'),(u.hash||'').replace(/^#/,'').split('/'))}catch(e){}
  partes=partes.map(x=>{try{return decodeURIComponent(x)}catch(e){return x}}).filter(Boolean);
  let pasta='';for(let i=0;i<partes.length;i++){const x=partes[i],k=x.toLowerCase().replace(/[\s_-]/g,'');
   if(partes[i-1]&&/^(id|deeplink|readconv)$/i.test(partes[i-1]))continue; // id de uma mensagem, não de pasta
@@ -795,7 +795,7 @@ function mostraCaixa(){const el=document.getElementById('g_caixa_info');if(el)el
 async function salvaCfgEmail(){const bruto=(document.getElementById('g_caixa')?.value||'').trim(),cx=lerCaixa(bruto),caixa=cx.email,it=+val('g_int');errEl('ge_caixa','');errEl('ge_int','');
  if(bruto&&!cx.email&&!cx.pasta){errEl('ge_caixa','Não encontrei um e-mail nem uma pasta nesse link. Cole o link da pasta no Outlook na web ou o endereço da caixa.');return}
  if(!(it>=5&&it<=240)){errEl('ge_int','Use um valor entre 5 e 240.');return}
- try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),emailTodos:val('g_todos')!=='dep',emailEnviados:!!document.getElementById('g_env')?.checked,caixa,caixaLink:/^https?:/i.test(bruto)?bruto:'',caixaPasta:cx.pasta||'',emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast('Configuração salva');fechar()}
+ try{await DB.doc('config/estrutura').set({...CFG,emailModo:val('g_modo'),emailTodos:val('g_todos')!=='dep',emailEnviados:!!document.getElementById('g_env')?.checked,caixa,caixaLink:/https?:/i.test(bruto)?bruto:'',caixaPasta:cx.pasta||'',emailDesde:val('g_desde'),emailIntervalo:it});log(`Alterou a integração de e-mail para o modo ${val('g_modo')==='auto'?'automático':'com triagem'}`);toast('Configuração salva');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só diretores e administradores podem mudar essa configuração.':'Não foi possível salvar.')}}
 function iniciarAutoSync(){const tick=()=>{if(!real()||S.sim||!pode('email')||!MCP||S.sync||document.hidden)return;let ok=false;try{ok=localStorage.getItem('autoSync_'+ME.uid)==='1'}catch(e){}if(!ok)return;const last=SYNC.ultima?Date.parse(SYNC.ultima):0;if(Date.now()-last>(+CFG.emailIntervalo||15)*6e4)sincronizar(false)};setTimeout(tick,5000);setInterval(tick,60000)}
 
