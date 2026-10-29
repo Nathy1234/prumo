@@ -365,6 +365,8 @@ const CATS_SUG=[
 const temPal=(nt,k)=>new RegExp('(^|[^a-z0-9])'+reEsc(norm(k))+'([^a-z0-9]|$)').test(nt);
 function catSugerida(t){const nt=norm(t);let best=null,bs=0;
  for(const [n,ks] of CATS_SUG){let sc=0;for(const k of ks)if(temPal(nt,k))sc+=k.includes(' ')?2:1;if(sc>bs){bs=sc;best=n}}return best}
+/* categoria de um e-mail da triagem: o assunto cadastrado, senão a sugestão automática */
+const emCat=e=>{const a=assDe(e.sug?.assunto);if(a)return a.n;const t=`${e.assunto||''} ${e.trecho||''}`,id=assPorTexto(t);return assDe(id)?.n||catSugerida(t)||''};
 const slugCat=n=>'auto_'+norm(n).replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
 async function autoCategorias(){if(S._acat||!real()||S.sim||!DB||!(pode('chamados')||pode('cadastros')))return;
  const tent=S._acTent=S._acTent||new Set();
@@ -2474,7 +2476,11 @@ usuarios(){const ped=D.pedidos.filter(p=>!acessoDe(p.id)).sort((a,b)=>a.em<b.em?
  <div class="panel"><div class="ph"><h2>O que cada perfil pode fazer</h2><span>a equipe pode ter permissões ajustadas pessoa a pessoa</span></div>${matriz()}</div>`+
  note('Quem entra pela primeira vez aparece em Pedidos de acesso. Diretores e administradores liberam, ajustam permissões ou bloqueiam. Bloquear não apaga o histórico.')},
 triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="row"><span class="t" style="white-space:normal">${oc} ${oc>1?'e-mails vieram':'e-mail veio'} de outra caixa, não do ${esc(CFG.caixa)}. Eles não aparecem mais na revisão. Quer apagar essas cópias do Prumo? Os chamados já criados não mudam.</span><button class="btn ${S.confOC?'danger':''}" onclick="removerOutraCaixa()">${S.confOC?'Confirmar: remover':'Remover do Prumo'}</button></div>`:'';const limpa=(pode('email')||podeAdmin())&&D.emails.some(e=>!virouChamado(e));const pend=emPend(),hist=D.emails.filter(e=>daCaixa(e)&&(e.st==='aplicado'||(e.st==='ignorado'&&!e.auto))).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
- const g={};pend.forEach(e=>{const k=remDoEmail(e);(g[k]=g[k]||[]).push(e)});
+ const cats={};pend.forEach(e=>{const n=emCat(e)||'';cats[n]=(cats[n]||0)+1});
+ if(S.fCatT&&!(S.fCatT in cats))S.fCatT='';
+ const abasT=Object.keys(cats).filter(Boolean).sort((a,b)=>cats[b]-cats[a]||a.localeCompare(b));
+ const pendV=S.fCatT?pend.filter(e=>(emCat(e)||'')===(S.fCatT==='_sem'?'':S.fCatT)):pend;
+ const g={};pendV.forEach(e=>{const k=remDoEmail(e);(g[k]=g[k]||[]).push(e)});
  const q=norm(S.fRemT||'');
  const G=Object.entries(g).map(([k,l])=>{const r=D.remetentes.find(x=>x.id===k);return {k,r,nome:r?.nome||l[0].deNome||l[0].de,email:r?.email||l[0].de,dep:r?r.dep:l[0].dep,l:l.sort((a,b)=>a.recebido<b.recebido?1:-1)}}).filter(x=>!q||norm(x.nome+' '+x.email+' '+depNome(x.dep)).includes(q)).sort((a,b)=>a.l[0].recebido<b.l[0].recebido?1:-1);
  const sem=lerTodos()?[]:D.departamentos.filter(d=>!listaEmails(d).length);
@@ -2482,7 +2488,8 @@ triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="row">
  return head('Pedidos de outras áreas e e-mails','Chamados','Os e-mails lidos da caixa ou pasta conectada ficam aqui, agrupados por remetente. Aceite cada um como chamado.')+
  chAbas('em')+chEmail()+(pode('email')?`<details class="dmais" style="margin-top:18px" ${S.limpaAb?'open':''} ontoggle="S.limpaAb=this.open"><summary>Mais opções de e-mail</summary><div class="row"><div class="t" style="white-space:normal"><b>Buscar os e-mails de novo</b><span>Lê de novo a caixa desde ${CFG.emailDesde?fmt(CFG.emailDesde):'30 dias atrás'} e traz de volta para a revisão o que saiu do Prumo. Não apaga nada e não repete os que já estão aqui.</span></div><button class="btn" onclick="relerEmails()">${S.sync?'Buscando…':'Buscar de novo'}</button></div>${ocBan}</details>`:'')+
  (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
- `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pend.length} ${pend.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
+ `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pendV.length} ${pendV.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
+ ${abasT.length?`<div class="tabs" role="tablist" aria-label="Categorias dos e-mails" style="flex-wrap:wrap"><button role="tab" aria-selected="${!S.fCatT}" class="${S.fCatT?'':'on'}" onclick="S.fCatT='';render()">Todos <span class="meta">${pend.length}</span></button>${abasT.map(n=>`<button role="tab" aria-selected="${S.fCatT===n}" class="${S.fCatT===n?'on':''}" onclick="S.fCatT=this.dataset.c;render()" data-c="${esc(n)}">${esc(n)} <span class="meta">${cats[n]}</span></button>`).join('')}${cats['']?`<button role="tab" aria-selected="${S.fCatT==='_sem'}" class="${S.fCatT==='_sem'?'on':''}" onclick="S.fCatT='_sem';render()">Sem categoria <span class="meta">${cats['']}</span></button>`:''}</div>`:''}
  ${Object.keys(g).length>3?`<input class="inp" id="fremt" data-nodraft="1" placeholder="Buscar remetente ou setor" value="${esc(S.fRemT||'')}" oninput="S.fRemT=this.value;render()">`:''}
  <div class="tscroll" id="tscroll">${G.length?G.map(x=>`<div class="remg"><div class="remh"><span class="av">${esc((x.nome||'?')[0].toUpperCase())}</span><div class="t"><b>${esc(x.nome)}</b><span>${esc(x.email)} · ${x.l.length} ${x.l.length===1?'e-mail':'e-mails'}</span></div>
   <select class="inp" style="width:auto;max-width:100%" aria-label="Setor de ${esc(x.nome)}" onchange="setRem('${esc(x.k)}',{dep:this.value})"><option value="">Setor: não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===x.dep?'selected':''}>Setor: ${esc(d.n)}</option>`).join('')}</select><button class="btn ghost" onclick="editRem('${esc(x.k)}')">Mais opções</button></div>
