@@ -277,14 +277,16 @@ begin
           jsonb_build_object('criado', v_json->>'criado', 'motivo', 'diario', 'partes', v_i,
                              'tamanho', length(v_txt), 'registros', v_n, 'por', null, 'enviado', ''));
 
-  -- Apaga backups mais antigos que o prazo configurado (padrão: 30 dias).
-  v_reter := coalesce((v_cfg->>'bkReter')::int, 30);
+  -- Apaga backups mais antigos que o prazo configurado (padrão: 7 dias). O mais recente nunca é apagado.
+  v_reter := greatest(1, coalesce((v_cfg->>'bkDias')::int, 7));
   delete from public.docs
    where col like 'backups/%/partes'
      and split_part(col, '/', 2) in (select id from public.docs where col = 'backups'
+                                     and id <> v_id
                                      and (data->>'criado')::timestamptz < now() - make_interval(days => v_reter));
   delete from public.docs
-   where col = 'backups' and (data->>'criado')::timestamptz < now() - make_interval(days => v_reter);
+   where col = 'backups' and id <> v_id
+     and (data->>'criado')::timestamptz < now() - make_interval(days => v_reter);
   return v_id;
 end $$;
 revoke all on function public.backup_diario() from public, anon, authenticated;

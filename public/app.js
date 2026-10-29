@@ -994,8 +994,9 @@ async function criarPonto(motivo){
  for(let i=0;i<partes.length;i++)await DB.doc(`backups/${id}/partes/p${i}`).set({i,t:partes[i]});
  await DB.doc('backups/'+id).set({criado:b.criado,motivo,partes:partes.length,tamanho:txt.length,registros:contar(b),por:ME.uid||null,enviado:''});
  await podarBackups();return id}
-async function podarBackups(){const reter=+CFG.bkReter||30,limite=new Date(Date.now()-reter*864e5).toISOString();
- for(const b of D.backups.filter(x=>x.criado<limite)){try{for(let i=0;i<(b.partes||0);i++)await DB.doc(`backups/${b.id}/partes/p${i}`).delete();await DB.doc('backups/'+b.id).delete()}catch(e){}}}
+const bkDias=()=>Math.max(1,+CFG.bkDias||7);
+async function podarBackups(){const limite=new Date(Date.now()-bkDias()*864e5).toISOString(),ult=[...D.backups].sort((x,y)=>(y.criado||'').localeCompare(x.criado||''))[0];
+ for(const b of D.backups.filter(x=>x.criado<limite&&x!==ult)){try{for(let i=0;i<(b.partes||0);i++)await DB.doc(`backups/${b.id}/partes/p${i}`).delete();await DB.doc('backups/'+b.id).delete()}catch(e){}}}
 async function lerPonto(id){const m=D.backups.find(x=>x.id===id);let t='';for(let i=0;i<(m?.partes||0);i++){const s=await DB.doc(`backups/${id}/partes/p${i}`).get();if(!s.exists)throw new Error('parte ausente');t+=s.data().t}return JSON.parse(t)}
 async function backupAgora(){if(!DB)return toast('O armazenamento não está disponível nesta visualização.');if(S.bk)return;S.bk=true;toast('Criando ponto de restauração…');
  try{await criarPonto('manual');log('Criou um ponto de restauração manual');toast('Ponto de restauração criado')}catch(e){toast(e?.code==='invalid_argument'?'Só administradores podem criar backups.':'Não foi possível criar o backup.')}finally{S.bk=false}}
@@ -1024,7 +1025,7 @@ function cfgBackup(){FORM={tipo:'_cfgbk'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Backup</p><h2 id="sheet-title">Configurar backup</h2><p class="sub" style="font-size:13px">O portal guarda uma cópia completa por dia e pode enviá-la ao e-mail dedicado.</p></div>
  <div class="fgrid">
   <label class="perm full"><input type="checkbox" id="b_auto" ${CFG.bkAuto!==false?'checked':''}><span><b>Backup automático diário</b><small>Feito pelo servidor todo dia às 6h, mesmo sem ninguém abrir o portal.</small></span></label>
-  <div><label class="lbl" for="b_reter">Guardar por (dias)</label><input class="inp" id="b_reter" type="number" min="7" max="365" value="${+CFG.bkReter||30}"><p class="ferr" id="be_reter"></p></div>
+  <div><label class="lbl" for="b_reter">Guardar por (dias)</label><input class="inp" id="b_reter" type="number" min="1" max="365" value="${bkDias()}"><p class="meta" style="margin:4px 0 0">Depois disso o backup é apagado. O mais recente sempre fica.</p><p class="ferr" id="be_reter"></p></div>
   <div class="full"><label class="lbl" for="b_email">E-mail dedicado ao backup · opcional</label><input class="inp" id="b_email" type="email" placeholder="backup.financeiro@empresa.com.br" value="${esc(CFG.bkEmail||'')}"><p class="ferr" id="be_email"></p></div>
   <label class="perm full"><input type="checkbox" id="b_enviar" ${CFG.bkEnviar?'checked':''}><span><b>Enviar o backup diário para esse e-mail</b><small>Sai pelo Outlook do administrador que fizer o backup do dia.</small></span></label></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgBk()">Salvar</button></div></div>`;
@@ -1032,8 +1033,8 @@ function cfgBackup(){FORM={tipo:'_cfgbk'};
 async function salvaCfgBk(){const em=val('b_email').toLowerCase(),r=+val('b_reter'),env=document.getElementById('b_enviar').checked;errEl('be_email','');errEl('be_reter','');
  if(em&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){errEl('be_email','Confira o endereço.');return}
  if(env&&!em){errEl('be_email','Informe o e-mail para ligar o envio.');return}
- if(!(r>=7&&r<=365)){errEl('be_reter','Use um valor entre 7 e 365.');return}
- try{await DB.doc('config/estrutura').set({...CFG,bkAuto:document.getElementById('b_auto').checked,bkReter:r,bkEmail:em,bkEnviar:env});log(`Alterou a configuração de backup${em?' e o e-mail de backup':''}`);toast('Configuração salva');fechar()}
+ if(!(r>=1&&r<=365)){errEl('be_reter','Use um valor entre 1 e 365.');return}
+ try{await DB.doc('config/estrutura').set({...CFG,bkAuto:document.getElementById('b_auto').checked,bkDias:r,bkEmail:em,bkEnviar:env});log(`Alterou a configuração de backup${em?' e o e-mail de backup':''}`);toast('Configuração salva');fechar()}
  catch(e){toast(e?.code==='invalid_argument'?'Só administradores podem mudar o backup.':'Não foi possível salvar.')}}
 function arquivoBackup(inp){const f=inp.files?.[0];inp.value='';if(!f)return;const rd=new FileReader();
  rd.onload=()=>{try{const b=JSON.parse(rd.result);if(!['Prumo','Portal de Gestão Contábil'].includes(b.sistema)||!b.dados)throw 0;confirmarRestauro(b,'arquivo '+f.name)}catch(e){toast('Esse arquivo não é um backup válido do portal.')}};rd.readAsText(f)}
@@ -2438,7 +2439,7 @@ backup(){const L=[...D.backups].sort((a,b)=>a.criado<b.criado?1:-1),hoje=D.backu
  (S.bkErr?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>O último envio de backup por e-mail falhou: ${esc(msgErro(S.bkErr))}</span><button class="btn" onclick="S.bkErr=null;enviarBackupEmail(true)">Tentar de novo</button></div>`:'')+
  `<div class="stats"><div class="stat"><p>Último backup</p><strong style="font-size:18px">${L[0]?fmtHora(L[0].criado):'—'}</strong><small>${L[0]?L[0].registros+' registros':'nenhum ainda'}</small></div>
  <div class="stat"><p>Backup de hoje</p><strong style="font-size:18px;color:${hoje?'var(--ok)':'var(--warn)'}">${hoje?'Feito':'Pendente'}</strong><small>${CFG.bkAuto===false?'automático desligado':'automático todos os dias'}</small></div>
- <div class="stat"><p>Pontos guardados</p><strong>${L.length}</strong><small>mantém ${+CFG.bkReter||30} dias</small></div>
+ <div class="stat"><p>Pontos guardados</p><strong>${L.length}</strong><small>mantém ${bkDias()} dias · o último sempre fica</small></div>
  <div class="stat"><p>E-mail de backup</p><strong style="font-size:14px;overflow-wrap:anywhere">${CFG.bkEmail?esc(CFG.bkEmail):'Não definido'}</strong><small>${CFG.bkEmail&&CFG.bkEnviar?(hoje?.enviado?'enviado hoje':'envio diário ligado'):'envio desligado'}</small></div></div>
  <div class="panel"><div class="ph"><h2>Como está configurado</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${CFG.bkEmail?`<button class="btn" onclick="enviarBackupEmail(true)">Enviar backup por e-mail agora</button>`:''}<button class="btn" onclick="cfgBackup()">Alterar</button></div></div>
   <div class="row"><div class="t"><b>Backup automático diário</b><span>${CFG.bkAuto===false?'Desligado':'Ligado. Feito pelo servidor todo dia às 6h.'}</span></div></div>
