@@ -642,7 +642,10 @@ const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa ta
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
 /* foto de quem é da equipe (pela conta ligada à pessoa); sem foto, a inicial */
-const uidDePessoa=pid=>pid==='dir'?D.acessos.find(a=>a.perfil==='diretor'&&a.ativo!==false)?.id:D.acessos.find(a=>a.pessoa===pid)?.id;
+const uidDePessoa=pid=>{if(!pid)return null;const a=pid==='dir'?D.acessos.find(x=>x.perfil==='diretor'&&x.ativo!==false)?.id:D.acessos.find(x=>x.pessoa===pid)?.id;
+ if(a&&PROF[a]?.avatarUrl)return a;if(real()&&ME.uid&&!S.sim&&(S.perfil===pid||(pid==='dir'&&dir()))&&PROF[ME.uid]?.avatarUrl)return ME.uid;
+ const n=norm(pid==='dir'?'':(pessoa(pid)?.n||''));if(!n)return a;const p1=n.split(/\s+/)[0];
+ const hit=Object.entries(PROF).find(([,p])=>p&&p.avatarUrl&&(norm(p.name||'')===n||norm(p.name||'').split(/\s+/)[0]===p1));return hit?hit[0]:a};
 const avP=(pid,nome,cls)=>{const u=uidDePessoa(pid),f=u&&PROF[u]?.avatarUrl;return fotoOk(f)?`<img class="av ${cls||''}" src="${f}" alt="">`:`<div class="av ${cls||''}">${esc((nome||'?')[0])}</div>`};
 function fotoSheet(){if(!real()||!ME.uid){toast('A foto de perfil funciona no sistema publicado, com login.');return}FORM={tipo:'_foto'};const f=PROF[ME.uid]?.avatarUrl;
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Meu perfil</p><h2 id="sheet-title">Foto de perfil</h2><p class="sub" style="font-size:13px">Aparece no menu, na equipe e nos registros. Todos da equipe veem.</p></div>
@@ -1652,7 +1655,7 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
   const cls=ok.length===l.length?(ok.some(o=>o.tarde)?'wa':'ok'):bad.length?'bad':an.length||ok.length?'ac':'ne';
   const lab=ok.length===l.length?(cls==='wa'?'Concluído com atraso':'Concluído'):bad.length?'Atrasado':ok.length?`${ok.length} de ${l.length} concluídas`:an.length?'Em andamento':'A fazer';
   const todosF=xs.flatMap(o=>o.fs),feitoPor=[...new Map(todosF.filter(f=>stF(f)==='feita').map(f=>[`${f.pid||f.nome}|${f.hora||''}`,`<span class="quemf">${avP(f.pid,f.nome,'avs')}${esc(f.nome||'—')}${f.hora?' · '+esc(f.hora):''}</span>`])).values()],emAnd=[...new Set(todosF.filter(f=>stF(f)==='andamento').map(f=>`● ${f.nome||'—'} iniciou ${hmDe(f.ini)}`))];
-  const resp=ok.length===l.length?[]:[`Responsável: ${[...new Set(xs.filter(o=>!o.fe).flatMap(o=>rsDe(o.r)))].map(nomeDe).join(', ')||'—'}`];
+  const resp=[]; // o andamento mostra só o que foi feito e por quem; sem os nomes de quem ainda vai fazer
   const tit=xs.map(o=>`${o.r.t}: ${o.fe?'concluída':o.an?'em andamento':o.bad?'atrasada':'a fazer'}`).join('\n');
   const its=l.flatMap(r=>itensDe(r.id,dia)),itTxt=its.length?[`${its.filter(i=>i.feito).length} de ${its.length} itens feitos`]:[];
   return `<td><button class="andb ${cls}" title="${esc(tit)}" onclick="S.cTab='dia';S.cDia='${dia}';S.cQuem='';ir('rotinas')"><b>${lab}</b>${feitoPor.join('')}${[...emAnd,...resp,...itTxt].map(t=>`<span>${esc(t)}</span>`).join('')}</button></td>`};
@@ -2455,7 +2458,9 @@ async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FOR
 const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
 const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
-const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
+const NAO_OCULTA=['painel','usuarios'];
+const ocultos=()=>Array.isArray(CFG.ocultos)?CFG.ocultos:['whats'];
+const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(NAO_OCULTA.includes(k)||!ocultos().includes(k))&&(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
 function chAbas(on){if(!(pode('chamados')&&pode('email')))return '';const nt=emPend().length;
  return `<div class="tabs big" role="tablist" aria-label="Chamados e e-mails"><button role="tab" aria-selected="${on==='ch'}" class="${on==='ch'?'on':''}" onclick="ir('chamados')">Chamados</button><button role="tab" aria-selected="${on==='em'}" class="${on==='em'?'on':''}" onclick="ir('triagem')">E-mails para revisar ${nt?`<span class="tag wa" style="font-size:11px;margin-left:4px">${nt}</span>`:''}</button></div>`}
 function chEmail(){if(!pode('email'))return '';
@@ -2580,7 +2585,7 @@ acesso(){const p=D.pedidos.find(x=>x.id===ME.uid),bloq=acessoDe(ME.uid)?.ativo==
   <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn pri" onclick="pedirAcesso()">${p?'Atualizar pedido':'Pedir acesso'}</button></div></div>`+
  note('Se o seu departamento não aparece na lista, peça para o financeiro cadastrá-lo.'))},
 usuarios(){const ped=D.pedidos.filter(p=>!acessoDe(p.id)).sort((a,b)=>a.em<b.em?1:-1),lst=[...D.acessos].sort((a,b)=>nomeU(a.id).localeCompare(nomeU(b.id)));
- return head('Administração','Usuários e <em>permissões</em>','Cada pessoa entra com a própria conta. O perfil define o que ela vê e o que pode fazer.',real()?`<button class="btn pri" onclick="novoAcesso()">Adicionar pessoa</button>`:'')+
+ return head('Administração','Usuários e <em>permissões</em>','Cada pessoa entra com a própria conta. O perfil define o que ela vê e o que pode fazer.',`${podeAdmin()?`<button class="btn" onclick="menuSheet()">Mostrar e ocultar áreas</button>`:''}${real()?`<button class="btn pri" onclick="novoAcesso()">Adicionar pessoa</button>`:''}`)+
  (real()?'':`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Modo demonstração: esta visualização não tem login. No portal publicado, cada pessoa aparece aqui com o nome da conta dela.</span></div>`)+
  (ped.length?`<div class="panel"><div class="ph"><h2>Pedidos de acesso</h2><span>${ped.length}</span></div>${ped.map(p=>`<div class="row">${avU(p.id)}<div class="t"><b>${esc(nomeU(p.id))}</b><span>${esc(PAPEIS[p.perfil]||'')}${p.dep?' · '+esc(depNome(p.dep)):''}${p.obs?' · '+esc(p.obs):''} · ${fmtHora(p.em)}</span></div><button class="btn" onclick="recusar('${esc(p.id)}')">Recusar</button><button class="btn pri" onclick="editAcesso('${esc(p.id)}')">Revisar e liberar</button></div>`).join('')}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Pessoas com acesso</h2><span>${lst.length}</span></div>
@@ -2764,7 +2769,7 @@ painel(){
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>`,
  estrutura:()=>`<div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
    <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div></div>`};
- return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}">${h}</section>`:''}).join('')}</div>`},
+ return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span><button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}">${h}</section>`:''}).join('')}</div>`},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
  return head('Reconhecimento','Destaques do mês','Conquistas, metas batidas e reconhecimentos da equipe.',mesNav('mesDest')+(pode('feedbacks')?novo('destaque','Registrar destaque'):''))+
@@ -2912,79 +2917,169 @@ const CSS_DASH=`.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))
 .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:16px}h4{font-size:13px;margin:0 0 8px;color:var(--ink2)}.bars{display:grid;gap:6px}.bar{display:grid;grid-template-columns:38% 1fr 28px;gap:8px;align-items:center;font-size:12.5px}
 .bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bt{background:var(--bg);border-radius:4px;height:10px;overflow:hidden}.bt i{display:block;height:100%;background:var(--acc);border-radius:4px}.bar b{text-align:right;font-variant-numeric:tabular-nums}
 .vazio{font-size:12px;color:var(--ink3);margin:0}.fe{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13px}.fe span{color:var(--ink3)}.fe .mais{color:var(--ink3);list-style:none}.just{margin:0;padding-left:18px;font-size:13px;display:grid;gap:4px}`;
-function htmlReuRel(k){const W=semanaDados(k),it=reuItens(k),pe=it.filter(x=>!sugFeita(x)),fa=it.filter(sugFeita),rs=it.reduce((a,x)=>a+topDe(x).length,0);
- const bloco=(x,i)=>{const T=topDe(x),cri=x.criado||(x.criadoEm||'').slice(0,10);
-  return `<section class="as"><div class="hd"><span class="n">${i+1}</span><h2>${esc(x.t)}</h2><span class="st ${sugFeita(x)?'ok':''}">${sugFeita(x)?'Falado':'A falar'}</span></div>
-  ${x.obs?`<p class="obs">${esc(x.obs)}</p>`:''}<p class="meta">Sugerido por ${esc(sugAutor(x))}${cri?` em ${fmtAno(cri)}`:''}${x.faladoEm?` · falado em ${fmtAno(x.faladoEm)}`:''}</p>
-  ${T.length?`<ul class="rs">${T.map(r=>`<li><span class="who">${esc(r.porNome||respNome(r.por)||'Equipe')}<em>${r.em?respQuando(r):''}</em></span><div class="tx">${htmlBlocos(blocosTxt(r.txt))}</div></li>`).join('')}</ul>`:'<p class="meta">Sem respostas.</p>'}
-  <div class="enc"><b>Encaminhamento</b><div class="lin"></div><div class="lin"></div></div></section>`};
- return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reuTit(k))} · Prumo</title>${FONTE}<style>${CSS_BASE}
- main{max-width:860px;margin:0 auto;padding:40px 24px 64px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:2px solid var(--acc);padding-bottom:16px;margin-bottom:24px}
- .ey{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-weight:600;margin:0 0 6px}h1{font-size:28px;margin:0;letter-spacing:-.01em}.ger{font-size:12px;color:var(--ink3);text-align:right}
- .nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 28px}.nums div{background:var(--bg);border-radius:10px;padding:12px}.nums b{display:block;font-size:24px}.nums span{font-size:12px;color:var(--ink3)}
- .as{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:0 0 14px;break-inside:avoid}.hd{display:flex;align-items:center;gap:10px}.n{width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600;flex:none}
- h2{font-size:17px;margin:0;flex:1}.st{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--acc)}.st.ok{background:#E8F3EA;color:#22663A}
- .obs{margin:10px 0 0;color:var(--ink2);white-space:pre-wrap}.meta{font-size:12px;color:var(--ink3);margin:6px 0 0}
- .rs{list-style:none;margin:12px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);display:grid;gap:10px}.who{display:block;font-size:12.5px;font-weight:600;color:var(--acc)}.who em{font-style:normal;font-weight:400;color:var(--ink3);margin-left:8px}.tx p{margin:2px 0}.tx ul{margin:4px 0;padding-left:18px}
- .sem{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:0 0 24px}.sem h3{margin-top:0}${CSS_DASH}@media (max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.g2{grid-template-columns:1fr}}
- .enc{margin-top:14px}.enc b{font-size:12px;color:var(--ink3);font-weight:600}.lin{border-bottom:1px solid var(--line);height:26px}
- h3{font-size:14px;color:var(--ink3);margin:28px 0 10px;text-transform:uppercase;letter-spacing:.06em}
- @media print{main{padding:0}.as{border-color:#ccc}}@media (max-width:600px){.nums{grid-template-columns:repeat(2,minmax(0,1fr))}.top{flex-direction:column;align-items:flex-start}.ger{text-align:left}}
- </style></head><body><main><div class="top"><div><p class="ey">Prumo · Financeiro e Contábil</p><h1>${esc(reuTit(k))}</h1></div><div class="ger">Gerado em ${esc(fmtHora(new Date().toISOString()))}<br>por ${esc(euNome())}</div></div>
- <section class="sem"><h3>Como foi a semana · ${fmt(W.de)} a ${fmt(W.ate)}</h3>${semanaHtml(W)}</section>
- <section class="sem"><h3>O que foi realizado na semana</h3>${realizadoHtml(W,30)}</section>
- <div class="nums"><div><b>${it.length}</b><span>assuntos</span></div><div><b>${pe.length}</b><span>a falar</span></div><div><b>${fa.length}</b><span>falados</span></div><div><b>${rs}</b><span>respostas</span></div></div>
- ${pe.length?`<h3>Pauta</h3>${pe.map(bloco).join('')}`:''}${fa.length?`<h3>Já falados</h3>${fa.map((x,i)=>bloco(x,pe.length+i)).join('')}`:''}${it.length?'':'<p>Nenhum assunto nesta reunião.</p>'}
+/* ===== Relatório e slides da reunião (versão profissional) =====
+   Mesmo fundo do sistema (vidro, marca d'água e logo), fotos de cada pessoa e painel dos chamados.
+   Período: a semana da reunião, ou o período escolhido pelo diretor em "Emitir relatório ou slides". */
+const LOGO_X='<svg viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="88" height="104" rx="22" fill="#E4602B"/><path d="M28 36H76M28 56H68M28 76H52" stroke="#FDFFF8" stroke-width="9" stroke-linecap="round"/><circle cx="88" cy="88" r="26" fill="#161616" stroke="#FFFFFF" stroke-width="5"/><path d="M76 88l8 8l16-17" stroke="#E4602B" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const MARCA_URL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect x='8' y='8' width='88' height='104' rx='22' fill='%23E4602B'/%3E%3Cpath d='M28 36H76M28 56H68M28 76H52' stroke='%23FFFFFF' stroke-width='9' stroke-linecap='round'/%3E%3Ccircle cx='88' cy='88' r='26' fill='%233D3D3D'/%3E%3C/svg%3E";
+const deptoNome=()=>CFG.depto||'Financeiro e Contábil';
+const nomeDiretor=()=>{const u=uidDePessoa('dir');return (u&&PROF[u]?.name)||(dir()&&real()&&!S.sim&&ME.nome)||'Diretor'};
+// foto de quem está na equipe (ou a inicial, se a pessoa ainda não escolheu foto)
+function fotoX(pid,nome,px){px=px||36;const u=uidDePessoa(pid),f=u&&PROF[u]?.avatarUrl;
+ return fotoOk(f)?`<img class="ft" style="width:${px}px;height:${px}px" src="${f}" alt="">`:`<span class="ft" style="width:${px}px;height:${px}px;font-size:${Math.round(px*.4)}px">${esc(String(nome||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?')}</span>`}
+const pidDoNome=n=>(colabs().find(p=>norm(p.n)===norm(n||''))||{}).id;
+function envolvidos(){return [{pid:'dir',n:nomeDiretor(),c:'Diretor'},...colabs().map(p=>({pid:p.id,n:p.n,c:p.c||''}))]}
+// realizado no período por pessoa (chamados concluídos + marcações do cronograma)
+function realizadoPer(pid,de,ate){const den=d=>d&&d>=de&&d<=ate;
+ const ch=D.chamados.filter(c=>c.st==='Concluído'&&(pid==null||quemFez(c)===pid)&&den((c.concl||'').slice(0,10))),cp=ch.filter(c=>c.prazo),cok=cp.filter(c=>!(c.concl>c.prazo)).length;
+ const vistos=new Set(),et={};let rot=0;const conta=(rid,dia,q)=>{const k=`${dia}_${rid}_${q}`;if(vistos.has(k))return;vistos.add(k);const r=D.cronograma.find(x=>x.id===rid);const g=(r?.etapa)||'Outras atividades';et[g]=(et[g]||0)+1;rot++};
+ (D.feitos||[]).filter(f=>f.st==='feita'&&den(f.dia)&&(pid==null||f.pid===pid)).forEach(f=>conta(f.rot,f.dia,f.pid||f.nome));
+ (D.execucoes||[]).filter(x=>x.s==='feita'&&den(x.dia)&&(pid==null||x.por===pid)).forEach(x=>conta(x.rot,x.dia,x.por));
+ return {ch:ch.length,chPrazo:cp.length,chOk:cok,pct:cp.length?Math.round(cok/cp.length*100):null,rot,etapas:Object.entries(et).sort((a,b)=>b[1]-a[1]),total:ch.length+rot}}
+// painel dos chamados no período
+function dashCh(de,ate){const den=x=>x&&x>=de&&x<=ate;
+ const rec=D.chamados.filter(c=>den(diaCh(c))),con=D.chamados.filter(c=>c.st==='Concluído'&&den((c.concl||'').slice(0,10))),ab=D.chamados.filter(c=>c.st!=='Concluído');
+ const atrE=ab.filter(chAtrasado).sort((a,b)=>(a.prazo||'').localeCompare(b.prazo||'')),mar=rec.filter(c=>chegadaDe(c)),chA=mar.filter(c=>chegadaDe(c)==='atrasado').length;
+ const cP=con.filter(c=>c.prazo),cOk=cP.filter(c=>!(c.concl>c.prazo)).length,fp=rec.filter(foraPadrao).length;
+ const pg=D.chamados.map(c=>({c,p:pagSit(c)})).filter(x=>x.p&&x.p.pg&&den(x.p.pg)),pgF=pg.filter(x=>!x.p.ok);
+ const grupo=f=>{const m={};rec.forEach(c=>{const n=f(c)||'Sem nome';const o=m[n]=m[n]||{n,t:0,a:0};o.t++;if(chegadaDe(c)==='atrasado')o.a++});return Object.values(m).sort((a,b)=>b.t-a.t)};
+ const cats=grupo(c=>assDe(c.cat)?.n||catSugerida(c.desc||'',c.assunto||'')||'Sem assunto').slice(0,7),deps=grupo(c=>c.dep?depNome(c.dep):remNomeCh(c)).slice(0,7);
+ const rems=grupo(c=>remNomeCh(c)).filter(x=>x.a).sort((a,b)=>b.a-a.a).slice(0,5);
+ const pessoas=colabs().map(p=>({pid:p.id,n:p.n,con:con.filter(c=>quemFez(c)===p.id).length,ab:ab.filter(c=>c.resp===p.id).length,atr:atrE.filter(c=>c.resp===p.id).length})).filter(x=>x.con||x.ab);
+ return {rec:rec.length,con:con.length,ab:ab.length,atrE,mar:mar.length,chA,pctA:mar.length?Math.round(chA/mar.length*100):null,cP:cP.length,cOk,pctOk:cP.length?Math.round(cOk/cP.length*100):null,fp,pg:pg.length,pgF,cats,deps,rems,pessoas}}
+const diasAtr=p=>Math.max(1,Math.round((new Date(HJ+'T12:00')-new Date(p+'T12:00'))/864e5));
+/* pedaços de HTML usados no relatório e nos slides */
+function kpisX(K){const t=[['Pedidos recebidos',K.rec,''],['Concluídos',K.con,K.pctOk===null?'':`${K.pctOk}% no prazo`],['Em aberto agora',K.ab,''],['Atrasados na entrega',K.atrE.length,K.atrE.length?'precisam de atenção':'nenhum'],['Chegaram atrasados',K.pctA===null?'—':K.pctA+'%',K.mar?`${K.chA} de ${K.mar} pedidos`:''],['Fora do padrão',K.fp,'solicitações de pagamento'],['Pagamentos no D-5',K.pg?`${K.pg-K.pgF.length}/${K.pg}`:'—',K.pgF.length?`${K.pgF.length} fora do prazo`:''],['Equipe',colabs().length,'pessoas']];
+ return `<div class="kpis">${t.map(([a,b,c],i)=>`<div class="glass kpi${(i===3&&K.atrE.length)||(i===4&&K.pctA>=30)?' alerta':''}"><span>${a}</span><b>${b}</b>${c?`<small>${esc(c)}</small>`:''}</div>`).join('')}</div>`}
+function barrasX(L,tit){const mx=Math.max(1,...L.map(x=>x.t));return `<div class="glass bloco"><h3>${tit}</h3>${L.length?`<div class="bars">${L.map(x=>`<div class="bar"><span class="bn" title="${esc(x.n)}">${esc(x.n)}</span><span class="bt"><i class="ok" style="width:${(x.t-x.a)/mx*100}%"></i><i class="at" style="width:${x.a/mx*100}%"></i></span><b>${x.t}</b></div>`).join('')}</div><p class="leg"><i class="ok"></i>em dia <i class="at"></i>chegou atrasado</p>`:'<p class="vazio">Sem pedidos no período.</p>'}</div>`}
+function atrasosX(K,max){const L=K.atrE.slice(0,max);return `<div class="glass bloco"><h3>Chamados atrasados na entrega <span class="cont">${K.atrE.length}</span></h3>${L.length?`<table class="tb"><thead><tr><th>Chamado</th><th>Responsável</th><th>Setor</th><th>Prazo</th><th>Atraso</th></tr></thead><tbody>${L.map(c=>`<tr><td><b>${esc(c.proto||'')}</b><small>${esc(c.assunto||'')}</small></td><td><span class="pq">${fotoX(c.resp,respNome(c.resp),26)}${esc(respNome(c.resp)||'Sem responsável')}</span></td><td>${c.dep?esc(depNome(c.dep)):esc(remNomeCh(c))}</td><td>${fmt(c.prazo)}</td><td><span class="pill at">${diasAtr(c.prazo)} ${diasAtr(c.prazo)===1?'dia':'dias'}</span></td></tr>`).join('')}</tbody></table>${K.atrE.length>max?`<p class="vazio" style="margin-top:8px">e mais ${K.atrE.length-max}</p>`:''}`:'<p class="vazio">Nenhum chamado atrasado.</p>'}</div>`}
+function remsX(K){return `<div class="glass bloco"><h3>Quem mais mandou pedido atrasado</h3>${K.rems.length?`<table class="tb"><thead><tr><th>Quem mandou</th><th class="n">Pedidos</th><th class="n">Atrasados</th><th class="n">%</th></tr></thead><tbody>${K.rems.map(r=>`<tr><td><b>${esc(r.n)}</b></td><td class="n">${r.t}</td><td class="n">${r.a}</td><td class="n"><span class="pill at">${Math.round(r.a/r.t*100)}%</span></td></tr>`).join('')}</tbody></table>`:'<p class="vazio">Ninguém mandou pedido atrasado no período.</p>'}</div>`}
+function equipeX(de,ate){const L=colabs().map(p=>({p,r:realizadoPer(p.id,de,ate)})),T=realizadoPer(null,de,ate);
+ const lin=(foto,nome,sub,r,tot)=>`<tr${tot?' class="tot"':''}><td><span class="pq">${foto}<span><b>${nome}</b>${sub?`<small>${sub}</small>`:''}</span></span></td><td class="n">${r.total}</td><td class="n">${r.ch}</td><td class="n">${r.rot}</td><td class="n">${r.pct===null?'—':r.pct+'%'}</td><td>${r.etapas.length?`<span class="chips">${r.etapas.slice(0,6).map(([g,n])=>`<span>${esc(g)} ${n}</span>`).join('')}</span>`:'—'}</td></tr>`;
+ return `<div class="glass bloco"><table class="tb"><thead><tr><th>Pessoa</th><th class="n">Realizadas</th><th class="n">Chamados</th><th class="n">Rotinas</th><th class="n">No prazo</th><th>O que realizou</th></tr></thead><tbody>${L.map(({p,r})=>lin(fotoX(p.id,p.n,32),esc(p.n),esc(p.c||''),r)).join('')}${lin('','Equipe toda','',T,true)}</tbody></table></div>`}
+function pessoasX(){return `<div class="gente">${envolvidos().map(e=>`<div class="pp">${fotoX(e.pid,e.n,44)}<div><b>${esc(e.n)}</b><small>${esc(e.c)}</small></div></div>`).join('')}</div>`}
+const CSS_X=`:root{--ink:#1E1E1E;--ink2:#4F4F4F;--ink3:#6B6B6B;--acc:#C24E1C;--acc2:#E4602B;--soft:rgba(228,96,43,.14);--line:rgba(20,20,20,.09);--vidro:rgba(255,255,255,.62);--borda:rgba(255,255,255,.85);--ok:#2F7D4A;--bad:#B4382C}
+*{box-sizing:border-box}body{margin:0;font-family:Onest,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink)}
+.fundo{background:radial-gradient(45% 55% at 90% 8%,rgba(228,96,43,.28),transparent 70%),radial-gradient(50% 60% at 12% 88%,rgba(160,160,155,.32),transparent 70%),#F1F1EE;position:relative;isolation:isolate;overflow:hidden}
+.fundo::after{content:"";position:absolute;right:-4%;bottom:-10%;width:34%;aspect-ratio:1;background:url("${MARCA_URL}") center/contain no-repeat;opacity:.05;z-index:-1;pointer-events:none}
+.glass{background:var(--vidro);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border:1px solid var(--borda);border-radius:18px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+.ft{display:inline-grid;place-items:center;border-radius:50%;object-fit:cover;background:var(--soft);color:var(--acc);font-weight:700;flex:none;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.marca{display:flex;align-items:center;gap:10px}.marca svg{width:34px;height:34px}.marca b{display:block;font-size:15px}.marca small{display:block;color:var(--ink3);font-size:11px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.kpi{padding:14px 16px}.kpi span{display:block;font-size:12px;color:var(--ink3)}.kpi b{display:block;font-size:28px;letter-spacing:-.02em;margin-top:2px}.kpi small{display:block;font-size:11.5px;color:var(--ink2)}
+.kpi.alerta{border-color:rgba(180,56,44,.35)}.kpi.alerta b{color:var(--bad)}
+.bloco{padding:16px 18px}.bloco h3{margin:0 0 12px;font-size:14px}.cont{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:12px;margin-left:6px;padding:0 6px}
+.bars{display:grid;gap:8px}.bar{display:grid;grid-template-columns:34% 1fr 30px;gap:10px;align-items:center;font-size:12.5px}.bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt{display:flex;height:12px;border-radius:999px;background:rgba(20,20,20,.06);overflow:hidden}.bt i{display:block;height:100%}.bt .ok,.leg .ok{background:var(--acc2)}.bt .at,.leg .at{background:#3D3D3D}
+.bar b{text-align:right;font-variant-numeric:tabular-nums}.leg{margin:10px 0 0;font-size:11px;color:var(--ink3);display:flex;gap:6px;align-items:center}.leg i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-left:6px}
+.lista{display:grid;gap:8px}.li{display:flex;align-items:center;gap:10px}.li .tx{flex:1;min-width:0}.li b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.li small{display:block;font-size:11.5px;color:var(--ink3)}
+.pill{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}.pill.at{background:rgba(180,56,44,.12);color:var(--bad)}
+.vazio{margin:0;color:var(--ink3);font-size:13px}
+.eqgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pess{display:flex;gap:14px;padding:14px 16px;align-items:flex-start}.pess .tx{min-width:0}.pess>div>b{font-size:15px}.pess small{display:block;color:var(--ink3);font-size:12px}
+.nums{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--ink2)}.nums b{color:var(--ink);font-size:15px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.chips span{font-size:11px;padding:2px 9px;border-radius:999px;background:var(--soft);color:var(--acc)}
+.gente{display:flex;flex-wrap:wrap;gap:10px}.pp{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border-radius:999px;background:var(--vidro);border:1px solid var(--borda)}.pp b{display:block;font-size:13px}.pp small{display:block;font-size:11px;color:var(--ink3)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--line)}
+.tb td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}.tb tr:last-child td{border-bottom:0}.tb td small{display:block;color:var(--ink3);font-size:11px;max-width:28ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb .n{text-align:right;font-variant-numeric:tabular-nums}.tb td.n{font-weight:600}.tb tr.tot td{font-weight:700;background:rgba(228,96,43,.06)}.pq{display:inline-flex;align-items:center;gap:8px}.pq small{max-width:none}.tb .chips{margin:0}`;
+const LOGO_DATA='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect x="8" y="8" width="88" height="104" rx="22" fill="#E4602B"/><path d="M28 36H76M28 56H68M28 76H52" stroke="#FDFFF8" stroke-width="9" stroke-linecap="round"/><circle cx="88" cy="88" r="26" fill="#161616" stroke="#FFFFFF" stroke-width="5"/><path d="M76 88l8 8l16-17" stroke="#E4602B" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+const perReu=k=>{const d=k.split('|')[0],ate=d&&d<HJ?addDia(d,-1):HJ;return {de:addDia(ate,-6),ate,rot:'Semana'}};
+/* ---------- relatório ---------- */
+function htmlReuRel(k,per){per=per||perReu(k);const K=dashCh(per.de,per.ate),T=realizadoPer(null,per.de,per.ate),it=k?reuItens(k):[],pe=it.filter(x=>!sugFeita(x)),fa=it.filter(sugFeita);
+ const bloco=(x,i)=>{const R=topDe(x),cri=x.criado||(x.criadoEm||'').slice(0,10);
+  return `<div class="glass as"><div class="hd"><span class="n">${i+1}</span><h3>${esc(x.t)}</h3><span class="st ${sugFeita(x)?'ok':''}">${sugFeita(x)?'Falado':'A falar'}</span></div>${x.obs?`<div class="tx">${htmlBlocos(blocosTxt(x.obs))}</div>`:''}<p class="meta">Sugerido por ${esc(sugAutor(x))}${cri?` em ${fmtAno(cri)}`:''}</p>
+  ${R.length?`<div class="rs">${R.map(r=>`<div class="rr">${fotoX(r.por||pidDoNome(r.porNome),r.porNome||respNome(r.por),34)}<div class="tx"><b>${esc(r.porNome||respNome(r.por)||'Equipe')}</b><small>${r.em?respQuando(r):''}</small>${htmlBlocos(blocosTxt(r.txt))}</div></div>`).join('')}</div>`:''}<div class="enc"><b>Encaminhamento</b><div class="lin"></div><div class="lin"></div></div></div>`};
+ return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(k?reuTit(k):'Relatório do departamento')} · Prumo</title><link rel="icon" href="${LOGO_DATA}">${FONTE}<style>${CSS_X}
+ body{min-height:100vh}main{max-width:980px;margin:0 auto;padding:32px 24px 64px;display:flex;flex-direction:column;gap:18px}
+ .cab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;padding:20px 22px}.cab h1{margin:6px 0 2px;font-size:28px;letter-spacing:-.02em}.cab .per{color:var(--ink2);font-size:14px}.cab .ger{font-size:12px;color:var(--ink3);text-align:right}
+ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);margin:12px 0 0}
+ .as{padding:18px 20px}.hd{display:flex;align-items:center;gap:10px}.hd h3{margin:0;font-size:16px;flex:1}.n{width:28px;height:28px;border-radius:50%;background:var(--acc2);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+ .st{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--acc)}.st.ok{background:#E3F1E7;color:var(--ok)}.meta{font-size:12px;color:var(--ink3);margin:8px 0 0}
+ .tx p{margin:4px 0}.tx ul{margin:4px 0;padding-left:18px}.rs{display:grid;gap:12px;margin-top:14px;padding-left:14px;border-left:2px solid var(--line)}.rr{display:flex;gap:10px;align-items:flex-start}.rr .tx{min-width:0}.rr b{font-size:13px;color:var(--acc)}.rr small{display:block;font-size:11px;color:var(--ink3)}
+ .enc{margin-top:14px}.enc b{font-size:12px;color:var(--ink3)}.lin{border-bottom:1px solid var(--line);height:26px}
+ @media (max-width:700px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.eqgrid{grid-template-columns:1fr}.cab .ger{text-align:left}}
+ @media print{body{background:#fff}.glass{backdrop-filter:none;box-shadow:none}}
+ </style></head><body class="fundo"><main>
+ <div class="glass cab"><div><div class="marca">${LOGO_X}<div><b>Prumo</b><small>${esc(deptoNome())}</small></div></div><h1>${esc(k?reuTit(k):'Relatório do departamento')}</h1><div class="per">${esc(per.rot)} de ${fmtAno(per.de)} a ${fmtAno(per.ate)}</div></div><div class="ger">Diretor: <b>${esc(nomeDiretor())}</b><br>Gerado em ${esc(fmtHora(new Date().toISOString()))}<br>por ${esc(euNome())}</div></div>
+ <h2>Quem participa</h2>${pessoasX()}
+ <h2>Painel dos chamados</h2>${kpisX(K)}<div class="g2">${barrasX(K.cats,'Pedidos por categoria')}${barrasX(K.deps,'Pedidos por setor')}</div>
+ <h2>Atrasos</h2><div class="g2">${atrasosX(K,12)}${remsX(K)}</div>
+ ${K.pgF.length?`<div class="glass bloco"><h3>Pagamentos fora do D-5 <span class="cont">${K.pgF.length}</span></h3><div class="lista">${K.pgF.slice(0,10).map(x=>`<div class="li"><div class="tx"><b>${esc(x.c.assunto||'')}</b><small>${esc(x.p.just||'sem justificativa')}</small></div><span class="pill at">pago ${fmt(x.p.pg)}</span></div>`).join('')}</div></div>`:''}
+ <h2>O que a equipe realizou</h2>${equipeX(per.de,per.ate)}
+ ${pe.length?`<h2>Pauta da reunião</h2>${pe.map(bloco).join('')}`:''}${fa.length?`<h2>Já falados</h2>${fa.map((x,i)=>bloco(x,pe.length+i)).join('')}`:''}
  </main></body></html>`}
-function htmlReuSlides(k){const it=reuItens(k),[d,h]=k.split('|'),W=semanaDados(k),tot=it.length;
- const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
- const quemR=r=>r.porNome||respNome(r.por)||'Equipe';
+/* ---------- slides ---------- */
+function htmlReuSlides(k,per){per=per||perReu(k);const it=k?reuItens(k):[],[d,h]=(k||'').split('|'),K=dashCh(per.de,per.ate),T=realizadoPer(null,per.de,per.ate),tot=it.length;
+ const quemR=r=>r.porNome||respNome(r.por)||'Equipe',pidR=r=>r.por||pidDoNome(r.porNome);
  const tit=t=>`<h2 class="${t.length>110?'t3':t.length>60?'t2':''}">${esc(t)}</h2>`;
- const sl=[];
- sl.push(`<section class="capa"><p class="ey">Prumo · Financeiro e Contábil</p><h1>Reunião da equipe</h1><p class="sub">${esc(d?reuTxt(d,h):'Assuntos sem data marcada')}</p><p class="mini">${tot} ${tot===1?'assunto':'assuntos'} · ${it.reduce((a,x)=>a+topDe(x).length,0)} respostas da equipe</p></section>`);
- // visão geral: o que vamos falar e o que fizemos na semana
- sl.push(`<section class="dash"><p class="ey">Visão geral</p><h2>Hoje e a semana que passou</h2><div class="g2 vg"><div><h4>O que vamos falar</h4>${tot?`<ol class="fe">${it.slice(0,8).map(x=>`<li>${esc(x.t.length>90?x.t.slice(0,88)+'…':x.t)}</li>`).join('')}${tot>8?`<li class="mais">e mais ${tot-8}</li>`:''}</ol>`:'<p class="vazio">Nenhum assunto na pauta.</p>'}</div>
-  <div><h4>O que fizemos na semana</h4><ul class="fe"><li><b>${W.con}</b> ${W.con===1?'pedido concluído':'pedidos concluídos'}</li><li><b>${W.rot}</b> ${W.rot===1?'rotina concluída':'rotinas concluídas'}</li><li><b>${W.rec}</b> ${W.rec===1?'pedido recebido':'pedidos recebidos'}</li>${W.pg?`<li><b>${W.pg-W.pgFora} de ${W.pg}</b> pagamentos no D-5</li>`:''}${W.falados.length?`<li><b>${W.falados.length}</b> ${W.falados.length===1?'assunto falado':'assuntos falados'}</li>`:''}</ul></div></div></section>`);
- // como foi a semana: números e gráficos
- sl.push(`<section class="dash"><p class="ey">Como foi a semana · ${fmt(W.de)} a ${fmt(W.ate)}</p><h2>Resumo da semana</h2>${semanaHtml({...W,just:[]})}</section>`);
- sl.push(`<section class="dash"><p class="ey">Como foi a semana · ${fmt(W.de)} a ${fmt(W.ate)}</p><h2>O que foi realizado</h2>${realizadoHtml(W,8)}</section>`);
- if(W.just.length)sl.push(`<section><p class="ey">Como foi a semana</p><h2>Pagamentos fora do D-5</h2><ul class="lista">${W.just.map(x=>`<li><b>${esc(x.a)}</b><span>${esc(x.j)}</span></li>`).join('')}</ul></section>`);
- if(tot)sl.push(`<section><p class="ey">Pauta</p><h2>O que vamos falar</h2><ol class="pauta">${it.map((x,i)=>`<li><span class="pn">${i+1}</span><div><b>${esc(x.t)}</b><em>Sugerido por ${esc(sugAutor(x))} · ${topDe(x).length} ${topDe(x).length===1?'resposta':'respostas'}${sugFeita(x)?' · já falado':''}</em></div></li>`).join('')}</ol></section>`);
- it.forEach((x,i)=>{const T=topDe(x),cab=`<p class="ey">Assunto ${i+1} de ${tot}${sugFeita(x)?' · já falado':''}</p>${tit(x.t)}`,rod=`<p class="rod">Sugerido por <b>${esc(sugAutor(x))}</b>${x.criado?` em ${fmtAno(x.criado)}`:''}</p>`;
-  // abertura do assunto: detalhes e quem respondeu
+ const topo=(ey)=>`<div class="sh"><div class="marca">${LOGO_X}<div><b>Prumo</b><small>${esc(deptoNome())}</small></div></div><span class="ey">${esc(ey)}</span></div>`;
+ const sl=[];const S2=(cls,ey,corpo)=>sl.push(`<section class="fundo ${cls||''}">${topo(ey)}<div class="cp">${corpo}</div><footer><span>${esc(deptoNome())} · Diretor: ${esc(nomeDiretor())}</span></footer></section>`);
+ // capa
+ sl.push(`<section class="fundo capa"><div class="glass capac"><div class="lg">${LOGO_X}</div><p class="ey2">${esc(deptoNome())}</p><h1>${k?'Reunião da equipe':'Relatório do departamento'}</h1><p class="sub">${esc(d?reuTxt(d,h):`${per.rot}: ${fmtAno(per.de)} a ${fmtAno(per.ate)}`)}</p><div class="dirc">${fotoX('dir',nomeDiretor(),48)}<div><b>${esc(nomeDiretor())}</b><small>Diretor</small></div></div></div><div class="gente">${colabs().map(p=>`<div class="pp">${fotoX(p.id,p.n,40)}<div><b>${esc(p.n)}</b><small>${esc(p.c||'')}</small></div></div>`).join('')}</div></section>`);
+ // agenda
+ S2('','Agenda',`${tit('O que vamos ver hoje')}<div class="g2"><div class="glass bloco"><h3>Números do período</h3><ol class="ag"><li>Painel dos chamados</li><li>Pedidos por categoria e setor</li><li>Atrasos</li><li>O que a equipe realizou</li></ol></div><div class="glass bloco"><h3>Pauta da reunião ${tot?`<span class="cont">${tot}</span>`:''}</h3>${tot?`<ol class="ag">${it.slice(0,7).map(x=>`<li>${esc(x.t.length>80?x.t.slice(0,78)+'…':x.t)}</li>`).join('')}${tot>7?`<li class="mais">e mais ${tot-7}</li>`:''}</ol>`:'<p class="vazio">Sem assuntos na pauta.</p>'}</div></div>`);
+ // painel
+ S2('','Painel dos chamados',`${tit(`Chamados · ${fmt(per.de)} a ${fmt(per.ate)}`)}${kpisX(K)}`);
+ S2('','Painel dos chamados',`${tit('Pedidos por categoria e por setor')}<div class="g2">${barrasX(K.cats,'Por categoria')}${barrasX(K.deps,'Por setor')}</div>`);
+ S2('','Atrasos',`${tit('Atrasos')}<div class="g2">${atrasosX(K,6)}${remsX(K)}</div>`);
+ if(K.pgF.length)S2('','Pagamentos',`${tit('Pagamentos fora do D-5')}<div class="glass bloco"><div class="lista">${K.pgF.slice(0,7).map(x=>`<div class="li"><div class="tx"><b>${esc(x.c.assunto||'')}</b><small>${esc(x.p.just||'sem justificativa')}</small></div><span class="pill at">pago ${fmt(x.p.pg)}</span></div>`).join('')}</div></div>`);
+ S2('','Equipe',`${tit('O que a equipe realizou')}${equipeX(per.de,per.ate)}`);
+ // pauta e respostas
+ it.forEach((x,i)=>{const R=topDe(x),cab=tit(x.t),ey=`Assunto ${i+1} de ${tot}${sugFeita(x)?' · já falado':''}`;
   const ob=paginarBlocos(blocosTxt(x.obs),600);
-  sl.push(`<section>${cab}${ob.length?`<div class="det">${htmlBlocos(ob[0])}</div>`:''}${T.length?`<p class="rh">Responderam: ${[...new Set(T.map(quemR))].map(n=>`<span class="chip"><i>${esc(ini(n))}</i>${esc(n)}</span>`).join('')}</p>`:'<p class="vaz">Sem respostas da equipe. Espaço para a conversa.</p>'}${rod}</section>`);
-  ob.slice(1).forEach(pgx=>sl.push(`<section>${cab}<div class="det"><span class="cont">detalhes · continuação</span>${htmlBlocos(pgx)}</div>${rod}</section>`));
-  // uma resposta por slide (ou mais, se for longa), com o nome de quem respondeu
-  T.forEach((r,ri)=>{const pgs=paginarBlocos(blocosTxt(r.txt),780);pgs.forEach((pgx,pi)=>sl.push(`<section>${cab}<div class="card"><div class="ch"><span class="av">${esc(ini(quemR(r)))}</span><div><b>${esc(quemR(r))}</b><span class="qd">Resposta ${ri+1} de ${T.length}${r.em?' · '+esc(respQuando(r)):''}${pgs.length>1?` · parte ${pi+1} de ${pgs.length}`:''}</span></div></div><div class="tx">${htmlBlocos(pgx)}</div></div>${rod}</section>`))})});
- sl.push(`<section class="capa"><p class="ey">Encerramento</p><h1>Encaminhamentos</h1><p class="sub">Quem faz o quê, e até quando.</p></section>`);
- return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slides · ${esc(reuTit(k))}</title>${FONTE}<style>${CSS_BASE}
- html,body{height:100%;background:#0E1413}.deck{position:fixed;inset:0;display:grid;place-items:center}
- section{display:none;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));background:#fff;padding:4.5% 7% 7%;flex-direction:column;position:relative;font-size:min(2.1vw,3.75vh);overflow:hidden}
- section.on{display:flex}.ey{font-size:.58em;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);font-weight:600;margin:0 0 .6em}
- h1{font-size:2.6em;margin:0;letter-spacing:-.02em;line-height:1.05}h2{font-size:1.5em;margin:0 0 .7em;letter-spacing:-.01em;line-height:1.15}h2.t2{font-size:1.15em}h2.t3{font-size:.95em}
- .capa{justify-content:center;background:var(--acc);color:#fff}.capa .ey{color:#FFE3D6}.capa .sub{font-size:1.1em;margin:.8em 0 0;color:#FFFFFF}.capa .mini{font-size:.7em;margin:2em 0 0;color:#FFE3D6}
- .pauta{list-style:none;margin:0;padding:0;display:grid;gap:.5em}.pauta li{display:flex;gap:.7em;align-items:flex-start}.pauta .pn{flex:none;width:1.6em;height:1.6em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.65em;font-weight:600;margin-top:.15em}
- .pauta b{display:block;font-weight:600;font-size:.82em}.pauta em{font-style:normal;color:var(--ink3);font-size:.58em}
- .det{background:var(--bg);border-radius:.6em;padding:.8em 1em;font-size:.72em;color:var(--ink2);line-height:1.45}.det p{margin:.15em 0}.det ul{margin:.2em 0;padding-left:1.2em}.cont{display:block;font-size:.8em;color:var(--ink3);margin-bottom:.3em}
- .rh{font-size:.62em;color:var(--ink3);margin:.9em 0 0;display:flex;flex-wrap:wrap;gap:.4em;align-items:center}.chip{display:inline-flex;align-items:center;gap:.35em;background:var(--soft);color:var(--acc);border-radius:999px;padding:.2em .7em .2em .25em;font-weight:500}.chip i{font-style:normal;width:1.5em;height:1.5em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.75em}
- .card{border:1px solid var(--line);border-radius:.7em;padding:.8em 1.1em;display:flex;flex-direction:column;gap:.5em}.ch{display:flex;align-items:center;gap:.6em}.ch b{display:block;font-size:.8em}.qd{display:block;font-size:.55em;color:var(--ink3)}
- .av{flex:none;width:2.1em;height:2.1em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.6em;font-weight:600}
- .tx{font-size:.72em;line-height:1.45}.tx p{margin:.2em 0}.tx ul{margin:.25em 0;padding-left:1.2em;display:grid;gap:.2em}
- .lista{margin:0;padding-left:1.1em;display:grid;gap:.5em;font-size:.75em}.lista span{display:block;color:var(--ink2);font-size:.9em}
- .vaz{color:var(--ink3);font-size:.75em}.rod{position:absolute;left:7%;bottom:3.5%;margin:0;font-size:.52em;color:var(--ink3)}.rod b{color:var(--ink2);font-weight:600}
- .dash{font-size:min(1.55vw,2.75vh)}.vg .fe{font-size:1.05em;gap:.45em}.vg .fe b{color:var(--acc)}.dash h2{font-size:1.9em}${CSS_DASH.replace(/font-size:24px/g,'font-size:1.9em').replace(/font-size:12px/g,'font-size:.85em').replace(/font-size:12.5px/g,'font-size:.9em').replace(/font-size:13px/g,'font-size:.95em')}
- .nav{position:fixed;right:16px;bottom:12px;color:#9FB0AC;font:12px Onest,system-ui,sans-serif;display:flex;gap:8px;align-items:center}.nav button{background:#1D2826;color:#E7ECEA;border:0;border-radius:8px;min-width:40px;min-height:36px;font:inherit;cursor:pointer}
- @media print{@page{size:1280px 720px;margin:0}html,body{background:#fff}.deck{position:static;display:block}section{display:flex!important;width:1280px;height:720px;font-size:27px;page-break-after:always}.dash{font-size:20px}.nav{display:none}}
- </style></head><body><div class="deck">${sl.map((x,i)=>i?x:x.replace('<section class="capa">','<section class="capa on">')).join('')}</div>
+  S2('',ey,`${cab}${ob.length?`<div class="glass bloco det">${htmlBlocos(ob[0])}</div>`:''}<div class="quem"><span>Sugerido por</span><div class="pp">${fotoX(x.a||'dir',sugAutor(x),34)}<b>${esc(sugAutor(x))}</b></div>${R.length?`<span>Responderam</span>${[...new Map(R.map(r=>[quemR(r),r])).values()].map(r=>`<div class="pp">${fotoX(pidR(r),quemR(r),34)}<b>${esc(quemR(r))}</b></div>`).join('')}`:''}</div>${R.length?'':'<div class="glass bloco"><p class="vazio">Ninguém respondeu este assunto ainda. Espaço para a conversa na reunião.</p></div>'}`);
+  ob.slice(1).forEach(pgx=>S2('',ey,`${cab}<div class="glass bloco det"><small class="cont2">detalhes · continuação</small>${htmlBlocos(pgx)}</div>`));
+  R.forEach((r,ri)=>{const pgs=paginarBlocos(blocosTxt(r.txt),760);pgs.forEach((pgx,pi)=>S2('',ey,`${cab}<div class="glass bloco resp"><div class="rh">${fotoX(pidR(r),quemR(r),46)}<div><b>${esc(quemR(r))}</b><small>Resposta ${ri+1} de ${R.length}${r.em?' · '+esc(respQuando(r)):''}${pgs.length>1?` · parte ${pi+1} de ${pgs.length}`:''}</small></div></div><div class="tx">${htmlBlocos(pgx)}</div></div>`))})});
+ sl.push(`<section class="fundo capa"><div class="glass capac"><div class="lg">${LOGO_X}</div><p class="ey2">Encerramento</p><h1>Encaminhamentos</h1><p class="sub">Quem faz o quê, e até quando.</p></div></section>`);
+ return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slides · ${esc(k?reuTit(k):deptoNome())}</title><link rel="icon" href="${LOGO_DATA}">${FONTE}<style>${CSS_X}
+ html,body{height:100%;background:#0E0E0E}.deck{position:fixed;inset:0;display:grid;place-items:center}
+ section{display:none;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));padding:3.2% 4.5% 5%;flex-direction:column;position:relative;font-size:min(1.45vw,2.6vh)}
+ section.on{display:flex}.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.6em}.sh .marca svg{width:2.4em;height:2.4em}.sh .marca b{font-size:1.05em}.sh .marca small{font-size:.75em}
+ .ey{font-size:.78em;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);font-weight:600;background:var(--vidro);border:1px solid var(--borda);padding:.35em .9em;border-radius:999px}
+ .cp{flex:1;display:flex;flex-direction:column;gap:1em;min-height:0}
+ h2{font-size:2.2em;margin:0 0 .2em;letter-spacing:-.02em;line-height:1.1}h2.t2{font-size:1.6em}h2.t3{font-size:1.25em}
+ footer{position:absolute;left:4.5%;right:4.5%;bottom:2.2%;display:flex;justify-content:space-between;font-size:.72em;color:var(--ink3)}
+ .kpis{gap:.9em}.kpi{padding:1em 1.1em}.kpi span{font-size:.85em}.kpi b{font-size:2.3em}.kpi small{font-size:.78em}
+ .bloco{padding:1.1em 1.3em}.bloco h3{font-size:1.05em}.bar{font-size:.95em}.bt{height:.85em}.li b{font-size:.95em}.li small{font-size:.8em}.vazio{font-size:.95em}
+ .eqgrid{gap:.8em}.pess{padding:.9em 1.1em}.pess>div>b{font-size:1.1em}.nums{font-size:.85em}.nums b{font-size:1.15em}.chips span{font-size:.75em}
+ .tb{font-size:.9em}.tb td small{font-size:.8em}.ag{margin:0;padding-left:1.2em;display:grid;gap:.45em;font-size:1em}.ag .mais{list-style:none;color:var(--ink3)}
+ .det{font-size:.98em;color:var(--ink2);line-height:1.5}.det p{margin:.2em 0}.det ul{margin:.3em 0;padding-left:1.2em}.cont2{display:block;color:var(--ink3);margin-bottom:.3em}
+ .quem{display:flex;flex-wrap:wrap;align-items:center;gap:.6em;font-size:.9em;color:var(--ink3)}.quem .pp{padding:.3em .9em .3em .3em}.quem .pp b{font-size:.95em;color:var(--ink)}
+ .resp .rh{display:flex;align-items:center;gap:.8em;margin-bottom:.7em}.resp .rh b{font-size:1.15em;display:block}.resp .rh small{color:var(--ink3);font-size:.8em}.resp .tx{font-size:1.02em;line-height:1.5}.resp .tx p{margin:.25em 0}.resp .tx ul{margin:.3em 0;padding-left:1.2em;display:grid;gap:.25em}
+ .capa{justify-content:center;align-items:center;gap:1.4em;padding:4%}.capac{padding:2.2em 3em;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.4em;min-width:55%}.capa .lg svg{width:4.5em;height:4.5em}
+ .capa .ey2{margin:.4em 0 0;font-size:.9em;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:600}.capa h1{font-size:3.2em;margin:0;letter-spacing:-.02em}.capa .sub{margin:.2em 0 0;color:var(--ink2);font-size:1.15em}
+ .dirc{display:flex;align-items:center;gap:.7em;margin-top:1em;text-align:left}.dirc b{display:block}.dirc small{color:var(--ink3);font-size:.8em}.capa .gente{justify-content:center;max-width:90%}.capa .pp{font-size:.9em}
+ .nav{position:fixed;right:16px;bottom:12px;color:#9A9A96;font:12px Onest,system-ui,sans-serif;display:flex;gap:8px;align-items:center}.nav button{background:#262626;color:#F4F4F2;border:0;border-radius:999px;min-width:40px;min-height:36px;font:inherit;cursor:pointer}
+ @media print{@page{size:1280px 720px;margin:0}html,body{background:#fff}.deck{position:static;display:block}section{display:flex!important;width:1280px;height:720px;font-size:18.5px;page-break-after:always}.nav{display:none}.glass{backdrop-filter:none}}
+ </style></head><body><div class="deck">${sl.map((x,i)=>i?x:x.replace('<section class="fundo capa">','<section class="fundo capa on">')).join('')}</div>
  <div class="nav"><button id="ant" aria-label="Slide anterior">‹</button><span id="pos"></span><button id="prox" aria-label="Próximo slide">›</button></div>
- <script>(function(){var S=[].slice.call(document.querySelectorAll('section')),i=0,p=document.getElementById('pos');function ir(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach(function(s,j){s.classList.toggle('on',j===i)});p.textContent=(i+1)+' / '+S.length}
+ <script>(function(){var S=[].slice.call(document.querySelectorAll('section')),i=0,p=document.getElementById('pos');S.forEach(function(s,j){var g=s.querySelector('.pg');if(g)g.textContent=(j+1)+' / '+S.length});function ir(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach(function(s,j){s.classList.toggle('on',j===i)});p.textContent=(i+1)+' / '+S.length}
  document.getElementById('ant').onclick=function(){ir(i-1)};document.getElementById('prox').onclick=function(){ir(i+1)};
  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();ir(i+1)}if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();ir(i-1)}if(e.key==='f'){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}});ir(0)})()</script></body></html>`}
-async function baixarReu(k,tipo){if(!DL){toast('O download não está disponível nesta visualização.');return}const nome=(k.split('|')[0]||'sem-data');
- try{await DL.save({filename:tipo==='slides'?`slides-reuniao-${nome}.html`:`relatorio-reuniao-${nome}.html`,data:new Blob([tipo==='slides'?htmlReuSlides(k):htmlReuRel(k)],{type:'text/html'})});
-  log(`Baixou ${tipo==='slides'?'os slides':'o relatório'} da ${reuTit(k).toLowerCase()}`);toast(tipo==='slides'?'Slides baixados. Abra o arquivo e use as setas do teclado; F deixa em tela cheia.':'Relatório baixado. Abra no navegador; dá para imprimir ou salvar em PDF.')}
+async function baixarReu(k,tipo,per){if(!DL){toast('O download não está disponível nesta visualização.');return}k=k||'';const nome=(k.split('|')[0]||(per?per.de+'-a-'+per.ate:HJ));
+ try{await DL.save({filename:`${tipo==='slides'?'slides':'relatorio'}-${k?'reuniao':'departamento'}-${nome}.html`,data:new Blob([tipo==='slides'?htmlReuSlides(k,per):htmlReuRel(k,per)],{type:'text/html'})});
+  log(`Baixou ${tipo==='slides'?'os slides':'o relatório'} ${k?'da '+reuTit(k).toLowerCase():`do departamento (${per?fmtAno(per.de)+' a '+fmtAno(per.ate):''})`}`);toast(tipo==='slides'?'Slides baixados. Abra o arquivo e use as setas do teclado; F deixa em tela cheia.':'Relatório baixado. Abra no navegador; dá para imprimir ou salvar em PDF.',5000)}
  catch(e){toast('Não foi possível baixar.')}}
+/* o diretor emite relatório ou slides quando quiser, escolhendo o período */
+function periodoEmit(v){const m=MES_ATUAL;if(v==='mes')return {de:m+'-01',ate:HJ,rot:'Mês'};if(v==='ant'){const a=addMes(m,-1);return {de:a+'-01',ate:isoD(new Date(+m.slice(0,4),+m.slice(5,7)-1,0)),rot:'Mês'}}
+ if(v==='tri'){const t=mesesTri(S.tri);return {de:t[0]+'-01',ate:fimTri(S.tri)<HJ?fimTri(S.tri):HJ,rot:'Trimestre'}}return {de:addDia(HJ,-6),ate:HJ,rot:'Semana'}}
+/* o admin escolhe quais áreas aparecem no menu para todos; nada é apagado, só fica escondido */
+function menuSheet(){if(!podeAdmin())return;FORM={tipo:'_menu'};const oc=new Set(ocultos());
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Administração</p><h2 id="sheet-title">Mostrar e ocultar áreas</h2><p class="sub" style="font-size:13px">Desmarque o que não quer que apareça no menu. Vale para todos. Nada é apagado: ao marcar de novo, a área volta como estava.</p></div>
+ <div class="fgrid">${MENU.filter(([k])=>!NAO_OCULTA.includes(k)).map(([k,n])=>`<label class="perm"><input type="checkbox" data-k="${k}" ${oc.has(k)?'':'checked'}><span><b>${esc(n)}</b></span></label>`).join('')}</div>
+ <p class="meta" style="margin:0">Painel e Usuários e permissões ficam sempre visíveis, para dar para voltar aqui.</p>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaMenu()">Salvar</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+async function salvaMenu(){if(FORM?.tipo!=='_menu'||!DB)return;const oc=[...document.querySelectorAll('#sheet input[data-k]')].filter(i=>!i.checked).map(i=>i.dataset.k);
+ try{await DB.doc('config/estrutura').set({...CFG,ocultos:oc});CFG.ocultos=oc;log(`Mudou as áreas do menu${oc.length?`: ocultou ${oc.map(k=>(MENU.find(m=>m[0]===k)||[,k])[1]).join(', ')}`:': todas visíveis'}`);toast('Menu atualizado');fechar();render()}
+ catch(e){toast('Só administradores podem mudar o menu.')}}
+function emitirSheet(){FORM={tipo:'_emit'};const R=proxReunioes(1),k=R[0]?`${R[0].d}|${R[0].h}`:'';
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Para a reunião ou para o diretor</p><h2 id="sheet-title">Emitir relatório ou slides</h2><p class="sub" style="font-size:13px">Painel dos chamados, atrasos, o que a equipe realizou e, se quiser, a pauta da próxima reunião. Com o fundo, o logo e as fotos da equipe.</p></div>
+ <div class="fgrid"><div class="full"><label class="lbl" for="em_per">Período</label><select class="inp" id="em_per"><option value="sem">Últimos 7 dias</option><option value="mes">Este mês até hoje</option><option value="ant">Mês passado</option><option value="tri">Trimestre</option></select></div>
+ ${k?`<label class="perm full"><input type="checkbox" id="em_reu" checked><span><b>Incluir a pauta da ${esc(reuTit(k).toLowerCase())}</b><small>Os assuntos, quem sugeriu e as respostas da equipe.</small></span></label>`:''}</div>
+ <div class="foot"><button class="btn" onclick="fechar()">Fechar</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="emitir('rel','${esc(k)}')">Baixar relatório</button><button class="btn pri" onclick="emitir('slides','${esc(k)}')">Baixar slides</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+function emitir(tipo,k){const per=periodoEmit(val('em_per')),r=document.getElementById('em_reu');baixarReu(r&&r.checked?k:'',tipo,per)}
 function reuSheet(k){FORM={tipo:'_reu',k};const sh=document.getElementById('sheet');sh.classList.add('sheet-reu');sh.innerHTML='';reuPaint(true);document.getElementById('ov').hidden=false;setTimeout(()=>document.getElementById('rq_t')?.focus(),50)}
 // redesenha a reunião sem perder o que está sendo digitado
 function reuPaint(novo){if(FORM?.tipo!=='_reu')return;const sh=document.getElementById('sheet'),k=FORM.k;
@@ -3165,7 +3260,7 @@ window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
 /* rascunhos: o que foi digitado num formulário volta quando você reabre */
 const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
 (function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
-const SEM_RASC=new Set(['_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+const SEM_RASC=new Set(['_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
 function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
 function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
 const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);

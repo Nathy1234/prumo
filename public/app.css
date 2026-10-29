@@ -529,3 +529,13 @@ aside,.panel,.stats,.sheet{backdrop-filter:blur(18px) saturate(1.5);-webkit-back
 .lets{display:flex;flex-wrap:wrap;gap:3px}
 .let{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:6px;background:var(--accent-soft);color:var(--accent-ink);font-size:10.5px;font-weight:700;cursor:default}
 .legend .let{margin-right:4px}
+
+/* andamento do departamento organizado como tabela */
+table.andt{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:760px}
+table.andt th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.andt td{vertical-align:top;padding:10px 8px;border-right:1px solid var(--line-soft)}table.andt td:last-child{border-right:0}
+table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);border-bottom:1px solid var(--line-soft)}
+.andb{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:5px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel);cursor:pointer;min-height:58px;color:var(--ink)}
+.andb b{font-size:12.5px}.andb>span{font-size:11.5px;color:var(--ink-2)}
+.andb.ok{background:var(--ok-bg);border-color:transparent}.andb.ok b{color:var(--ok)}.andb.bad{background:var(--bad-bg);border-color:transparent}.andb.bad b{color:var(--bad)}
+.andb.ac{background:var(--accent-soft);border-color:transparent}.andb.wa{background:var(--warn-bg);border-color:transparent}.andn{color:var(--ink-3)}
