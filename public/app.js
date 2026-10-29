@@ -2617,7 +2617,7 @@ proc(){const b=S.busca.toLowerCase(),l=D.procedimentos.filter(p=>(p.t+' '+p.a).t
 
 melhorias(){const ab=S.sugAba==='sistema'?'sistema':'reuniao',l=D.sugestoes.filter(s=>sugCat(s)===ab);
  const tabs=`<div class="tabs big" role="tablist" aria-label="Tipo de sugestão">${SUG_CAT.map(([k,n])=>{const q=D.sugestoes.filter(s=>sugCat(s)===k&&!sugFeita(s)).length;return `<button role="tab" aria-selected="${ab===k}" class="${ab===k?'on':''}" onclick="S.sugAba='${k}';render()">${n} <span class="meta">${q}</span></button>`}).join('')}</div>`;
- const topo=head('Ideias da equipe','Melhorias e sugestões','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`<button class="btn pri" onclick="sugSheet(null,'${ab}')">Nova sugestão</button>`)+tabs;
+ const topo=head('Ideias da equipe','Melhorias e sugestões','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
  if(!l.length)return topo+`<div class="panel">${vazio(ab==='reuniao'?'Nenhum assunto para as reuniões':'Nenhuma ideia para o sistema',ab==='reuniao'?'Anote aqui o que precisa ser falado e escolha em qual reunião.':'Toda ideia de melhoria começa aqui.')}</div>`;
  if(ab==='sistema')return topo+`<div class="panel">${[...l].sort((x,y)=>sugFeita(x)-sugFeita(y)||(y.v||0)-(x.v||0)).map(linSug).join('')}</div>`;
  const pend=l.filter(s=>!sugFeita(s)),feitas=l.filter(sugFeita).sort((x,y)=>(y.faladoEm||'').localeCompare(x.faladoEm||'')).slice(0,20);
@@ -2628,7 +2628,7 @@ melhorias(){const ab=S.sugAba==='sistema'?'sistema':'reuniao',l=D.sugestoes.filt
  ks.map(k=>{const [d,h]=k.split('|'),ev=d?proxReunioes(40).find(r=>r.d===d&&(r.h||'')===(h||'')):null,passou=d&&d<HJ;
   return `<div class="panel"><div class="ph"><h2>${d?`Reunião de ${esc(reuTxt(d,h))}`:'Sem reunião marcada'}</h2><span>${passou?'<span class="tag wa">já passou · remarque ou marque como falado</span> ':''}${grupos[k].length} ${grupos[k].length===1?'assunto':'assuntos'}${ev?.t?' · '+esc(ev.t):''}</span></div>${grupos[k].sort((x,y)=>(y.v||0)-(x.v||0)).map(linSug).join('')}</div>`}).join('')+
  (feitas.length?`<div class="panel"><div class="ph"><h2>Já falados</h2><span>últimos ${feitas.length}</span></div>${feitas.map(linSug).join('')}</div>`:'')+
- note('Sugestões antigas, de antes das abas, aparecem em Para reuniões. Use Editar para mudar a categoria.')},
+ note('Cada assunto aceita tópicos: qualquer pessoa da equipe escreve no campo do assunto o que não pode esquecer de falar. Na reunião, marque cada tópico conforme for falando. Sugestões antigas, de antes das abas, aparecem em Para reuniões.')},
 
 relat(){const tf=D.tarefas,f=tf.filter(x=>x.s==='feita').length,ms=mesesTri(S.tri),dq=D.destaques.filter(d=>ms.includes(d.mes));
  return head('Para as reuniões','Relatórios','Montados a partir de tudo o que foi registrado no portal.',triNav())+
@@ -2664,7 +2664,18 @@ function proxReunioes(n){const ate=addDia(HJ,70),L=[];
  for(const e of D.eventos.filter(e=>e.tipo==='Reunião'&&vejoEv(e)))for(const d of diasDe(HJ,ate))if(evOcorre(e,d))L.push({d,h:e.hora||'',t:e.t||''});
  return L.sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:(x.h||'').localeCompare(y.h||'')).slice(0,n)}
 function linSug(s){const c=sugCat(s),cri=s.criado||(s.criadoEm||'').slice(0,10),cor={Implantada:'ok','Em teste':'ac','Em análise':'wa',Falado:'ok','A falar':'ac'}[s.e]||'ne';
- return `<div class="row"><button class="btn" onclick="vt('${esc(s.id)}')" aria-label="Votar" title="Apoiar esta sugestão" style="font-variant-numeric:tabular-nums">▲ ${s.v||0}</button><div class="t"><b>${esc(s.t)}</b>${s.obs?`<span style="color:var(--ink-2)">${esc(s.obs)}</span>`:''}<span>Sugerida por ${esc(sugAutor(s))}${cri?` · criada em ${fmtAno(cri)}`:''}${c==='reuniao'&&s.reuData&&sugFeita(s)?` · reunião de ${esc(reuTxt(s.reuData,s.reuHora))}`:''}${s.faladoEm?` · falado em ${fmtAno(s.faladoEm)}`:''}</span></div><span class="tag ${cor}">${esc(s.e||(c==='reuniao'?'A falar':'Nova'))}</span>${c==='reuniao'&&!sugFeita(s)?`<button class="btn ghost" onclick="sugFalado('${esc(s.id)}')">Falado ✓</button>`:''}<button class="btn ghost" onclick="sugSheet('${esc(s.id)}')" aria-label="Editar">Editar</button></div>`}
+ return `<div class="row"><button class="btn" onclick="vt('${esc(s.id)}')" aria-label="Votar" title="Apoiar esta sugestão" style="font-variant-numeric:tabular-nums">▲ ${s.v||0}</button><div class="t"><b>${esc(s.t)}</b>${s.obs?`<span style="color:var(--ink-2)">${esc(s.obs)}</span>`:''}<span>Sugerida por ${esc(sugAutor(s))}${cri?` · criada em ${fmtAno(cri)}`:''}${c==='reuniao'&&s.reuData&&sugFeita(s)?` · reunião de ${esc(reuTxt(s.reuData,s.reuHora))}`:''}${s.faladoEm?` · falado em ${fmtAno(s.faladoEm)}`:''}</span>${c==='reuniao'?topBloco(s):''}</div><span class="tag ${cor}">${esc(s.e||(c==='reuniao'?'A falar':'Nova'))}</span>${c==='reuniao'&&!sugFeita(s)?`<button class="btn ghost" onclick="sugFalado('${esc(s.id)}')">Falado ✓</button>`:''}<button class="btn ghost" onclick="sugSheet('${esc(s.id)}')" aria-label="Editar">Editar</button></div>`}
+/* tópicos: qualquer pessoa acrescenta o que não pode esquecer de falar no assunto */
+const topDe=s=>Array.isArray(s.topicos)?s.topicos:[];
+function topBloco(s){const T=topDe(s),fe=sugFeita(s),sid=esc(s.id);
+ return `<div class="tops">${T.length?`<ul>${T.map(x=>`<li class="${x.ok?'ok':''}"><label><input type="checkbox" ${x.ok?'checked':''} onchange="topOk('${sid}','${esc(x.id)}')" aria-label="Marcar tópico como falado"><span>${esc(x.txt)}</span></label><small>${esc(x.porNome||respNome(x.por)||'')}${x.em?' · '+fmt(x.em.slice(0,10)):''}</small>${!fe&&(x.por===S.perfil||dir())?`<button class="btn ghost xs" onclick="topRem('${sid}','${esc(x.id)}')" aria-label="Tirar tópico" title="Tirar tópico">×</button>`:''}</li>`).join('')}</ul>`:''}${fe?'':`<div class="topadd"><input class="inp" id="tp_${sid}" maxlength="300" placeholder="Acrescentar um tópico para não esquecer" onkeydown="if(event.key==='Enter')addTop('${sid}')"><button class="btn" onclick="addTop('${sid}')">Adicionar</button></div>`}</div>`}
+function addTop(id){const s=D.sugestoes.find(x=>x.id===id),el=document.getElementById('tp_'+id),txt=(el?.value||'').trim().slice(0,300);if(!s||!txt)return;
+ const n={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),txt,por:S.perfil,porNome:euNome(),em:new Date().toISOString(),ok:false};
+ patch('sugestoes',id,{topicos:[...topDe(s),n]},'Tópico acrescentado',`Acrescentou o tópico "${txt}" no assunto "${s.t}"`)}
+function topOk(id,tid){const s=D.sugestoes.find(x=>x.id===id);if(!s)return;
+ patch('sugestoes',id,{topicos:topDe(s).map(x=>x.id===tid?{...x,ok:!x.ok}:x)},null,false)}
+function topRem(id,tid){const s=D.sugestoes.find(x=>x.id===id),x=topDe(s||{}).find(y=>y.id===tid);if(!s||!x)return;if(!confirm(`Tirar o tópico "${x.txt}"?`))return;
+ patch('sugestoes',id,{topicos:topDe(s).filter(y=>y.id!==tid)},'Tópico retirado',`Tirou o tópico "${x.txt}" do assunto "${s.t}"`)}
 function sugFalado(id){const s=D.sugestoes.find(x=>x.id===id);if(!s)return;patch('sugestoes',id,{e:'Falado',faladoEm:HJ},'Marcado como falado',`Marcou como falado na reunião: "${s.t}"`)}
 function sugSheet(id,cat){const s=id?D.sugestoes.find(x=>x.id===id):null;if(id&&!s)return;const c=s?sugCat(s):(cat==='sistema'?'sistema':'reuniao');
  FORM={tipo:'_sug',id:id||null};
@@ -2672,10 +2683,10 @@ function sugSheet(id,cat){const s=id?D.sugestoes.find(x=>x.id===id):null;if(id&&
  const aut=s?(s.a||'dir'):(dir()?'dir':S.perfil),A=autoresSug();if(aut&&!A.some(x=>x[0]===aut))A.push([aut,respNome(aut)]);
  const cri=s?(s.criado||(s.criadoEm||'').slice(0,10)):HJ;
  const st=k=>`<select class="inp" id="sg_e_${k}">${SUG_ST[k].map(x=>`<option ${x===(s?.e)?'selected':''}>${x}</option>`).join('')}${s?.e&&sugCat(s)===k&&!SUG_ST[k].includes(s.e)?`<option selected>${esc(s.e)}</option>`:''}</select>`;
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Melhorias e sugestões</p><h2 id="sheet-title">${s?'Editar sugestão':'Nova sugestão'}</h2></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Melhorias e sugestões</p><h2 id="sheet-title">${c==='reuniao'?(s?'Editar assunto':'Novo assunto'):(s?'Editar sugestão':'Nova sugestão')}</h2></div>
  <div class="fgrid">
-  <div class="full"><label class="lbl" for="sg_t">Sugestão</label><input class="inp" id="sg_t" maxlength="200" value="${esc(s?.t||'')}" placeholder="${c==='reuniao'?'Combinar a ordem das conferências na semana do fechamento':'Avisar no celular quando chegar chamado novo'}"><p class="ferr" id="sge_t"></p></div>
-  <div class="full"><label class="lbl" for="sg_obs">Detalhes · opcional</label><textarea class="inp" id="sg_obs" rows="2" maxlength="600">${esc(s?.obs||'')}</textarea></div>
+  <div class="full"><label class="lbl" for="sg_t">${c==='reuniao'?'Assunto':'Sugestão'}</label><input class="inp" id="sg_t" maxlength="200" value="${esc(s?.t||'')}" placeholder="${c==='reuniao'?'Combinar a ordem das conferências na semana do fechamento':'Avisar no celular quando chegar chamado novo'}"><p class="ferr" id="sge_t"></p></div>
+  <div class="full"><label class="lbl" for="sg_obs">Detalhes · opcional</label>${c==='reuniao'?'<p class="meta" style="margin:0 0 4px">Depois de salvar, qualquer pessoa da equipe pode acrescentar tópicos neste assunto direto na lista.</p>':''}<textarea class="inp" id="sg_obs" rows="2" maxlength="600">${esc(s?.obs||'')}</textarea></div>
   <div><label class="lbl" for="sg_cat">Categoria</label><select class="inp" id="sg_cat" onchange="sugVis()">${SUG_CAT.map(([k,n])=>`<option value="${k}" ${k===c?'selected':''}>${n}</option>`).join('')}</select></div>
   <div><label class="lbl" for="sg_a">Sugerida por</label><select class="inp" id="sg_a">${A.map(([k,n])=>`<option value="${esc(k)}" ${k===aut?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
   <div><span class="lbl">Criada em</span><p style="margin:8px 0 0">${cri?fmtAno(cri):'—'}${s?'':' (hoje)'}</p></div>
@@ -2690,7 +2701,7 @@ function sugVis(){const c=val('sg_cat'),sh=(i,v)=>{const el=document.getElementB
  sh('sgw_e_reuniao',c==='reuniao');sh('sgw_e_sistema',c==='sistema');sh('sgw_reu',c==='reuniao');sh('sgw_outra',c==='reuniao'&&val('sg_reu')==='outra')}
 async function salvaSug(){if(FORM?.tipo!=='_sug'||S.salvandoSug)return;errEl('sge_t','');errEl('sge_od','');
  const t=val('sg_t').slice(0,200),obs=(document.getElementById('sg_obs')?.value||'').trim().slice(0,600),cat=val('sg_cat')==='sistema'?'sistema':'reuniao',a=val('sg_a'),e=val('sg_e_'+cat),r=cat==='reuniao'?val('sg_reu'):'';
- if(!t){errEl('sge_t','Escreva a sugestão.');return}
+ if(!t){errEl('sge_t',cat==='reuniao'?'Escreva o assunto.':'Escreva a sugestão.');return}
  let reuData='',reuHora='',criar=false;
  if(r==='outra'){reuData=val('sg_od');reuHora=val('sg_oh');criar=!!document.getElementById('sg_cria')?.checked;if(!reuData){errEl('sge_od','Escolha a data da reunião.');return}if(reuData<HJ){errEl('sge_od','Escolha hoje ou uma data futura.');return}}
  else if(r){[reuData,reuHora]=r.split('|')}

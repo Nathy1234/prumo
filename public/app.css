@@ -415,3 +415,15 @@ p.meta{white-space:normal}
 
 .phtg{width:100%;background:none;border:0;color:inherit;font:inherit;cursor:pointer;text-align:left;margin:0}
 .phtg:hover span{color:var(--ink)}
+
+.tops{margin-top:6px}
+.tops ul{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:4px}
+.tops li{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+.tops li label{display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0;cursor:pointer}
+.tops li label span{overflow-wrap:anywhere}
+.tops li.ok label span{text-decoration:line-through;color:var(--ink-3)}
+.tops li small{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.tops .xs{padding:0 8px;min-height:24px;font-size:14px}
+.topadd{display:flex;gap:6px;max-width:560px}
+.topadd .inp{flex:1;min-width:0;padding:6px 10px;font-size:13px}
+@media (max-width:600px){.tops li{flex-wrap:wrap}}
