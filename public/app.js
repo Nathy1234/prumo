@@ -2839,11 +2839,41 @@ const reuItens=k=>D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&reuKey(x)===k).so
 const respQuando=x=>x.em?`${fmt(x.em.slice(0,10))} às ${new Date(x.em).toTimeString().slice(0,5)}`:'';
 const CSS_BASE=`:root{--ink:#16201E;--ink2:#3F4A48;--ink3:#5B6664;--acc:#1E5B55;--soft:#E4EFED;--line:#DDE3E1;--bg:#F6F7F7}*{box-sizing:border-box}body{margin:0;font-family:Onest,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:#fff}`;
 const FONTE='<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&display=swap">';
-function htmlReuRel(k){const it=reuItens(k),pe=it.filter(x=>!sugFeita(x)),fa=it.filter(sugFeita),rs=it.reduce((a,x)=>a+topDe(x).length,0);
+/* texto das respostas: linhas e itens com "*" ou "-" viram lista */
+function blocosTxt(t){const out=[];String(t||'').replace(/\r/g,'').split('\n').forEach(l=>{l=l.trim();if(!l)return;
+ const ps=l.split(/\s+\*\s+/);ps.forEach((x,i)=>{x=x.trim();if(!x)return;const b=/^[*\-•]\s*/.test(x)||i>0;out.push({b,t:x.replace(/^[*\-•]\s*/,'')})})});return out}
+const htmlBlocos=B=>{let h='',ul=false;for(const x of B){if(x.b&&!ul){h+='<ul>';ul=true}if(!x.b&&ul){h+='</ul>';ul=false}h+=x.b?`<li>${esc(x.t)}</li>`:`<p>${esc(x.t)}</p>`}return h+(ul?'</ul>':'')};
+// divide os blocos em páginas que cabem num slide
+function paginarBlocos(B,max){const pg=[];let cur=[],n=0;for(const x of B){const parts=x.t.length>max?(()=>{const o=[];let r=x.t;while(r.length>max){let c=r.lastIndexOf(' ',max);if(c<max*0.5)c=max;o.push(r.slice(0,c));r=r.slice(c).trim()}o.push(r);return o})():[x.t];
+ for(const t of parts){if(cur.length&&n+t.length>max){pg.push(cur);cur=[];n=0}cur.push({b:x.b,t});n+=t.length}}if(cur.length)pg.push(cur);return pg}
+/* como foi a semana: os 7 dias até a reunião (ou até hoje, se a reunião ainda vai acontecer) */
+function semanaDados(k){const d=k.split('|')[0],ate=d&&d<HJ?addDia(d,-1):HJ,de=addDia(ate,-6),den=x=>x&&x>=de&&x<=ate;
+ const rec=D.chamados.filter(c=>den(diaCh(c))),con=D.chamados.filter(c=>c.st==='Concluído'&&den((c.concl||'').slice(0,10))),ab=D.chamados.filter(c=>c.st!=='Concluído');
+ const mar=rec.filter(c=>chegadaDe(c)),atr=mar.filter(c=>chegadaDe(c)==='atrasado').length,fp=rec.filter(foraPadrao).length;
+ const pg=D.chamados.map(c=>({c,p:pagSit(c)})).filter(x=>x.p&&x.p.pg&&den(x.p.pg)),pgFora=pg.filter(x=>!x.p.ok);
+ const rot=(D.execucoes||[]).filter(x=>x.s==='feita'&&den(x.dia)).length;
+ const cont=f=>{const m={};rec.forEach(c=>{const n=f(c);if(n)m[n]=(m[n]||0)+1});return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,6)};
+ return {de,ate,rec:rec.length,con:con.length,ab:ab.length,atr,mar:mar.length,fp,pg:pg.length,pgFora:pgFora.length,just:pgFora.filter(x=>x.p.just).map(x=>({a:x.c.assunto||'',j:x.p.just})).slice(0,4),rot,em:emPend().length,
+  cats:cont(c=>assDe(c.cat)?.n||catSugerida(c.desc||'',c.assunto||'')||'Sem assunto'),deps:cont(c=>c.dep?depNome(c.dep):''),
+  feitos:con.sort((a,b)=>(b.concl||'').localeCompare(a.concl||'')).map(c=>({t:c.assunto||c.proto||'',q:c.dep?depNome(c.dep):remNomeCh(c)})),
+  falados:D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&sugFeita(x)&&den(x.faladoEm)).map(x=>x.t)}}
+function realizadoHtml(W,max){const f=W.feitos.slice(0,max),r=W.feitos.length-f.length;
+ return `<div class="g2"><div><h4>Pedidos concluídos (${W.feitos.length})</h4>${f.length?`<ul class="fe">${f.map(x=>`<li>${esc(x.t)}${x.q?` <span>· ${esc(x.q)}</span>`:''}</li>`).join('')}${r?`<li class="mais">e mais ${r}</li>`:''}</ul>`:'<p class="vazio">Nenhum pedido concluído na semana.</p>'}</div>
+ <div><h4>Assuntos já falados na semana (${W.falados.length})</h4>${W.falados.length?`<ul class="fe">${W.falados.slice(0,max).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'<p class="vazio">Nenhum assunto marcado como falado.</p>'}<h4 style="margin-top:14px">Rotinas do cronograma</h4><p class="vazio" style="font-size:inherit;color:var(--ink2)">${W.rot} ${W.rot===1?'rotina concluída':'rotinas concluídas'}</p></div></div>`}
+const barras=L=>{const mx=Math.max(1,...L.map(x=>x[1]));return L.length?`<div class="bars">${L.map(([n,v])=>`<div class="bar"><span class="bn">${esc(n)}</span><span class="bt"><i style="width:${Math.round(v/mx*100)}%"></i></span><b>${v}</b></div>`).join('')}</div>`:'<p class="vazio">Sem dados na semana.</p>'};
+function semanaHtml(W){const pct=W.mar?Math.round(W.atr/W.mar*100):0;
+ return `<div class="kpis"><div><b>${W.rec}</b><span>pedidos recebidos</span></div><div><b>${W.con}</b><span>concluídos</span></div><div><b>${W.ab}</b><span>em aberto agora</span></div><div><b>${W.mar?pct+'%':'—'}</b><span>chegaram atrasados${W.mar?` (${W.atr} de ${W.mar})`:''}</span></div><div><b>${W.fp}</b><span>fora do padrão</span></div><div><b>${W.pg?`${W.pg-W.pgFora}/${W.pg}`:'—'}</b><span>pagamentos no D-5</span></div><div><b>${W.rot}</b><span>rotinas concluídas</span></div><div><b>${W.em}</b><span>e-mails para revisar</span></div></div>
+ <div class="g2"><div><h4>Pedidos por categoria</h4>${barras(W.cats)}</div><div><h4>Pedidos por setor</h4>${barras(W.deps)}</div></div>
+ ${W.just.length?`<h4>Pagamentos fora do D-5</h4><ul class="just">${W.just.map(x=>`<li><b>${esc(x.a)}</b> — ${esc(x.j)}</li>`).join('')}</ul>`:''}`}
+const CSS_DASH=`.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.kpis div{background:var(--bg);border-radius:10px;padding:12px}.kpis b{display:block;font-size:24px;letter-spacing:-.01em}.kpis span{font-size:12px;color:var(--ink3)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:16px}h4{font-size:13px;margin:0 0 8px;color:var(--ink2)}.bars{display:grid;gap:6px}.bar{display:grid;grid-template-columns:38% 1fr 28px;gap:8px;align-items:center;font-size:12.5px}
+.bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bt{background:var(--bg);border-radius:4px;height:10px;overflow:hidden}.bt i{display:block;height:100%;background:var(--acc);border-radius:4px}.bar b{text-align:right;font-variant-numeric:tabular-nums}
+.vazio{font-size:12px;color:var(--ink3);margin:0}.fe{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13px}.fe span{color:var(--ink3)}.fe .mais{color:var(--ink3);list-style:none}.just{margin:0;padding-left:18px;font-size:13px;display:grid;gap:4px}`;
+function htmlReuRel(k){const W=semanaDados(k),it=reuItens(k),pe=it.filter(x=>!sugFeita(x)),fa=it.filter(sugFeita),rs=it.reduce((a,x)=>a+topDe(x).length,0);
  const bloco=(x,i)=>{const T=topDe(x),cri=x.criado||(x.criadoEm||'').slice(0,10);
   return `<section class="as"><div class="hd"><span class="n">${i+1}</span><h2>${esc(x.t)}</h2><span class="st ${sugFeita(x)?'ok':''}">${sugFeita(x)?'Falado':'A falar'}</span></div>
   ${x.obs?`<p class="obs">${esc(x.obs)}</p>`:''}<p class="meta">Sugerido por ${esc(sugAutor(x))}${cri?` em ${fmtAno(cri)}`:''}${x.faladoEm?` · falado em ${fmtAno(x.faladoEm)}`:''}</p>
-  ${T.length?`<ul class="rs">${T.map(r=>`<li><p>${esc(r.txt)}</p><span>${esc(r.porNome||respNome(r.por)||'')}${r.em?' · '+respQuando(r):''}</span></li>`).join('')}</ul>`:'<p class="meta">Sem respostas.</p>'}
+  ${T.length?`<ul class="rs">${T.map(r=>`<li><span class="who">${esc(r.porNome||respNome(r.por)||'Equipe')}<em>${r.em?respQuando(r):''}</em></span><div class="tx">${htmlBlocos(blocosTxt(r.txt))}</div></li>`).join('')}</ul>`:'<p class="meta">Sem respostas.</p>'}
   <div class="enc"><b>Encaminhamento</b><div class="lin"></div><div class="lin"></div></div></section>`};
  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reuTit(k))} · Prumo</title>${FONTE}<style>${CSS_BASE}
  main{max-width:860px;margin:0 auto;padding:40px 24px 64px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:2px solid var(--acc);padding-bottom:16px;margin-bottom:24px}
@@ -2852,33 +2882,57 @@ function htmlReuRel(k){const it=reuItens(k),pe=it.filter(x=>!sugFeita(x)),fa=it.
  .as{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:0 0 14px;break-inside:avoid}.hd{display:flex;align-items:center;gap:10px}.n{width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600;flex:none}
  h2{font-size:17px;margin:0;flex:1}.st{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--acc)}.st.ok{background:#E8F3EA;color:#22663A}
  .obs{margin:10px 0 0;color:var(--ink2);white-space:pre-wrap}.meta{font-size:12px;color:var(--ink3);margin:6px 0 0}
- .rs{list-style:none;margin:12px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);display:grid;gap:8px}.rs p{margin:0;white-space:pre-wrap}.rs span{font-size:12px;color:var(--ink3)}
+ .rs{list-style:none;margin:12px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);display:grid;gap:10px}.who{display:block;font-size:12.5px;font-weight:600;color:var(--acc)}.who em{font-style:normal;font-weight:400;color:var(--ink3);margin-left:8px}.tx p{margin:2px 0}.tx ul{margin:4px 0;padding-left:18px}
+ .sem{border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:0 0 24px}.sem h3{margin-top:0}${CSS_DASH}@media (max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.g2{grid-template-columns:1fr}}
  .enc{margin-top:14px}.enc b{font-size:12px;color:var(--ink3);font-weight:600}.lin{border-bottom:1px solid var(--line);height:26px}
  h3{font-size:14px;color:var(--ink3);margin:28px 0 10px;text-transform:uppercase;letter-spacing:.06em}
  @media print{main{padding:0}.as{border-color:#ccc}}@media (max-width:600px){.nums{grid-template-columns:repeat(2,minmax(0,1fr))}.top{flex-direction:column;align-items:flex-start}.ger{text-align:left}}
  </style></head><body><main><div class="top"><div><p class="ey">Prumo · Financeiro e Contábil</p><h1>${esc(reuTit(k))}</h1></div><div class="ger">Gerado em ${esc(fmtHora(new Date().toISOString()))}<br>por ${esc(euNome())}</div></div>
+ <section class="sem"><h3>Como foi a semana · ${fmt(W.de)} a ${fmt(W.ate)}</h3>${semanaHtml(W)}</section>
+ <section class="sem"><h3>O que foi realizado na semana</h3>${realizadoHtml(W,30)}</section>
  <div class="nums"><div><b>${it.length}</b><span>assuntos</span></div><div><b>${pe.length}</b><span>a falar</span></div><div><b>${fa.length}</b><span>falados</span></div><div><b>${rs}</b><span>respostas</span></div></div>
  ${pe.length?`<h3>Pauta</h3>${pe.map(bloco).join('')}`:''}${fa.length?`<h3>Já falados</h3>${fa.map((x,i)=>bloco(x,pe.length+i)).join('')}`:''}${it.length?'':'<p>Nenhum assunto nesta reunião.</p>'}
  </main></body></html>`}
-function htmlReuSlides(k){const it=reuItens(k),[d,h]=k.split('|');
+function htmlReuSlides(k){const it=reuItens(k),[d,h]=k.split('|'),W=semanaDados(k),tot=it.length;
+ const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+ const quemR=r=>r.porNome||respNome(r.por)||'Equipe';
+ const tit=t=>`<h2 class="${t.length>110?'t3':t.length>60?'t2':''}">${esc(t)}</h2>`;
  const sl=[];
- sl.push(`<section class="capa"><p class="ey">Prumo · Financeiro e Contábil</p><h1>Reunião da equipe</h1><p class="sub">${esc(d?reuTxt(d,h):'Assuntos sem data marcada')}</p><p class="mini">${it.length} ${it.length===1?'assunto':'assuntos'}</p></section>`);
- if(it.length)sl.push(`<section><p class="ey">Pauta</p><h2>O que vamos falar</h2><ol class="pauta">${it.map(x=>`<li><span>${esc(x.t)}</span><em>${esc(sugAutor(x))}</em></li>`).join('')}</ol></section>`);
- it.forEach((x,i)=>{const T=topDe(x);sl.push(`<section><p class="ey">Assunto ${i+1} de ${it.length}</p><h2>${esc(x.t)}</h2>${x.obs?`<p class="obs">${esc(x.obs)}</p>`:''}
-  ${T.length?`<ul class="tp">${T.slice(0,7).map(r=>`<li>${esc(r.txt)}<span>${esc(r.porNome||respNome(r.por)||'')}</span></li>`).join('')}${T.length>7?`<li class="mais">e mais ${T.length-7} no relatório</li>`:''}</ul>`:'<p class="vaz">Sem tópicos registrados. Espaço para a conversa.</p>'}
-  <p class="rod">Sugerido por ${esc(sugAutor(x))}</p></section>`)});
+ sl.push(`<section class="capa"><p class="ey">Prumo · Financeiro e Contábil</p><h1>Reunião da equipe</h1><p class="sub">${esc(d?reuTxt(d,h):'Assuntos sem data marcada')}</p><p class="mini">${tot} ${tot===1?'assunto':'assuntos'} · ${it.reduce((a,x)=>a+topDe(x).length,0)} respostas da equipe</p></section>`);
+ // visão geral: o que vamos falar e o que fizemos na semana
+ sl.push(`<section class="dash"><p class="ey">Visão geral</p><h2>Hoje e a semana que passou</h2><div class="g2 vg"><div><h4>O que vamos falar</h4>${tot?`<ol class="fe">${it.slice(0,8).map(x=>`<li>${esc(x.t.length>90?x.t.slice(0,88)+'…':x.t)}</li>`).join('')}${tot>8?`<li class="mais">e mais ${tot-8}</li>`:''}</ol>`:'<p class="vazio">Nenhum assunto na pauta.</p>'}</div>
+  <div><h4>O que fizemos na semana</h4><ul class="fe"><li><b>${W.con}</b> ${W.con===1?'pedido concluído':'pedidos concluídos'}</li><li><b>${W.rot}</b> ${W.rot===1?'rotina concluída':'rotinas concluídas'}</li><li><b>${W.rec}</b> ${W.rec===1?'pedido recebido':'pedidos recebidos'}</li>${W.pg?`<li><b>${W.pg-W.pgFora} de ${W.pg}</b> pagamentos no D-5</li>`:''}${W.falados.length?`<li><b>${W.falados.length}</b> ${W.falados.length===1?'assunto falado':'assuntos falados'}</li>`:''}</ul></div></div></section>`);
+ // como foi a semana: números e gráficos
+ sl.push(`<section class="dash"><p class="ey">Como foi a semana · ${fmt(W.de)} a ${fmt(W.ate)}</p><h2>Resumo da semana</h2>${semanaHtml({...W,just:[]})}</section>`);
+ sl.push(`<section class="dash"><p class="ey">Como foi a semana · ${fmt(W.de)} a ${fmt(W.ate)}</p><h2>O que foi realizado</h2>${realizadoHtml(W,8)}</section>`);
+ if(W.just.length)sl.push(`<section><p class="ey">Como foi a semana</p><h2>Pagamentos fora do D-5</h2><ul class="lista">${W.just.map(x=>`<li><b>${esc(x.a)}</b><span>${esc(x.j)}</span></li>`).join('')}</ul></section>`);
+ if(tot)sl.push(`<section><p class="ey">Pauta</p><h2>O que vamos falar</h2><ol class="pauta">${it.map((x,i)=>`<li><span class="pn">${i+1}</span><div><b>${esc(x.t)}</b><em>Sugerido por ${esc(sugAutor(x))} · ${topDe(x).length} ${topDe(x).length===1?'resposta':'respostas'}${sugFeita(x)?' · já falado':''}</em></div></li>`).join('')}</ol></section>`);
+ it.forEach((x,i)=>{const T=topDe(x),cab=`<p class="ey">Assunto ${i+1} de ${tot}${sugFeita(x)?' · já falado':''}</p>${tit(x.t)}`,rod=`<p class="rod">Sugerido por <b>${esc(sugAutor(x))}</b>${x.criado?` em ${fmtAno(x.criado)}`:''}</p>`;
+  // abertura do assunto: detalhes e quem respondeu
+  const ob=paginarBlocos(blocosTxt(x.obs),600);
+  sl.push(`<section>${cab}${ob.length?`<div class="det">${htmlBlocos(ob[0])}</div>`:''}${T.length?`<p class="rh">Responderam: ${[...new Set(T.map(quemR))].map(n=>`<span class="chip"><i>${esc(ini(n))}</i>${esc(n)}</span>`).join('')}</p>`:'<p class="vaz">Sem respostas da equipe. Espaço para a conversa.</p>'}${rod}</section>`);
+  ob.slice(1).forEach(pgx=>sl.push(`<section>${cab}<div class="det"><span class="cont">detalhes · continuação</span>${htmlBlocos(pgx)}</div>${rod}</section>`));
+  // uma resposta por slide (ou mais, se for longa), com o nome de quem respondeu
+  T.forEach((r,ri)=>{const pgs=paginarBlocos(blocosTxt(r.txt),780);pgs.forEach((pgx,pi)=>sl.push(`<section>${cab}<div class="card"><div class="ch"><span class="av">${esc(ini(quemR(r)))}</span><div><b>${esc(quemR(r))}</b><span class="qd">Resposta ${ri+1} de ${T.length}${r.em?' · '+esc(respQuando(r)):''}${pgs.length>1?` · parte ${pi+1} de ${pgs.length}`:''}</span></div></div><div class="tx">${htmlBlocos(pgx)}</div></div>${rod}</section>`))})});
  sl.push(`<section class="capa"><p class="ey">Encerramento</p><h1>Encaminhamentos</h1><p class="sub">Quem faz o quê, e até quando.</p></section>`);
  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slides · ${esc(reuTit(k))}</title>${FONTE}<style>${CSS_BASE}
  html,body{height:100%;background:#0E1413}.deck{position:fixed;inset:0;display:grid;place-items:center}
- section{display:none;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));background:#fff;padding:6% 7%;flex-direction:column;position:relative;font-size:min(2.2vw,3.9vh)}
- section.on{display:flex}.ey{font-size:.62em;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);font-weight:600;margin:0 0 .8em}
- h1{font-size:2.6em;margin:0;letter-spacing:-.02em;line-height:1.05}h2{font-size:1.9em;margin:0 0 .6em;letter-spacing:-.01em;line-height:1.15}
+ section{display:none;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));background:#fff;padding:4.5% 7% 7%;flex-direction:column;position:relative;font-size:min(2.1vw,3.75vh);overflow:hidden}
+ section.on{display:flex}.ey{font-size:.58em;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);font-weight:600;margin:0 0 .6em}
+ h1{font-size:2.6em;margin:0;letter-spacing:-.02em;line-height:1.05}h2{font-size:1.5em;margin:0 0 .7em;letter-spacing:-.01em;line-height:1.15}h2.t2{font-size:1.15em}h2.t3{font-size:.95em}
  .capa{justify-content:center;background:var(--acc);color:#fff}.capa .ey{color:#A9DAD2}.capa .sub{font-size:1.1em;margin:.8em 0 0;color:#D6ECE8}.capa .mini{font-size:.7em;margin:2em 0 0;color:#A9DAD2}
- .pauta{margin:0;padding-left:1.2em;display:grid;gap:.45em;font-size:.95em}.pauta li span{font-weight:500}.pauta em{font-style:normal;color:var(--ink3);font-size:.7em;margin-left:.6em}
- .obs{color:var(--ink2);margin:0 0 .8em;font-size:.9em;white-space:pre-wrap}.tp{margin:0;padding-left:1.1em;display:grid;gap:.5em;font-size:.85em}.tp span{display:block;font-size:.65em;color:var(--ink3)}.tp .mais{color:var(--ink3);list-style:none}
- .vaz{color:var(--ink3);font-size:.85em}.rod{position:absolute;left:7%;bottom:5%;margin:0;font-size:.6em;color:var(--ink3)}
+ .pauta{list-style:none;margin:0;padding:0;display:grid;gap:.5em}.pauta li{display:flex;gap:.7em;align-items:flex-start}.pauta .pn{flex:none;width:1.6em;height:1.6em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.65em;font-weight:600;margin-top:.15em}
+ .pauta b{display:block;font-weight:600;font-size:.82em}.pauta em{font-style:normal;color:var(--ink3);font-size:.58em}
+ .det{background:var(--bg);border-radius:.6em;padding:.8em 1em;font-size:.72em;color:var(--ink2);line-height:1.45}.det p{margin:.15em 0}.det ul{margin:.2em 0;padding-left:1.2em}.cont{display:block;font-size:.8em;color:var(--ink3);margin-bottom:.3em}
+ .rh{font-size:.62em;color:var(--ink3);margin:.9em 0 0;display:flex;flex-wrap:wrap;gap:.4em;align-items:center}.chip{display:inline-flex;align-items:center;gap:.35em;background:var(--soft);color:var(--acc);border-radius:999px;padding:.2em .7em .2em .25em;font-weight:500}.chip i{font-style:normal;width:1.5em;height:1.5em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.75em}
+ .card{border:1px solid var(--line);border-radius:.7em;padding:.8em 1.1em;display:flex;flex-direction:column;gap:.5em}.ch{display:flex;align-items:center;gap:.6em}.ch b{display:block;font-size:.8em}.qd{display:block;font-size:.55em;color:var(--ink3)}
+ .av{flex:none;width:2.1em;height:2.1em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.6em;font-weight:600}
+ .tx{font-size:.72em;line-height:1.45}.tx p{margin:.2em 0}.tx ul{margin:.25em 0;padding-left:1.2em;display:grid;gap:.2em}
+ .lista{margin:0;padding-left:1.1em;display:grid;gap:.5em;font-size:.75em}.lista span{display:block;color:var(--ink2);font-size:.9em}
+ .vaz{color:var(--ink3);font-size:.75em}.rod{position:absolute;left:7%;bottom:3.5%;margin:0;font-size:.52em;color:var(--ink3)}.rod b{color:var(--ink2);font-weight:600}
+ .dash{font-size:min(1.55vw,2.75vh)}.vg .fe{font-size:1.05em;gap:.45em}.vg .fe b{color:var(--acc)}.dash h2{font-size:1.9em}${CSS_DASH.replace(/font-size:24px/g,'font-size:1.9em').replace(/font-size:12px/g,'font-size:.85em').replace(/font-size:12.5px/g,'font-size:.9em').replace(/font-size:13px/g,'font-size:.95em')}
  .nav{position:fixed;right:16px;bottom:12px;color:#9FB0AC;font:12px Onest,system-ui,sans-serif;display:flex;gap:8px;align-items:center}.nav button{background:#1D2826;color:#E7ECEA;border:0;border-radius:8px;min-width:40px;min-height:36px;font:inherit;cursor:pointer}
- @media print{@page{size:1280px 720px;margin:0}html,body{background:#fff}.deck{position:static;display:block}section{display:flex!important;width:1280px;height:720px;font-size:28px;page-break-after:always}.nav{display:none}}
+ @media print{@page{size:1280px 720px;margin:0}html,body{background:#fff}.deck{position:static;display:block}section{display:flex!important;width:1280px;height:720px;font-size:27px;page-break-after:always}.dash{font-size:20px}.nav{display:none}}
  </style></head><body><div class="deck">${sl.map((x,i)=>i?x:x.replace('<section class="capa">','<section class="capa on">')).join('')}</div>
  <div class="nav"><button id="ant" aria-label="Slide anterior">‹</button><span id="pos"></span><button id="prox" aria-label="Próximo slide">›</button></div>
  <script>(function(){var S=[].slice.call(document.querySelectorAll('section')),i=0,p=document.getElementById('pos');function ir(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach(function(s,j){s.classList.toggle('on',j===i)});p.textContent=(i+1)+' / '+S.length}
