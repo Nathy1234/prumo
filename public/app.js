@@ -345,6 +345,41 @@ const assLista=()=>[...D.assuntos].sort((a,b)=>(a.n||'').localeCompare(b.n||''))
 const subsDe=id=>(assDe(id)?.subs||[]).filter(Boolean);
 const catTxt=c=>`${assNome(c.cat)}${c.subcat?' › '+c.subcat:''}`;
 const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+/* categorias automáticas dos chamados: pedidos parecidos viram uma aba de assunto.
+   Só preenche chamados sem assunto; nunca troca o que alguém escolheu e não apaga nada. */
+const CATS_SUG=[
+ ['Reembolso',['reembolso','reembolsos','reembolsar','ressarcimento','ressarcir']],
+ ['Adiantamento',['adiantamento','adiantamentos']],
+ ['Diárias e viagens',['diaria','diarias','viagem','viagens','hospedagem','passagem','passagens','quilometragem','km rodado','combustivel']],
+ ['Prestação de contas',['prestacao de contas','prestar contas']],
+ ['Folha e RH',['folha','folha de pagamento','rescisao','rescisoes','ferias','13 salario','decimo terceiro','salario','salarios','pensao','vale transporte','vale alimentacao','beneficio','beneficios']],
+ ['Impostos e guias',['imposto','impostos','guia','guias','darf','gps','fgts','inss','iss','irrf','pis','cofins','csll','tributo','tributos','das simples']],
+ ['Repasse de polos',['polo','polos','repasse','repasses']],
+ ['Nota fiscal',['nota fiscal','notas fiscais','nf','nfe','nf-e','nfse','nfs-e','danfe','xml']],
+ ['Estorno e devolução',['estorno','estornos','devolucao','devolver','cancelamento']],
+ ['Cadastro e dados bancários',['cadastro de fornecedor','cadastrar fornecedor','dados bancarios','conta bancaria','alteracao bancaria']],
+ ['Contratos',['contrato','contratos','aditivo']],
+ ['Cartão corporativo',['cartao corporativo','fatura do cartao']],
+ ['Compras e orçamentos',['pedido de compra','orcamento','orcamentos','cotacao']],
+ ['Pagamento a fornecedor',['boleto','boletos','fornecedor','fornecedores','fatura','faturas','pix','pagamento','pagamentos']]];
+const temPal=(nt,k)=>new RegExp('(^|[^a-z0-9])'+reEsc(norm(k))+'([^a-z0-9]|$)').test(nt);
+function catSugerida(t){const nt=norm(t);let best=null,bs=0;
+ for(const [n,ks] of CATS_SUG){let sc=0;for(const k of ks)if(temPal(nt,k))sc+=k.includes(' ')?2:1;if(sc>bs){bs=sc;best=n}}return best}
+const slugCat=n=>'auto_'+norm(n).replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+async function autoCategorias(){if(S._acat||!real()||S.sim||!DB||!(pode('chamados')||pode('cadastros')))return;
+ const tent=S._acTent=S._acTent||new Set();
+ const L=D.chamados.filter(c=>!assDe(c.cat)&&!c.catManual&&!tent.has(c.id)).slice(0,150);if(!L.length)return;
+ S._acat=true;let n=0;const novas=[];
+ try{for(const c of L){tent.add(c.id);const txt=`${c.assunto||''} ${c.desc||''} ${c.subcat||''} ${c.tipo&&c.tipo!=='Outros'?c.tipo:''}`;
+   let id=assPorTexto(txt);
+   if(!assDe(id)){const nome=catSugerida(txt);if(!nome)continue;
+    const ex=D.assuntos.find(a=>norm(a.n)===norm(nome));id=ex?.id||slugCat(nome);
+    if(!ex&&!assDe(id)){const ks=CATS_SUG.find(x=>x[0]===nome)[1];if(!await salvar('assuntos',id,{n:nome,palavras:ks.join(', '),dias:3,subs:[],auto:true,criado:HJ,criadoPor:S.perfil},null,false))continue;novas.push(nome)}}
+   const at=D.chamados.find(x=>x.id===c.id);if(!at||assDe(at.cat))continue;
+   if(await patch('chamados',c.id,{cat:id,catAuto:true},null,false))n++}
+  if(n)log(`Separou ${n} ${n===1?'chamado':'chamados'} em abas de assunto automaticamente${novas.length?` (abas novas: ${novas.join(', ')})`:''}`);
+  if(novas.length)toast(`Abas novas em Chamados: ${novas.join(', ')}`)}
+ catch(e){}finally{S._acat=false}}
 function assPorTexto(t){const nt=norm(t);let best='',bs=0;
  for(const a of D.assuntos){const ks=[a.n,...String(a.palavras||'').split(/[,;]+/),...(a.subs||[])].map(x=>norm(x).trim()).filter(x=>x.length>1);let s=0;
   for(const k of ks)if(new RegExp('(^|[^a-z0-9])'+reEsc(k)).test(nt))s++;
@@ -455,7 +490,7 @@ async function salvaAceite(){const tit=val('ac_tit'),prazo=val('ac_prazo'),resp=
  if(!prazo){errEl('ace_prazo','Defina o prazo de entrega.');ok=false}
  if(!resp){errEl('ace_resp','Escolha o responsável.');ok=false}
  if(!ok||S.triando)return;
- const campos={assunto:tit.slice(0,200),cat:val('ac_cat'),subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
+ const campos={assunto:tit.slice(0,200),cat:val('ac_cat'),catManual:true,subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
  const aceite={aceito:HJ,aceitoEm:new Date().toISOString(),aceitoPor:S.perfil,aceitoUid:ME.uid||null,aceitoNome:euNome()};
  const desc=`prazo ${fmt(prazo)} · ${respNome(resp)}${campos.cat?' · '+catTxt(campos):''}`;
  if(FORM.email){const em=D.emails.find(x=>x.id===FORM.email);if(!em)return;S.triando=true;
@@ -2509,7 +2544,7 @@ chamados(){if(!pode('chamados'))return V.triagem();const fCat=S.fCat||'',bq=norm
  ${S.fRem?`<div class="remg remh"><span class="av">${esc((remNomeCh(rCh[0]||{})||'?')[0].toUpperCase())}</span><div class="t"><b>${esc(remNomeCh(rCh[0]||{}))}</b><span>${esc(rSel?.email||'')} · ${rCh.length} ${rCh.length===1?'chamado':'chamados'}, ${rCh.filter(c=>c.st!=='Concluído').length} em aberto</span></div>
  ${pode('email')||pode('cadastros')?`<select class="inp" style="width:auto;max-width:100%" aria-label="Setor do remetente" onchange="setRem('${esc(S.fRem)}',{dep:this.value})"><option value="">Setor: não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===(rSel?rSel.dep:rCh[0]?.dep)?'selected':''}>Setor: ${esc(d.n)}</option>`).join('')}</select>`:''}<button class="btn ghost" onclick="editRem('${esc(S.fRem)}')">E-mails e opções</button><button class="btn ghost" onclick="S.fRem='';render()">Ver todos</button></div>`:''}
  <div class="kanban">${ordemEt().map(e=>{const it=l.filter(c=>c.st===e).sort((a,b)=>e==='Concluído'?((b.concl||'')<(a.concl||'')?-1:1):((a.prazo||a.venc||'9')<(b.prazo||b.venc||'9')?-1:1));const ci=ordemEt().indexOf(e),ce=ETAPAS.indexOf(e);return `<div class="col"><h3 id="colh_${ce}"><span class="cn" ${podeCol()?`ondblclick="colNome(${ce})" title="Clique duas vezes para renomear"`:''}>${esc(nomeEt(e))}</span><span class="cdir">${podeCol()?`<span class="cact"><button ${ci?'':'disabled'} onclick="colMove(${ce},-1)" aria-label="Mover coluna para a esquerda" title="Mover para a esquerda">‹</button><button onclick="colNome(${ce})" aria-label="Renomear coluna" title="Renomear">✎</button><button ${ci<ETAPAS.length-1?'':'disabled'} onclick="colMove(${ce},1)" aria-label="Mover coluna para a direita" title="Mover para a direita">›</button></span>`:''}<span>${it.length}</span></span></h3>${e==='Concluído'?'<span class="meta" style="font-size:11.5px">Últimos 30 dias</span>':''}${it.map(c=>cardCh(c,true)).join('')}${e==='Concluído'&&pode('realizadas')?`<button class="btn ghost" onclick="ir('realizadas')">Ver todas as realizadas</button>`:''}</div>`}).join('')}</div>`+
- note('Clique em um assunto para ver só as demandas dele. Os outros departamentos veem só Abrir chamado e Meus chamados. Quem não tem a permissão Abrir e-mails no portal vê o resumo, o assunto e a categoria, sem o e-mail.')},
+ note('Pedidos parecidos são separados sozinhos em abas (Reembolso, Nota fiscal, Impostos…). Se o Prumo errar, abra o chamado e troque o assunto: o que você escolher não é mudado de novo. Nenhum e-mail ou chamado sai da tela por causa disso. Clique em um assunto para ver só as demandas dele. Os outros departamentos veem só Abrir chamado e Meus chamados. Quem não tem a permissão Abrir e-mails no portal vê o resumo, o assunto e a categoria, sem o e-mail.')},
 realizadas(){const per=S.rPer||'mes';
  const ini={mes:MES_ATUAL+'-01',mesant:addMes(MES_ATUAL,-1)+'-01',tri:mesesTri(triDe(MES_ATUAL))[0]+'-01','12m':isoD(new Date(Date.now()-365*864e5)),tudo:''}[per]??'',fim=per==='mesant'?MES_ATUAL+'-01':'9999';
  const L=D.chamados.filter(c=>c.st==='Concluído'&&(c.concl||'')>=ini&&(c.concl||'')<fim&&(!S.rCat||(S.rCat==='_sem'?!assDe(c.cat):c.cat===S.rCat))&&(!S.rDep||(S.rDep==='_sem'?!c.dep:c.dep===S.rDep))&&(!S.rQuem||quemFez(c)===S.rQuem)).sort((a,b)=>(b.conclEm||b.concl||'')<(a.conclEm||a.concl||'')?-1:1);
@@ -2972,5 +3007,5 @@ render();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
  setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);
  setTimeout(limparHorasModelo,6000);setInterval(limparHorasModelo,3e4);
- setTimeout(autoOrganizar,9000);setInterval(autoOrganizar,3e4);
+ setTimeout(autoOrganizar,9000);setInterval(autoOrganizar,3e4);setTimeout(autoCategorias,12000);setInterval(autoCategorias,6e4);
 })();
