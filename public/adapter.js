@@ -191,11 +191,17 @@
   const corDe = id => cores[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % cores.length];
   function criarUser(u, nome, admin) {
     const cache = {};
+    window.portalSalvarFoto = async foto => {
+      const { error } = await sb.from('perfis').update({ avatar: foto || null, atualizado: new Date().toISOString() }).eq('id', u.id);
+      if (error) throw error;
+      cache[u.id] = { ...(cache[u.id] || { id: u.id, nome }), avatar: foto || null };
+      return true;
+    };
     const perfilDe = (id, row) => ({ id, name: row?.nome || '', avatarUrl: row?.avatar || '', color: corDe(id), email: null, isMe: id === u.id, guest: false });
     return {
       isOwner: async () => admin, canEdit: async () => admin, can: async () => true,
       id: async () => u.id, name: async () => nome, email: async () => u.email,
-      me: async () => ({ id: u.id, name: nome, avatarUrl: '', color: corDe(u.id), email: u.email, isOwner: admin, canEdit: admin }),
+      me: async () => ({ id: u.id, name: nome, avatarUrl: cache[u.id]?.avatar || '', color: corDe(u.id), email: u.email, isOwner: admin, canEdit: admin }),
       profiles: async ids => {
         ids = [...new Set([].concat(ids || []).filter(Boolean))];
         const faltam = ids.filter(i => !(i in cache) && /^[0-9a-f-]{36}$/i.test(i));
@@ -386,6 +392,13 @@
       return data?.session?.provider_token || null;
     }
     window.portalMsStatus = () => msFuncao({ acao: 'status' }).catch(() => null);
+    window.portalFotoMicrosoft = async () => {
+      const t = await token('eu'); if (!t) return null;
+      const r = await fetch('https://graph.microsoft.com/v1.0/me/photos/240x240/$value', { headers: { Authorization: 'Bearer ' + t } });
+      if (!r.ok) return null;
+      const b = await r.blob();
+      return await new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => ok(null); fr.readAsDataURL(b); });
+    };
     // Renova antes de vencer, enquanto o portal está aberto.
     setInterval(() => { for (const tipo of ['equipe', 'eu']) { try { const s = JSON.parse(sessionStorage.getItem(CH[tipo]) || 'null'); if (s && s.exp - Date.now() < 10 * 60e3) { sessionStorage.removeItem(CH[tipo]); renovar(tipo); } } catch (e) {} } }, 5 * 60e3);
     async function graph(metodo, url, corpo, extras) {
