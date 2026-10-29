@@ -685,7 +685,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=97;
+const PRUMO_ATUALIZACOES=98;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -693,6 +693,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-29','Relatório e slides das reuniões só para admin e diretor, com liberação pelo admin'],
  ['2026-10-29','Equipe no trimestre compara o tempo percorrido com o L, B e C do calendário'],
  ['2026-10-29','Botão "Não teve" para os dias sem lançamento, baixa ou conciliação'],
  ['2026-10-29','Férias e ausências, aniversários e tempo de casa no painel; ajuste de outubro no cronograma'],
@@ -788,6 +789,9 @@ const semMovDe=(rid,dia,sis)=>(D.semmov||[]).find(m=>m.rot===rid&&m.dia===dia&&!
 async function naoTeve(rid,dia,on){const r=D.cronograma.find(x=>x.id===rid);if(!r)return;const sis=multiSis(r)?sisAtual():((r.sis||[])[0]||''),id=`${dia}_${rid}${multiSis(r)?'_'+sis:''}`;
  if(on){await salvar('semmov',id,{rot:rid,dia,sis,por:S.perfil,nome:euNome(),em:new Date().toISOString(),desfeito:false},'Marcado: não teve no dia',`Marcou que não teve "${r.t}" em ${fmt(dia)}`)}
  else{const m=semMovDe(rid,dia,sis);if(m)await patch('semmov',m.id,{desfeito:true,desfeitoPor:euNome()},'Desfeito',`Desfez o "não teve" de "${r.t}" em ${fmt(dia)}`)}}
+/* relatório e slides das reuniões: só admin e diretor, até o admin liberar para a equipe */
+const podeReuExp=()=>podeAdmin()||dir()||CFG.reuExpTodos===true;
+async function libReuExp(){if(!podeAdmin()||!DB)return;const v=!CFG.reuExpTodos;try{await DB.doc('config/estrutura').set({...CFG,reuExpTodos:v});CFG.reuExpTodos=v;log(v?'Liberou o relatório e os slides das reuniões para a equipe':'Deixou o relatório e os slides das reuniões só para admin e diretor');toast(v?'Liberado para a equipe':'Agora só admin e diretor',3500);render()}catch(e){toast('Só administradores podem mudar.')}}
 const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'};
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
@@ -3016,7 +3020,7 @@ proc(){const b=S.busca.toLowerCase(),l=D.procedimentos.filter(p=>(p.t+' '+p.a).t
 
 melhorias(){const ab=S.sugAba==='sistema'?'sistema':'reuniao',l=D.sugestoes.filter(s=>sugCat(s)===ab);
  const tabs=`<div class="tabs big" role="tablist" aria-label="Tipo de sugestão">${SUG_CAT.map(([k,n])=>{const q=D.sugestoes.filter(s=>sugCat(s)===k&&!sugFeita(s)).length;return `<button role="tab" aria-selected="${ab===k}" class="${ab===k?'on':''}" onclick="S.sugAba='${k}';render()">${n} <span class="meta">${q}</span></button>`}).join('')}</div>`;
- const topo=head('Ideias da equipe','Melhorias e sugestões','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
+ const topo=head('Ideias da equipe','Melhorias e sugestões','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`${podeAdmin()?`<button class="btn ghost" onclick="libReuExp()" title="Quem pode baixar o relatório e os slides das reuniões">Relatório e slides: ${CFG.reuExpTodos?'liberados para a equipe':'só admin e diretor'}</button>`:''}<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
  if(!l.length)return topo+`<div class="panel">${vazio(ab==='reuniao'?'Nenhum assunto para as reuniões':'Nenhuma ideia para o sistema',ab==='reuniao'?'Anote aqui o que precisa ser falado e escolha em qual reunião.':'Toda ideia de melhoria começa aqui.')}</div>`;
  if(ab==='sistema')return topo+`<div class="panel">${[...l].sort((x,y)=>sugFeita(x)-sugFeita(y)||(y.v||0)-(x.v||0)).map(linSug).join('')}</div>`;
  const R=proxReunioes(4),ks=new Set([...R.map(r=>`${r.d}|${r.h}`),...l.map(reuKey)]);
@@ -3085,7 +3089,7 @@ function reuCard(k,l){const it=l.filter(x=>reuKey(x)===k),pe=it.filter(x=>!sugFe
  return `<div class="panel reucard"><div class="ph"><h2>${esc(reuTit(k))}</h2>${tag}</div>${ev?.t&&!/^reuni[aã]o$/i.test(ev.t)?`<p class="meta" style="margin:0">${esc(ev.t)}</p>`:''}
  <p class="reunum">${it.length?`<b>${pe.length}</b> ${pe.length===1?'assunto a falar':'assuntos a falar'} · <b>${it.length-pe.length}</b> ${it.length-pe.length===1?'falado':'falados'} · <b>${rs}</b> ${rs===1?'resposta':'respostas'}`:'Nenhum assunto ainda.'}</p>
  ${it.length?`<ul class="reuprev">${it.slice(0,4).map(x=>`<li class="${sugFeita(x)?'ok':''}">${esc(x.t)}${topDe(x).length?` <span class="meta">· ${topDe(x).length}</span>`:''}</li>`).join('')}${it.length>4?`<li class="meta">e mais ${it.length-4}</li>`:''}</ul>`:''}
- <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" onclick="reuSheet('${esc(k)}')">${it.length?'Abrir reunião':'Abrir e criar assunto'}</button>${it.length?`<button class="btn" onclick="baixarReu('${esc(k)}','rel')">Relatório</button><button class="btn" onclick="baixarReu('${esc(k)}','slides')">Slides</button>`:''}</div></div>`}
+ <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" onclick="reuSheet('${esc(k)}')">${it.length?'Abrir reunião':'Abrir e criar assunto'}</button>${it.length&&podeReuExp()?`<button class="btn" onclick="baixarReu('${esc(k)}','rel')">Relatório</button><button class="btn" onclick="baixarReu('${esc(k)}','slides')">Slides</button>`:''}</div></div>`}
 /* relatório e slides da reunião (arquivos HTML que abrem no navegador; dá para imprimir ou salvar em PDF) */
 const reuItens=k=>D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&reuKey(x)===k).sort((x,y)=>sugFeita(x)-sugFeita(y)||(x.criadoEm||x.criado||'').localeCompare(y.criadoEm||y.criado||''));
 const respQuando=x=>x.em?`${fmt(x.em.slice(0,10))} às ${new Date(x.em).toTimeString().slice(0,5)}`:'';
@@ -3261,7 +3265,7 @@ function htmlReuSlides(k,per){per=per||perReu(k);const it=k?reuItens(k):[],[d,h]
  <script>(function(){var S=[].slice.call(document.querySelectorAll('section')),i=0,p=document.getElementById('pos');S.forEach(function(s,j){var g=s.querySelector('.pg');if(g)g.textContent=(j+1)+' / '+S.length});function ir(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach(function(s,j){s.classList.toggle('on',j===i)});p.textContent=(i+1)+' / '+S.length}
  document.getElementById('ant').onclick=function(){ir(i-1)};document.getElementById('prox').onclick=function(){ir(i+1)};
  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();ir(i+1)}if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();ir(i-1)}if(e.key==='f'){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}});ir(0)})()</script></body></html>`}
-async function baixarReu(k,tipo,per){if(!DL){toast('O download não está disponível nesta visualização.');return}k=k||'';const nome=(k.split('|')[0]||(per?per.de+'-a-'+per.ate:HJ));
+async function baixarReu(k,tipo,per){if(!podeReuExp()){toast('Relatório e slides estão liberados só para o admin e o diretor.');return}if(!DL){toast('O download não está disponível nesta visualização.');return}k=k||'';const nome=(k.split('|')[0]||(per?per.de+'-a-'+per.ate:HJ));
  try{await DL.save({filename:`${tipo==='slides'?'slides':'relatorio'}-${k?'reuniao':'departamento'}-${nome}.html`,data:new Blob([tipo==='slides'?htmlReuSlides(k,per):htmlReuRel(k,per)],{type:'text/html'})});
   log(`Baixou ${tipo==='slides'?'os slides':'o relatório'} ${k?'da '+reuTit(k).toLowerCase():`do departamento (${per?fmtAno(per.de)+' a '+fmtAno(per.ate):''})`}`);toast(tipo==='slides'?'Slides baixados. Abra o arquivo e use as setas do teclado; F deixa em tela cheia.':'Relatório baixado. Abra no navegador; dá para imprimir ou salvar em PDF.',5000)}
  catch(e){toast('Não foi possível baixar.')}}
@@ -3322,7 +3326,7 @@ function reuPaint(novo){if(FORM?.tipo!=='_reu')return;const sh=document.getEleme
  const ae=document.activeElement,fid=ae&&sh.contains(ae)?ae.id:null,pos=fid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null,top=sh.scrollTop;
  const it=D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&reuKey(x)===k).sort((x,y)=>sugFeita(x)-sugFeita(y)||(x.criadoEm||x.criado||'').localeCompare(y.criadoEm||y.criado||''));
  const pe=it.filter(x=>!sugFeita(x)).length;
- sh.innerHTML=`<div><p class="eyebrow">Melhorias · reunião da equipe</p><h2 id="sheet-title">${esc(reuTit(k))}</h2><p class="sub" style="font-size:13px">${it.length?`${pe} ${pe===1?'assunto a falar':'assuntos a falar'} de ${it.length}. Responda em cada assunto o que não pode esquecer.`:'Nenhum assunto ainda. Crie o primeiro.'}</p>${it.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="baixarReu(FORM.k,'rel')">Relatório (HTML)</button><button class="btn" onclick="baixarReu(FORM.k,'slides')">Slides para apresentar</button></div>`:''}</div>
+ sh.innerHTML=`<div><p class="eyebrow">Melhorias · reunião da equipe</p><h2 id="sheet-title">${esc(reuTit(k))}</h2><p class="sub" style="font-size:13px">${it.length?`${pe} ${pe===1?'assunto a falar':'assuntos a falar'} de ${it.length}. Responda em cada assunto o que não pode esquecer.`:'Nenhum assunto ainda. Crie o primeiro.'}</p>${it.length&&podeReuExp()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="baixarReu(FORM.k,'rel')">Relatório (HTML)</button><button class="btn" onclick="baixarReu(FORM.k,'slides')">Slides para apresentar</button></div>`:''}</div>
  <div class="reunovo"><label class="lbl" for="rq_t">Novo assunto</label><input class="inp" id="rq_t" maxlength="200" placeholder="O que precisa ser falado nesta reunião" onkeydown="if(event.key==='Enter'){event.preventDefault();reuNovo()}"><textarea class="inp" id="rq_obs" rows="2" maxlength="5000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,420)+'px'" placeholder="Detalhes · opcional"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn pri" onclick="reuNovo()">Criar assunto</button></div></div>
  ${it.map(reuAssunto).join('')}
  <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;
