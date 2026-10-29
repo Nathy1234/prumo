@@ -302,13 +302,14 @@ function detalheCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;FORM={
  const h=D.logs.filter(l=>(l.alvo||'').includes(c.proto)||(l.acao||'').includes(c.proto));
  const linha=(l,v)=>v?`<div class="row"><div class="t"><span>${l}</span><b>${esc(v)}</b></div></div>`:'';
  const sp=stPrazo(c),eq=!solic()&&pode('chamados'),le=pode('ler_email');
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(nomeEt(c.st))}${c.sub?' · '+esc(c.sub):''}</span>${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}</div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · aberto em ${fmt(c.aberto)}</p><h2 id="sheet-title">${esc(c.assunto)}</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span class="tag ${stCh[c.st]}">${esc(nomeEt(c.st))}${c.sub?' · '+esc(c.sub):''}</span>${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${c.fora?'<span class="tag wa">Fora do prazo da política</span>':''}${pagTag(c)}${padraoTag(c)}</div>
  ${pode('chamados')||dir()?`<div class="chegada"><span class="lbl" style="margin:0">Chegou ao financeiro</span><button class="chip ${chegadaDe(c)==='prazo'?'on':''}" onclick="marcaChegada('${esc(c.id)}','prazo')">Em dia</button><button class="chip ${chegadaDe(c)==='atrasado'?'on bad':''}" onclick="marcaChegada('${esc(c.id)}','atrasado')">Atrasado</button><span class="meta">${!c.chegada&&c.origem==='email'?'automático pelo texto do e-mail':c.chegadaAuto?(c.prazoEnv?`automático · pedido para ${fmtAno(c.prazoEnv)}, chegou ${antecDias(c.recebidoEm||c.abertoEm,c.prazoEnv)} ${CHEG_UTEIS()?'dias úteis':'dias'} antes (mínimo ${chegTxt()})`:'automático · o e-mail não trazia data de prazo'):c.chegada?`marcado por ${esc(c.chegadaPor||'—')}`:''}</span></div>`:''}</div>
  ${c.pend?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>Pendência: ${esc(c.pend)}</span></div>`:''}
- <div>${linha('Tipo',c.tipo)}${linha('Assunto',c.cat||c.subcat?catTxt(c):'Sem assunto')}${linha('Setor',c.dep?depNome(c.dep):'Não definido')}${linha(c.origem==='email'?'Remetente':'Solicitante',c.solicitante)}${linha('Chegou em',c.recebidoEm?fmtHora(c.recebidoEm)+'/'+c.recebidoEm.slice(0,4):fmtAno(c.aberto))}${linha('Fornecedor ou favorecido',c.favorecido)}${linha('NF ou documento',c.nf)}${linha('Vencimento do pagamento',c.venc?fmtAno(c.venc):'')}${linha('Centro de custo',c.cc)}${linha('Gestor que aprovou',c.aprovador)}${linha('Responsável no financeiro',c.resp?respNome(c.resp):'Ninguém aceitou ainda')}${linha('Prazo de entrega',c.prazo?fmtAno(c.prazo):'')}${linha('Aceita por',c.aceitoEm?`${c.aceitoNome||'—'} · ${fmtHora(c.aceitoEm)}`:'')}${linha('Realizada por',c.st==='Concluído'?`${quemFezNome(c)} · ${c.conclEm?fmtHora(c.conclEm):fmt(c.concl)}`:'')}${linha('No cronograma',[...D.cronitens.filter(x=>x.chamadoId===c.id).map(x=>`${D.cronograma.find(r=>r.id===x.rot)?.t||'Rotina'} · ${fmt(x.dia)}${x.feito?' · feito':''}`),...D.cronograma.filter(r=>r.chamadoId===c.id).map(r=>`${r.t} · ${fmt(r.data)}`)].join(' | '))}${linha('Descrição',c.desc)}
+ ${foraPadrao(c)?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Fora do padrão. Falta: ${esc(padraoTxt(c))}.${c.pedidoFaltaEm?` Pedido enviado por ${esc(c.pedidoFaltaPor||'—')} em ${fmtHora(c.pedidoFaltaEm)}.`:''}</span>${eq?`<button class="btn" onclick="pedirFalta('c:${esc(c.id)}')">${c.pedidoFaltaEm?'Pedir de novo':'Pedir o que falta'}</button>`:''}</div>`:''}
+ <div>${linha('Tipo',c.tipo)}${linha('Assunto',c.cat||c.subcat?catTxt(c):'Sem assunto')}${linha('Setor',c.dep?depNome(c.dep):'Não definido')}${linha(c.origem==='email'?'Remetente':'Solicitante',c.solicitante)}${linha('Chegou em',c.recebidoEm?fmtHora(c.recebidoEm)+'/'+c.recebidoEm.slice(0,4):fmtAno(c.aberto))}${linha('Fornecedor ou favorecido',c.favorecido)}${linha('NF ou documento',c.nf)}${linha('Vencimento do pagamento',vencDe(c)?fmtAno(vencDe(c))+(c.venc?'':' (data pedida no e-mail)'):'')}${(()=>{const p=pagSit(c);return p&&!p.pend?linha(`Pagamento (limite D-${PAG_D()}: ${fmtAno(p.lim)})`,`${fmtAno(p.pg)} · ${p.ok?'dentro do padrão':'fora do padrão'}${c.pagJust?' · '+c.pagJust:''}`):''})()}${linha('Centro de custo',c.cc)}${linha('Gestor que aprovou',c.aprovador)}${linha('Responsável no financeiro',c.resp?respNome(c.resp):'Ninguém aceitou ainda')}${linha('Prazo de entrega',c.prazo?fmtAno(c.prazo):'')}${linha('Aceita por',c.aceitoEm?`${c.aceitoNome||'—'} · ${fmtHora(c.aceitoEm)}`:'')}${linha('Realizada por',c.st==='Concluído'?`${quemFezNome(c)} · ${c.conclEm?fmtHora(c.conclEm):fmt(c.concl)}`:'')}${linha('No cronograma',[...D.cronitens.filter(x=>x.chamadoId===c.id).map(x=>`${D.cronograma.find(r=>r.id===x.rot)?.t||'Rotina'} · ${fmt(x.dia)}${x.feito?' · feito':''}`),...D.cronograma.filter(r=>r.chamadoId===c.id).map(r=>`${r.t} · ${fmt(r.data)}`)].join(' | '))}${linha('Descrição',c.desc)}
  ${c.origem==='email'&&le&&(c.msgId||c.emailLink)?`<div class="row"><div class="t"><span>E-mail de origem</span></div>${c.msgId?`<button class="btn" onclick="lerEmail('c:${esc(c.id)}')">Ler aqui</button>`:''}${c.emailLink?`<a class="btn ghost" href="${esc(c.emailLink)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}${c.doc&&/^https?:\/\//.test(c.doc)?`<div class="row"><div class="t"><span>Documento</span></div><a class="btn" href="${esc(c.doc)}" target="_blank" rel="noopener">Abrir documento</a></div>`:''}</div>
  <div><span class="lbl">Histórico</span>${h.length?h.map(l=>`<div class="row"><span class="meta" style="width:96px">${fmtHora(l.em)}</span><div class="t"><b style="font-weight:400">${esc(l.acao)}</b><span>${esc(quemLog(l))}</span></div></div>`).join(''):'<p class="meta">Sem registros.</p>'}</div>
- <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap">${eq&&c.st!=='Concluído'?`<button class="btn" onclick="aceitarSheet({ch:'${esc(c.id)}'})">${c.aceitoEm?'Prazo, assunto e responsável':'Aceitar'}</button>`:''}${eq&&c.st==='Concluído'?`<button class="btn" onclick="reabrirCh('${esc(c.id)}')">${S.reab===c.id?'Confirmar reabertura':'Reabrir'}</button>`:''}${eq&&c.st!=='Concluído'?`<button class="btn" onclick="chParaCron('${esc(c.id)}')">${D.cronograma.some(r=>r.chamadoId===c.id)||D.cronitens.some(x=>x.chamadoId===c.id)?'Levar de novo ao cronograma':'Levar para o cronograma'}</button>`:''}</div><button class="btn" onclick="fechar()">Fechar</button></div>`;
+ <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap">${eq&&c.st!=='Concluído'?`<button class="btn" onclick="aceitarSheet({ch:'${esc(c.id)}'})">${c.aceitoEm?'Prazo, assunto e responsável':'Aceitar'}</button>`:''}${eq&&c.st==='Concluído'?`<button class="btn" onclick="reabrirCh('${esc(c.id)}')">${S.reab===c.id?'Confirmar reabertura':'Reabrir'}</button>`:''}${eq&&PAGTO(c.tipo)&&['Programado','Concluído'].includes(c.st)?`<button class="btn" onclick="pagSheet('${esc(c.id)}',true)">Pagamento e justificativa</button>`:''}${eq&&c.origem==='email'&&c.msgId&&PAGTO(c.tipo)&&!c.padrao?`<button class="btn" onclick="conferirPadrao('c:${esc(c.id)}')">Conferir padrão</button>`:''}${eq&&c.st!=='Concluído'?`<button class="btn" onclick="chParaCron('${esc(c.id)}')">${D.cronograma.some(r=>r.chamadoId===c.id)||D.cronitens.some(x=>x.chamadoId===c.id)?'Levar de novo ao cronograma':'Levar para o cronograma'}</button>`:''}</div><button class="btn" onclick="fechar()">Fechar</button></div>`;
  document.getElementById('ov').hidden=false}
 function pendCh(id){const c=D.chamados.find(x=>x.id===id);FORM={tipo:'_pend'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)}</p><h2 id="sheet-title">Devolver com pendência</h2><p class="sub" style="font-size:13px">O solicitante recebe a notificação e corrige o chamado.</p></div>
@@ -319,13 +320,14 @@ async function salvaPend(id){const m=document.getElementById('p_mot').value.trim
  const c=D.chamados.find(x=>x.id===id);if(await patch('chamados',id,{st:'Pendência com solicitante',pend:m,devolucoes:(+c.devolucoes||0)+1},'Devolvido ao solicitante',`Devolveu o chamado ${c.proto} com pendência: ${m}`))fechar()}
 function avCh(id){const c=D.chamados.find(x=>x.id===id);if(!c)return;const nx=proxEtapa(c);if(!nx)return;
  const bl=nx==='Programado'&&bloqueioForn(c.favorecido);if(bl){toast(`Pagamento travado: a troca de dados bancários de ${bl.forn} ainda não foi aprovada.`);return}
- const mud={st:nx,sub:''};if(nx==='Programado')mud.programadoEm=HJ;
+ if(nx==='Programado'){const v=vencDe(c);if(v&&HJ>uteisAntes(v,PAG_D())){pagSheet(id);return}}
+ const mud={st:nx,sub:''};if(nx==='Programado')Object.assign(mud,{programadoEm:HJ,pagoEm:HJ,pagAtraso:false});
  if(nx==='Concluído')Object.assign(mud,{concl:HJ,conclEm:new Date().toISOString(),conclPor:S.perfil,conclUid:ME.uid||null,conclNome:euNome(),programadoEm:c.programadoEm||HJ},c.resp?{}:{resp:S.perfil});
  const pz=nx==='Concluído'&&c.prazo?(HJ>c.prazo?' com atraso':' no prazo'):'';
  patch('chamados',id,mud,nx==='Concluído'?`Concluído${pz}. Foi para Demandas realizadas.`:`Movido para ${nomeEt(nx)}`,nx==='Concluído'?`Concluiu o chamado ${c.proto}${pz}`:`Moveu o chamado ${c.proto} para ${nomeEt(nx)}`)}
 function cardCh(c,interno){const du=c.venc?diasAte(c.venc):null,sp=stPrazo(c),subs=subEtapas(c.st),nx=proxEtapa(c);
  return `<div class="kcard${interno&&chAtrasado(c)?' late':''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px"><span class="meta">${esc(c.proto)}</span>${chegadaTag(c,true)||(c.fora?'<span class="tag wa" style="font-size:10.5px">Fora do prazo</span>':'')}</div><b>${esc(c.assunto)}</b><span>${esc(c.tipo)} · ${esc(c.dep?depNome(c.dep):c.origem==='email'&&(c.rem||c.solicitante)?remNomeCh(c)+' · sem setor':'Setor não definido')}</span>
- <div class="ktags">${c.cat||c.subcat?`<span class="tag ac">${esc(catTxt(c))}</span>`:''}${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${bloqueioForn(c.favorecido)&&!['Programado','Concluído'].includes(c.st)?'<span class="tag bad">Dados bancários em verificação</span>':''}${c.origem==='email'?`<span class="tag ne">${c.aceitoEm?'Via e-mail':'Via e-mail · conferir'}</span>`:''}</div>
+ <div class="ktags">${c.cat||c.subcat?`<span class="tag ac">${esc(catTxt(c))}</span>`:''}${sp?`<span class="tag ${sp[0]}">${sp[1]}</span>`:''}${bloqueioForn(c.favorecido)&&!['Programado','Concluído'].includes(c.st)?'<span class="tag bad">Dados bancários em verificação</span>':''}${pagTag(c,true)}${padraoTag(c,true)}${c.origem==='email'?`<span class="tag ne">${c.aceitoEm?'Via e-mail':'Via e-mail · conferir'}</span>`:''}</div>
  ${c.origem==='email'&&(c.solicitante||c.rem)?(interno&&c.rem?`<button class="lnk" style="display:block;font-size:12px" onclick="S.fRem='${esc(c.rem)}';render();window.scrollTo({top:0})" title="Ver tudo deste remetente">De: ${esc(remNomeCh(c))}</button>`:`<span style="display:block">De: ${esc(remNomeCh(c))}</span>`):''}
  ${c.venc?`<span style="display:block;color:${du!==null&&du<=1&&c.st!=='Concluído'&&c.st!=='Programado'?'var(--bad)':'var(--ink-3)'}">Pagamento vence ${fmt(c.venc)}${du!==null&&du>=0&&c.st!=='Concluído'?` · ${du===0?'hoje':du===1?'amanhã':`em ${du} dias`}`:''}</span>`:''}
  ${c.resp?`<span style="display:block">Com: ${esc(respNome(c.resp))}</span>`:''}
@@ -651,7 +653,7 @@ async function aplicar(em,c,auto,extra,lg){
  if(c.acao==='entrega'){const e=D.entregas.find(x=>x.id===c.ref);if(!e)return 'erro';
   const ok=await receber(e.id,dia,`${auto?'O e-mail registrou automaticamente':'Confirmou pelo e-mail'} a entrega "${e.item}" de ${dn}${e.prazo&&dia>e.prazo?' (com atraso)':''}`);return ok?'entrega:'+e.id:'erro'}
  if(c.acao==='chamado'){const proto='CH-'+String(Date.now()).slice(-6);
-  const ok=await salvar('chamados',null,{tipo:c.tipo||'Solicitação de pagamento',dep:em.dep,solicitante:em.deNome||em.de,assunto:em.assunto,desc:`Recebido por e-mail de ${em.de} em ${fmtHora(em.recebido)}. ${em.trecho||''}`.trim(),favorecido:'',nf:'',venc:'',cc:'',aprovador:'',doc:'',chk:[],fora:false,proto,st:'Aberto',aberto:dia,abertoEm:new Date().toISOString(),resp:'',pend:'',origem:'email',conferir:true,emailLink:em.link||'',cat:em.sug?.assunto||'',msgId:em.msgId||'',caixa:em.caixa||'',recebidoEm:em.recebido||'',rem:em.rem||(em.de?remId(em.de):''),...(em.chegada?{chegada:em.chegada,chegadaAuto:true,chegadaPor:'Automático pelo e-mail',prazoEnv:em.prazoEnv||'',prazoTrecho:em.prazoTrecho||''}:{}),...(extra||{})},auto?null:extra?`Demanda ${proto} aceita`:`Chamado ${proto} criado`,lg?lg(proto):`${auto?'O e-mail abriu automaticamente':'Criou a partir de e-mail'} o chamado ${proto} · ${dn}`);
+  const ok=await salvar('chamados',null,{tipo:c.tipo||'Solicitação de pagamento',dep:em.dep,solicitante:em.deNome||em.de,assunto:em.assunto,desc:`Recebido por e-mail de ${em.de} em ${fmtHora(em.recebido)}. ${em.trecho||''}`.trim(),favorecido:'',nf:'',venc:'',cc:'',aprovador:'',doc:'',chk:[],fora:false,proto,st:'Aberto',aberto:dia,abertoEm:new Date().toISOString(),resp:'',pend:'',origem:'email',conferir:true,emailLink:em.link||'',cat:em.sug?.assunto||'',msgId:em.msgId||'',caixa:em.caixa||'',recebidoEm:em.recebido||'',rem:em.rem||(em.de?remId(em.de):''),...(em.chegada?{chegada:em.chegada,chegadaAuto:true,chegadaPor:'Automático pelo e-mail',prazoEnv:em.prazoEnv||'',prazoTrecho:em.prazoTrecho||''}:{}),...(Array.isArray(em.falta)?{falta:em.falta,faltaCc:em.faltaCc||[],padrao:true}:{}),...(extra||{})},auto?null:extra?`Demanda ${proto} aceita`:`Chamado ${proto} criado`,lg?lg(proto):`${auto?'O e-mail abriu automaticamente':'Criou a partir de e-mail'} o chamado ${proto} · ${dn}`);
   return ok?'chamado:'+proto:'erro'}
  return ''}
 /* chegada automática: se o e-mail traz uma data de prazo/entrega, chegou em dia; sem data, já chegou atrasado */
@@ -677,7 +679,95 @@ function prazoNoTexto(txt,recebido){
 function chegadaDe(c){if(!c)return '';if(c.chegada&&c.chegadaAuto&&c.origem==='email')return chegPorData(c.prazoEnv,c.recebidoEm||c.abertoEm);if(c.chegada)return c.chegada;if(c.origem!=='email')return '';return prazoNoTexto(`${c.assunto||''}\n${(c.desc||'').replace(/^Recebido por e-mail de .*? em [^.]*\.\s*/,'')}`,c.recebidoEm||c.abertoEm).st}
 const chegadaTag=(c,peq)=>{const v=chegadaDe(c),auto=!c.chegada||c.chegadaAuto,fs=peq?' style="font-size:10.5px"':'',an=c.prazoEnv?antecDias(c.recebidoEm||c.abertoEm,c.prazoEnv):null,dica=c.prazoEnv?` title="Pedido para ${fmtAno(c.prazoEnv)} · chegou ${an} ${CHEG_UTEIS()?'dias úteis':'dias'} antes · mínimo ${chegTxt()}"`:auto&&v==='atrasado'?' title="O e-mail não trazia data de prazo"':'';
  return v==='atrasado'?`<span class="tag bad"${fs}${dica}>Chegou atrasado${auto?' · auto':''}</span>`:v==='prazo'?`<span class="tag ok"${fs}${dica}>Chegou em dia${auto?' · auto':''}</span>`:''};
-async function prazoDoEmail(m){const r0=prazoNoTexto((m.subject||'')+'\n'+(m.summary||''),m.receivedDateTime);if(r0.st==='prazo'||!MCP||!m.id)return r0;
+/* ---------- padrão do contas a pagar ----------
+   Solicitação: D-8 antes do vencimento, com vencimento, data do pagamento, NF/recibo, informações do pagamento
+   e documento (boleto ou PIX), copiando as caixas obrigatórias e o diretor que autorizou. Pagamento: D-5. */
+const COPIAS_PAD=['contasapagaread@fatecie.edu.br','controladoria@fatecie.edu.br','guilherme.esquivel@fatecie.edu.br'];
+const copiasPad=()=>Array.isArray(CFG.padraoCopias)&&CFG.padraoCopias.length?CFG.padraoCopias:COPIAS_PAD;
+const PAG_D=()=>+CFG.pagD||5;
+const DATA_RX='\\d{1,2}\\s*(?:[\\/.-]\\s*\\d{1,2}|de\\s+[a-z]+)';
+const ITENS_SOLIC=[
+ ['venc','data de vencimento',t=>new RegExp('venc\\w*[^\\d\\n]{0,30}'+DATA_RX).test(t)],
+ ['datapag','data do pagamento',t=>new RegExp('(pagamento|pagar|pago|programa\\w*|agendar)[^\\d\\n]{0,30}'+DATA_RX).test(t)],
+ ['nf','nota fiscal ou recibo',(t,a)=>/\bnf\b|\bnfs?-?e\b|nota fiscal|recibo|danfe|cupom fiscal/.test(t+' '+a)],
+ ['info','informações do pagamento (valor e favorecido)',t=>/r\$\s?\d|\bvalor\b/.test(t)],
+ ['doc','documento (boleto ou PIX)',(t,a)=>/boleto|\bpix\b|linha digitavel|codigo de barras|\d{5}\.?\d{5}\s?\d{5}\.?\d{6}/.test(t+' '+a)]];
+const itemNome=k=>ITENS_SOLIC.find(i=>i[0]===k)?.[1]||k;
+function padraoSolic(txt,anexos,dest){const t=norm(txt||''),a=norm((anexos||[]).join(' ')),d=(dest||[]).map(norm);
+ return {falta:ITENS_SOLIC.filter(([,,f])=>!f(t,a)).map(([k])=>k),faltaCc:copiasPad().filter(x=>!d.includes(norm(x)))}}
+const foraPadrao=x=>Array.isArray(x.falta)&&(x.falta.length>0||(x.faltaCc||[]).length>0);
+const padraoTxt=x=>[...(x.falta||[]).map(itemNome),...(x.faltaCc||[]).map(e=>'cópia para '+e.split('@')[0])].join(', ');
+const padraoTag=(x,peq)=>foraPadrao(x)?`<span class="tag wa"${peq?' style="font-size:10.5px"':''} title="Falta: ${esc(padraoTxt(x))}">Fora do padrão</span>`:'';
+async function lerCompleto(id){if(!MCP||!id)return null;try{const r=await MCP.callTool(SRV,'outlook_get_message',{id,...(CFG.caixa?{mailboxOwnerEmail:CFG.caixa}:{})},{cache:false});return r?.payload||r?.structuredContent||null}catch(e){return null}}
+const padraoDe=(subj,full)=>({...padraoSolic((subj||'')+'\n'+(full.body||''),(full.attachments||[]).map(a=>a.name),[...(full.to||[]),...(full.cc||[])]),padrao:true});
+/* confere o padrão de um e-mail ou chamado que chegou antes desta regra */
+async function conferirPadrao(ref){const [k,id]=ref.split(':'),col=k==='e'?'emails':'chamados',x=D[col].find(y=>y.id===id);if(!x?.msgId){toast('Esse item não tem o e-mail de origem.');return}
+ toast('Conferindo o e-mail…');const full=await lerCompleto(x.msgId);if(!full){toast('Não consegui abrir o e-mail no Outlook. Verifique a conexão.');return}
+ const pd=padraoDe(x.assunto,full);await patch(col,id,pd,foraPadrao(pd)?`Fora do padrão: falta ${padraoTxt(pd)}`:'Está no padrão',false);if(FORM?.tipo==='_det')detalheCh(id)}
+/* resposta pronta pedindo o que faltou; alguém revisa e envia pela própria conta */
+function pedirFalta(ref){const [k,id]=ref.split(':'),x=k==='e'?D.emails.find(e=>e.id===id):D.chamados.find(c=>c.id===id);if(!x)return;
+ const para=k==='e'?x.de:(D.remetentes.find(r=>r.id===x.rem)?.email||''),nome0=(k==='e'?x.deNome:remNomeCh(x))||'',nome=nome0==='Sem nome'||nome0.includes('@')?'':nome0.split(' ')[0];
+ const itens=(x.falta||[]).map(itemNome),cc=x.faltaCc||[];
+ const corpo=`Olá${nome?', '+nome:''}.\n\nRecebemos a solicitação "${x.assunto}", mas para seguir com o pagamento ela precisa estar no padrão do Contas a Pagar.\n\n${itens.length?'Está faltando:\n'+itens.map(i=>'- '+i).join('\n')+'\n\n':''}${cc.length?'Faltou copiar:\n'+cc.map(i=>'- '+i).join('\n')+'\n- o diretor que autorizou a solicitação\n\n':''}Lembrando o padrão:\n- enviar com ${CHEG_MIN()} dias de antecedência do vencimento (D-${CHEG_MIN()})\n- informar data de vencimento, data do pagamento, nota fiscal ou recibo, informações do pagamento e o documento (boleto ou PIX)\n- copiar ${copiasPad().join(', ')} e o diretor que autorizou\n\nObrigado.\nContas a Pagar`;
+ FORM={tipo:'_pedfalta',ref};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Fora do padrão · ${esc(x.assunto)}</p><h2 id="sheet-title">Pedir o que faltou</h2><p class="sub" style="font-size:13px">Revise o texto. O e-mail sai pela sua conta do Outlook, para o remetente, com as cópias obrigatórias.</p></div>
+ <div class="fgrid"><div class="full"><label class="lbl" for="pf_para">Para</label><input class="inp" id="pf_para" value="${esc(para)}"></div>
+ <div class="full"><label class="lbl" for="pf_cc">Cópia (separe por vírgula)</label><input class="inp" id="pf_cc" value="${esc(copiasPad().join(', '))}"></div>
+ <div class="full"><label class="lbl" for="pf_as">Assunto</label><input class="inp" id="pf_as" value="${esc('RE: '+x.assunto)}"></div>
+ <div class="full"><label class="lbl" for="pf_tx">Mensagem</label><textarea class="inp" id="pf_tx" rows="14">${esc(corpo)}</textarea><p class="ferr" id="pf_err"></p></div></div>
+ <div class="foot"><button class="btn ghost" onclick="copiarFalta()">Copiar texto</button><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" id="pf_btn" onclick="enviarFalta()">Enviar</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+function copiarFalta(){const t=document.getElementById('pf_tx')?.value||'';try{navigator.clipboard.writeText(t).then(()=>toast('Texto copiado.'),()=>toast('Não foi possível copiar.'))}catch(e){toast('Não foi possível copiar.')}}
+async function enviarFalta(){const v=i=>(document.getElementById(i)?.value||'').trim(),lista=t=>t.split(/[;,\s]+/).filter(x=>x.includes('@'));
+ const para=lista(v('pf_para')),cc=lista(v('pf_cc')),err=document.getElementById('pf_err');
+ if(!para.length){err.textContent='Informe o e-mail de quem vai receber.';return}if(!MCP){err.textContent=msgErro({code:'sem_mcp'});return}
+ const b=document.getElementById('pf_btn');b.disabled=true;b.textContent='Enviando…';
+ try{await MCP.callTool(SRV,'outlook_send_mail',{to:para,cc,subject:v('pf_as'),bodyType:'text',body:document.getElementById('pf_tx').value},{cache:false});
+  const [k,id]=FORM.ref.split(':'),col=k==='e'?'emails':'chamados',x=D[col].find(y=>y.id===id);
+  await patch(col,id,{pedidoFaltaEm:new Date().toISOString(),pedidoFaltaPor:euNome()},'Pedido enviado',`Pediu o que faltou na solicitação "${x?.assunto||''}"${x?.proto?' ('+x.proto+')':''}`);fechar()}
+ catch(e){b.disabled=false;b.textContent='Enviar';err.textContent=msgErro(e)}}
+/* pagamento D-5: data limite = vencimento menos N dias úteis */
+const uteisAntes=(iso,n)=>{let d=iso,k=0;while(k<n){d=addDia(d,-1);if(ehUtil(d))k++}return d};
+const vencDe=c=>c.venc||c.prazoEnv||'';
+function pagSit(c){if(!PAGTO(c.tipo||''))return null;const v=vencDe(c);if(!v)return null;const lim=uteisAntes(v,PAG_D()),pg=c.pagoEm||c.programadoEm||'';
+ if(pg)return {pg,lim,v,ok:pg<=lim,just:c.pagJust||''};
+ if(['Programado','Concluído'].includes(c.st))return null;
+ return HJ>lim?{pg:'',lim,v,ok:false,pend:true}:null}
+const pagTag=(c,peq)=>{const p=pagSit(c);if(!p||p.ok)return '';return `<span class="tag ${p.pend?'bad':'wa'}"${peq?' style="font-size:10.5px"':''} title="Limite D-${PAG_D()}: ${fmtAno(p.lim)}">${p.pend?`Passou do D-${PAG_D()}`:`Pago fora do D-${PAG_D()}`}</span>`};
+/* registrar pagamento (e justificativa quando passou do D-5) */
+function pagSheet(id,editar){const c=D.chamados.find(x=>x.id===id);if(!c)return;FORM={tipo:'_pag',id,editar:!!editar};
+ const v=vencDe(c),pg=c.pagoEm||c.programadoEm||HJ;
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(c.proto)} · ${esc(c.assunto)}</p><h2 id="sheet-title">${editar?'Pagamento e justificativa':'Registrar o pagamento'}</h2><p class="sub" style="font-size:13px">Padrão: pagar ${PAG_D()} dias úteis antes do vencimento (D-${PAG_D()}). Depois disso, a justificativa é obrigatória e aparece no painel do diretor.</p></div>
+ <div class="fgrid"><div><label class="lbl" for="pg_venc">Vencimento</label><input class="inp" id="pg_venc" type="date" value="${esc(v)}" oninput="pagLim()"></div>
+ <div><label class="lbl" for="pg_data">Pago ou programado em</label><input class="inp" id="pg_data" type="date" value="${esc(pg)}" oninput="pagLim()"></div>
+ <p class="meta full" id="pg_lim" style="margin:0"></p>
+ <div class="full"><label class="lbl" for="pg_just">Justificativa</label><textarea class="inp" id="pg_just" rows="3" placeholder="Ex.: solicitação chegou fora do prazo; documento corrigido só no dia 12">${esc(c.pagJust||'')}</textarea><p class="ferr" id="pg_err"></p></div></div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaPag()">${editar?'Salvar':'Registrar e programar'}</button></div></div>`;
+ document.getElementById('ov').hidden=false;pagLim()}
+function pagLim(){const v=document.getElementById('pg_venc')?.value,d=document.getElementById('pg_data')?.value,el=document.getElementById('pg_lim');if(!el)return;
+ if(!v){el.textContent='Informe o vencimento para conferir o D-'+PAG_D()+'.';return}const lim=uteisAntes(v,PAG_D());
+ el.innerHTML=`Limite D-${PAG_D()}: <b>${fmtAno(lim)}</b> · ${d?(d<=lim?'<span style="color:var(--ok)">dentro do padrão</span>':'<span style="color:var(--bad)">fora do padrão: justifique</span>'):''}`}
+async function salvaPag(){const c=D.chamados.find(x=>x.id===FORM.id);if(!c)return;const v=document.getElementById('pg_venc').value,d=document.getElementById('pg_data').value||HJ,j=document.getElementById('pg_just').value.trim(),err=document.getElementById('pg_err');
+ const lim=v?uteisAntes(v,PAG_D()):'',fora=!!v&&d>lim;if(fora&&!j){err.textContent=`Passou do D-${PAG_D()}. Escreva a justificativa.`;return}
+ const mud={pagoEm:d,pagAtraso:fora,pagJust:j,pagJustPor:j?euNome():'',...(v&&!c.venc?{venc:v}:{})};
+ if(!FORM.editar)Object.assign(mud,{st:'Programado',sub:'',programadoEm:d});
+ if(await patch('chamados',c.id,mud,FORM.editar?'Pagamento atualizado':`Programado${fora?' fora do D-'+PAG_D():''}`,`${FORM.editar?'Atualizou o pagamento':'Programou o pagamento'} do chamado ${c.proto}${fora?` fora do D-${PAG_D()}: ${j}`:''}`))fechar()}
+/* painel: pagamentos D-5 e solicitações fora do padrão, por setor */
+function padraoBloco(L){const grp=c=>c.dep?depNome(c.dep):(remNomeCh(c)+' · sem setor');
+ const pg=L.map(c=>[c,pagSit(c)]).filter(([,p])=>p),sol=L.filter(c=>Array.isArray(c.falta));
+ if(!pg.length&&!sol.length)return '';
+ const por={};pg.forEach(([c,p])=>{const g=por[grp(c)]=por[grp(c)]||{n:grp(c),ok:0,fora:0,inc:0,sol:0};p.ok?g.ok++:g.fora++});
+ sol.forEach(c=>{const g=por[grp(c)]=por[grp(c)]||{n:grp(c),ok:0,fora:0,inc:0,sol:0};g.sol++;if(foraPadrao(c))g.inc++});
+ const G=Object.values(por).sort((a,b)=>(b.fora+b.inc)-(a.fora+a.inc)),mx=Math.max(1,...G.map(g=>g.ok+g.fora));
+ const fora=pg.filter(([,p])=>!p.ok),inc=sol.filter(foraPadrao),cont={};inc.forEach(c=>[...(c.falta||[]).map(itemNome),...((c.faltaCc||[]).length?['cópias obrigatórias']:[])].forEach(k=>cont[k]=(cont[k]||0)+1));
+ const barras=G.filter(g=>g.ok+g.fora).slice(0,8).map(g=>`<div class="hrow" title="${esc(g.n)}: ${g.ok} no D-${PAG_D()} e ${g.fora} fora"><span class="hn">${esc(g.n)}</span><div class="hbar" style="width:${Math.max(6,(g.ok+g.fora)/mx*100)}%">${g.ok?`<i class="ok" style="flex:${g.ok}"></i>`:''}${g.fora?`<i class="bad" style="flex:${g.fora}"></i>`:''}</div><span class="hv">${g.fora?`<b>${g.fora}</b> de ${g.ok+g.fora} fora`:`${g.ok} no prazo`}</span></div>`).join('')||'<p class="meta" style="margin:0">Nenhum pagamento registrado neste mês.</p>';
+ const just=fora.filter(([c])=>c.pagJust||c.pagAtraso);
+ return `<div class="dgrid" style="margin-top:14px"><div><div class="dh"><h3>Pagamentos no D-${PAG_D()}</h3><div class="dleg"><span><i style="background:var(--ok)"></i>No prazo</span><span><i style="background:var(--bad)"></i>Fora</span></div></div>${barras}</div>
+ <div><div class="dh"><h3>Solicitações fora do padrão</h3><span class="meta">${inc.length} de ${sol.length} conferidas</span></div>${inc.length?G.filter(g=>g.inc).slice(0,6).map(g=>`<div class="row" style="padding:6px 0"><div class="t"><b style="font-weight:500">${esc(g.n)}</b><span>${g.inc} de ${g.sol} fora do padrão</span></div><span class="tag wa">${Math.round(g.inc/g.sol*100)}%</span></div>`).join('')+`<p class="meta" style="margin:6px 0 0">Mais esquecido: ${Object.entries(cont).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,n])=>`${esc(k)} (${n})`).join(' · ')}</p>`:`<p class="meta" style="margin:0">${sol.length?'Todas as solicitações conferidas estavam no padrão.':'Nenhuma solicitação conferida ainda neste mês.'}</p>`}</div></div>
+ ${fora.length?`<details class="dmais"${S.dJust?' open':''} ontoggle="S.dJust=this.open"><summary>Pagamentos fora do D-${PAG_D()} e justificativas (${fora.length})</summary>${fora.map(([c,p])=>`<div class="row" style="padding:6px 0"><div class="t"><b style="font-weight:500">${esc(c.proto)} · ${esc(grp(c))}</b><span>${esc(c.assunto)} · vence ${fmt(p.v)} · limite ${fmt(p.lim)} · ${p.pend?'ainda não pago':'pago '+fmt(p.pg)}${c.pagJust?' · '+esc(c.pagJust):' · sem justificativa'}</span></div><button class="btn ghost" onclick="detalheCh('${esc(c.id)}')">Ver</button></div>`).join('')}</details>`:''}`}
+async function prazoDoEmail(m,corpo){const r0=prazoNoTexto((m.subject||'')+'\n'+(m.summary||''),m.receivedDateTime);if(r0.st==='prazo')return r0;
+ if(corpo){const r1=prazoNoTexto((m.subject||'')+'\n'+corpo,m.receivedDateTime);return r1.st==='prazo'||r1.data?r1:r0}
+ if(!MCP||!m.id)return r0;
  try{const r=await MCP.callTool(SRV,'outlook_get_message',{id:m.id,...(CFG.caixa?{mailboxOwnerEmail:CFG.caixa}:{})},{cache:false});const b=(r?.payload||r?.structuredContent||{}).body||'';
   if(b){const r1=prazoNoTexto((m.subject||'')+'\n'+b,m.receivedDateTime);if(r1.st==='prazo'||r1.data)return r1}}catch(e){}
  return r0}
@@ -713,8 +803,9 @@ async function processar(m){
  const txt=(m.subject||'')+' '+limparTxt(m.summary);
  let c;if(d)c=classificar(m,d);else{const t=tipoPorTexto(txt);c=t?{acao:'chamado',tipo:t,conf:'media'}:{acao:'nenhuma',conf:'baixa'}}
  c.assunto=rem?.cat&&assDe(rem.cat)?rem.cat:assPorTexto(txt);
- const pz=await prazoDoEmail(m);
- const em={dep:d?.id||'',de,deNome:limparTxt(m.senderName).slice(0,80),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),chegada:pz.st,prazoEnv:pz.data||'',prazoTrecho:limparTxt(pz.trecho||'').slice(0,80),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',sug:c,criado:new Date().toISOString(),por:ME.uid||null,msgId:m.id||'',caixa:CFG.caixa||'',rem:rid};
+ const pag=c.acao==='chamado'&&PAGTO(c.tipo),full=pag?await lerCompleto(m.id):null;
+ const pz=await prazoDoEmail(m,full?.body);
+ const em={dep:d?.id||'',de,deNome:limparTxt(m.senderName).slice(0,80),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),chegada:pz.st,prazoEnv:pz.data||'',prazoTrecho:limparTxt(pz.trecho||'').slice(0,80),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',sug:c,criado:new Date().toISOString(),por:ME.uid||null,msgId:m.id||'',caixa:CFG.caixa||'',rem:rid,...(full?padraoDe(m.subject,full):{})};
  if(!rem)rem=await novoContato(de,em.deNome,d?.id||'');
  if(rem.ignorar){await DB.collection('emails').doc(id).set({...em,st:'ignorado',auto:true,res:''});return 'dup'}
  if(em.chegada==='atrasado'&&Array.isArray(S._novosAtr))S._novosAtr.push(em);
@@ -801,8 +892,9 @@ async function triar(id,acao){const em=D.emails.find(x=>x.id===id);if(!em||S.tri
 function resTxt(e){const r=e.res||'';return (e.st==='ignorado'?'Ignorado':r.startsWith('entrega:')?`Entrega "${esc(D.entregas.find(x=>x.id===r.slice(8))?.item||'')}" recebida`:r.startsWith('chamado:')?`Virou o chamado ${esc(r.slice(8))}`:'Processado')+(e.auto?' automaticamente':'')}
 function cardEmail(e){const s=e.sug||{},ents=D.entregas.filter(x=>x.dep===e.dep&&!x.recebido).sort((a,b)=>a.prazo<b.prazo?-1:1),ref=D.entregas.find(x=>x.id===s.ref),le=pode('ler_email');
  const sug=s.acao==='entrega'&&ref?`Parece ser a entrega "${esc(ref.item)}"`:s.acao==='chamado'?`Parece um pedido: ${esc(s.tipo)}`:'Escolha o que fazer.';
- return `<div class="mail"><div class="mh"><div class="t"><b>${esc(e.assunto)} ${chegadaTag({origem:'email',chegada:e.prazoEnv?chegPorData(e.prazoEnv,e.recebido):(e.chegada||prazoNoTexto(e.assunto+'\n'+(e.trecho||''),e.recebido).st),chegadaAuto:true,prazoEnv:e.prazoEnv,recebidoEm:e.recebido},true)}</b><span>Recebido ${fmtHora(e.recebido)}${e.prazoEnv?` · prazo pedido: ${fmtAno(e.prazoEnv)}`:''}${e.anexos?' · com anexo':''}${e.dep?' · '+esc(depNome(e.dep)):''}</span></div>${le?`<div style="display:flex;gap:6px;flex-wrap:wrap">${e.msgId?`<button class="btn" onclick="lerEmail('e:${e.id}')">Ler aqui</button>`:''}${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}</div>
+ return `<div class="mail"><div class="mh"><div class="t"><b>${esc(e.assunto)} ${chegadaTag({origem:'email',chegada:e.prazoEnv?chegPorData(e.prazoEnv,e.recebido):(e.chegada||prazoNoTexto(e.assunto+'\n'+(e.trecho||''),e.recebido).st),chegadaAuto:true,prazoEnv:e.prazoEnv,recebidoEm:e.recebido},true)} ${padraoTag(e,true)}</b><span>Recebido ${fmtHora(e.recebido)}${e.prazoEnv?` · prazo pedido: ${fmtAno(e.prazoEnv)}`:''}${e.anexos?' · com anexo':''}${e.dep?' · '+esc(depNome(e.dep)):''}</span></div>${le?`<div style="display:flex;gap:6px;flex-wrap:wrap">${e.msgId?`<button class="btn" onclick="lerEmail('e:${e.id}')">Ler aqui</button>`:''}${e.link?`<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir no Outlook ↗</a>`:''}</div>`:''}</div>
  ${e.trecho?`<p class="trecho">${esc(e.trecho)}</p>`:''}
+ ${foraPadrao(e)?`<div class="banner" style="background:var(--warn-bg);color:var(--warn);margin:6px 0"><span>Fora do padrão do contas a pagar. Falta: ${esc(padraoTxt(e))}.${e.pedidoFaltaEm?` Pedido enviado por ${esc(e.pedidoFaltaPor||'—')} em ${fmtHora(e.pedidoFaltaEm)}.`:''}</span>${pode('chamados')?`<button class="btn" onclick="pedirFalta('e:${e.id}')">${e.pedidoFaltaEm?'Pedir de novo':'Pedir o que falta'}</button>`:''}</div>`:!e.padrao&&s.acao==='chamado'&&PAGTO(s.tipo)&&e.msgId&&pode('chamados')?`<button class="lnk" style="font-size:12px" onclick="conferirPadrao('e:${e.id}')">Conferir o padrão do contas a pagar</button>`:''}
  <div class="sug"><span class="tag ${s.conf==='alta'?'ok':s.conf==='media'?'ac':'ne'}">${s.conf==='alta'?'Confiança alta':s.conf==='media'?'Confiança média':'Revisar'}</span><span>${sug}</span>${s.assunto&&assDe(s.assunto)?`<span class="tag ac">Assunto: ${esc(assNome(s.assunto))}</span>`:''}</div>
  <div class="acts2">${pode('chamados')?`<button class="btn ${s.acao!=='entrega'?'pri':''}" onclick="aceitarSheet({email:'${e.id}'})">Aceitar como demanda</button>`:''}
  ${e.dep&&ents.length?`<div class="grp"><select class="inp" id="tr_${e.id}" data-nodraft="1" aria-label="Entrega recebida"><option value="">Qual entrega chegou?</option>${ents.map(x=>`<option value="${esc(x.id)}" ${s.ref===x.id?'selected':''}>${esc(x.item)} · prazo ${fmt(x.prazo)}</option>`).join('')}</select><button class="btn ${s.acao==='entrega'?'pri':''}" onclick="triar('${e.id}','entrega')">Confirmar recebimento</button></div>`:''}
@@ -1263,7 +1355,7 @@ const PROC_PAD=['Identificação','Conferência','Lançamento','Baixa','Pagament
 const SIS_PAD=['WAE','Protheus'];
 const emTeste=x=>(Array.isArray(CFG.cronTeste)?CFG.cronTeste:['Protheus']).includes(x);
 const sisTxt=x=>x+(emTeste(x)?' (em teste)':'');
-const procs=()=>Array.isArray(CFG.cronEtapas)&&CFG.cronEtapas.length?CFG.cronEtapas:PROC_PAD;
+const procs=()=>{const b=Array.isArray(CFG.cronEtapas)&&CFG.cronEtapas.length?CFG.cronEtapas:PROC_PAD;return [...b,...['Comprovantes','Controladoria','Impressão de caixas'].filter(x=>!b.includes(x))]};
 const sists=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_PAD;
 /* módulos guardados para depois: ficam fora do menu até o administrador ligar */
 const MODS=[['fechamento','Fechamento D+N','Etapas do fechamento do mês com prazo em dias úteis'],['entregas','Entregas dos departamentos','O que outras áreas precisam enviar e até quando'],['email','E-mails do Outlook','Alertas de e-mails para revisar e de problemas na leitura da caixa'],['outros','Outros alertas','Chamados, WhatsApp, troca de dados bancários, pedidos de acesso e backup. Desligado, os alertas vêm só do cronograma']];
@@ -1302,12 +1394,12 @@ const exDe=(rid,dia)=>{if(_exA!==D.execucoes){_exA=D.execucoes;_exM=new Map(D.ex
 const rsDe=r=>(r.rs||[]).filter(Boolean);
 const nomesRs=r=>rsDe(r).map(nomeDe).join(' e ')||'Sem responsável';
 const minhaRot=r=>rsDe(r).includes(S.perfil);
-const vejoRot=r=>dir()||pode('ver_tudo')||minhaRot(r);
+const vejoRot=r=>dir()||pode('ver_tudo')||minhaRot(r)||!rsDe(r).length;
 const podeMarcar=r=>podeEditRot();
 const podeCron=()=>dir()||podeAdmin()||pode('cadastros');
 /* toda a equipe pode corrigir e cadastrar rotinas; excluir fica com quem cadastra */
 const podeEditRot=()=>dir()||podeAdmin()||(!solic()&&S.perfil!=='pendente');
-const ordProc=r=>{const i=procs().indexOf(r.etapa);return i<0?99:i};
+const ordProc=r=>{const w=(r.sis||[]).length===1&&r.sis[0]==='WAE'?FLUXO_WAE.indexOf(r.etapa):-1;if(w>=0)return w;const i=procs().indexOf(r.etapa);return i<0?99:i};
 const ordR=(a,b)=>ordProc(a)-ordProc(b)||(a.hora||'99').localeCompare(b.hora||'99')||(a.t||'').localeCompare(b.t||'');
 /* situação de uma rotina num dia */
 function stOc(r,dia){const x=exDe(r.id,dia);
@@ -1526,7 +1618,7 @@ function cronRotinas(){const pc=podeEditRot(),L=[...D.cronograma].sort(ordR);
   ...per.filter(()=>true).map(k=>{const [a,b]=k.split('|');return [`Período especial: ${a?fmt(a)+' a ':'até '}${fmt(b)}`,'Valem só neste período. Depois saem sozinhas do cronograma.',L.filter(r=>r.fim&&r.freq!=='unica'&&r.freq!=='avulsa'&&(r.ini||'')+'|'+r.fim===k)]}),
   ['Demandas de um dia só','Inclui as que vieram de chamados.',L.filter(r=>r.freq==='unica')]].filter(b=>b[2].length);
  const etp=l=>{let ult=null;return l.map(r=>{const g=r.etapa||'Outras atividades',h=g!==ult?`<p class="eyebrow" style="margin:14px 0 2px">${esc(g)}</p>`:'';ult=g;return h+lin(r)}).join('')};
- return comecarBtn()+(orgPendente()?`<div class="banner"><span>Há uma versão mais organizada do cronograma: WAE e Protheus em colunas separadas, com as mesmas etapas; D-5 sempre; pagamento D-2 só em novembro e D-1 a partir de dezembro. As rotinas atuais são atualizadas sem perder o que já foi marcado.</span><button class="btn pri" onclick="organizarModelo()">Organizar agora</button></div>`:'')+
+ return comecarBtn()+(orgPendente()?`<div class="banner"><span>Há uma versão nova do cronograma: pagamento em D-5 e o fluxo do WAE (Pagamento no banco › Comprovantes › Controladoria › Lançamentos › Pagar títulos › Conciliar › Impressão de caixas). As rotinas são atualizadas sem perder o que já foi marcado, e as que saíram ficam pausadas.</span><button class="btn pri" onclick="organizarModelo()">Organizar agora</button></div>`:'')+
  (L.length?blocos.map(([t,d,l])=>`<div class="panel"><div class="ph"><h2>${t}</h2><span>${l.length} ${l.length>1?'rotinas':'rotina'}</span></div><p class="meta" style="margin:0">${d}</p>${etp(l)}</div>`).join(''):`<div class="panel">${vazio('Nenhuma rotina cadastrada','Use o modelo pronto ou cadastre cada rotina com etapa, sistema, responsáveis e horário.',null)}${podeCron()?'<div style="text-align:center;margin-top:-8px;padding-bottom:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" onclick="editRot()">Nova rotina</button><button class="btn pri" onclick="montarModelo()">Montar o cronograma</button></div>':''}</div>`)+
  note('Pausar ou dar data final a uma rotina mantém o histórico. Ao excluir, os registros de dias já feitos deixam de contar.')}
 function cronTri(){const ini=mesesTri(S.tri)[0]+'-01',fim=fimTri(S.tri);
@@ -1588,7 +1680,7 @@ function cfgCron(){FORM={tipo:'_cfgcron',listas:{et:[...procs()],sis:[...sists()
  <div><span class="lbl">Sistemas</span>${chipsEd('sis','Ex.: Internet banking')}</div>
  <div><span class="lbl">Sistemas em teste</span>${chipsEd('teste','Ex.: Protheus')}<p class="meta" style="margin:4px 0 0">Aparecem com a marca "em teste". Tire daqui quando o sistema passar a valer de vez.</p></div>
  <div><span class="lbl">Guardados para depois (ligue quando quiser usar)</span>${MODS.map(([k,n,d])=>`<label class="perm"><input type="checkbox" id="md_${k}" ${modOn(k)?'checked':''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>
- <div><span class="lbl">Modelo pronto</span><div style="display:flex;gap:8px;flex-wrap:wrap">${D.cronograma.length?`<button class="btn" type="button" onclick="organizarModelo()">Organizar com o modelo atualizado</button>`:`<button class="btn" type="button" onclick="montarModelo()">Montar o cronograma</button>`}</div><p class="meta" style="margin:4px 0 0">D-5 sempre, pagamento D-2 em novembro e D-1 a partir de dezembro, com Natalia, Jeferson e Natasha. Natalia faz Lançamento e Baixa no WAE e no Protheus. Atualiza as rotinas existentes sem apagar nada.</p></div></div>
+ <div><span class="lbl">Modelo pronto</span><div style="display:flex;gap:8px;flex-wrap:wrap">${D.cronograma.length?`<button class="btn" type="button" onclick="organizarModelo()">Organizar com o modelo atualizado</button>`:`<button class="btn" type="button" onclick="montarModelo()">Montar o cronograma</button>`}</div><p class="meta" style="margin:4px 0 0">Pagamento em D-5. WAE: Pagamento no banco › Comprovantes › Controladoria › Lançamentos › Pagar títulos › Conciliar › Impressão de caixas. Os responsáveis continuam como estão em cada rotina. Atualiza as rotinas sem apagar nada; as que saíram do fluxo ficam pausadas.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCfgCron()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
 async function salvaCfgCron(){const L=FORM.listas;if(!L.et.length||!L.sis.length){toast('Deixe ao menos uma etapa e um sistema.');return}
@@ -1605,25 +1697,38 @@ function gerirDeps(){FORM={tipo:'_deps'};
 /* modelo do departamento. "chave" identifica cada rotina para atualizações futuras sem duplicar */
 /* modelo do departamento, uma rotina por sistema (WAE e Protheus lado a lado).
    "chave" identifica cada rotina; "alias" são as chaves e títulos das versões anteriores, para atualizar no lugar */
-const MODELO_VER=4;
-function modeloCron({NA,JN}){const EV='Evandro (Protheus)',N0='2026-11-01',N1='2026-11-30',DZ='2026-12-01',L=[];
- const r=(chave,etapa,t,sis,rs,x,alias)=>L.push({chave,etapa,t,sis:[sis],rs,apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:N0,fim:'',ativo:true,mv:MODELO_VER,...(x||{}),_alias:alias||[]});
- const W='WAE',P='Protheus',pe={apoio:EV};
- for(const [x,suf] of [[W,'wae'],[P,'pro']]){const w=x===W,old=a=>w?a:[];
-  r('ident-'+suf,'Identificação','Identificar as contas a pagar (D-5)',x,JN,{obs:'D-5: contas que vencem daqui a 5 dias úteis. Vale sempre.'},old(['ident','Identificar as contas a pagar (D-5)','Identificar as contas que vencem em 5 dias úteis (D-5)','Identificar as contas que vencem no próximo dia útil']));
-  r('confer-'+suf,'Conferência','Conferir documentos, valores, vencimentos e centro de custo',x,JN,{obs:'Contas identificadas no D-5.'},old(['confer','Conferir documentos, valores, vencimentos e centro de custo']));
-  r('lanc-'+suf,'Lançamento',`Lançamento no ${x}`,x,w?NA:[...NA,...JN],w?{}:{...pe,somarRs:NA},[`Lançamento no ${x}`]);
-  r('baixa-'+suf,'Baixa',`Baixa no ${x}`,x,w?NA:[...NA,...JN],w?{}:{...pe,somarRs:NA},[`Baixa no ${x}`]);
-  r('pagnov-'+suf,'Pagamento','Pagamento · todas as contas (D-2 em novembro)',x,JN,{fim:N1,obs:'Regra: 10h todas as contas. Novembro: pagamento adiantado para 2 dias úteis antes do vencimento (D-2), porque trabalhamos no WAE e no Protheus.'},old(['pag-nov','Pagamento · todas as contas (D-2 em novembro)','Pagamento · todas as contas']));
-  r('pagd1-'+suf,'Pagamento','Pagamento · todas as contas (D-1)',x,JN,{ini:DZ,obs:'Regra: 10h todas as contas. Pagamento 1 dia útil antes do vencimento (D-1).'},old(['pag','Pagamento · todas as contas (D-1)']));
-  if(w)r('pag1430-wae','Pagamento','Pagamento · WAE',W,JN,{obs:'Regra: WAE a partir das 14:30. Segue o D-1 (D-2 em novembro).'},['pag-wae','Pagamento · WAE','Pagamento · WAE a partir das 14:30']);
-  r('polos-'+suf,'Pagamento','Pagamento dos polos',x,JN,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'},old(['pag-polos','Pagamento dos polos']));
-  r('folha-'+suf,'Pagamento','Folha de pagamento',x,JN,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'},old(['folha','Folha de pagamento']));
-  r('impnov-'+suf,'Pagamento','Impostos do dia 20 (D-2 em novembro)',x,JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:2,fim:N1,obs:'Atenção: confira as guias. Em novembro, pagar 2 dias úteis antes.'},old(['imp-nov','Impostos do dia 20 (D-2 em novembro)','Impostos (vencimento dia 20)']));
-  r('impd1-'+suf,'Pagamento','Impostos do dia 20 (D-1)',x,JN,{prio:'atencao',freq:'mensal_dia',n:20,antes:1,ini:DZ,obs:'Atenção: confira as guias. Crie uma rotina para cada vencimento diferente.'},old(['imp','Impostos do dia 20 (D-1)']));
-  r('concil-'+suf,'Conciliação','Conciliação bancária',x,JN,{},old(['concil','Conciliação bancária']));
-  if(w)r('repasse-polos','Pagamento','Repasse de polos',W,[],{freq:'avulsa',ini:''},['repasse-polos','Repasse de polos']);
-  if(!w)r('acomp','','Acompanhamento diário do Protheus',P,JN,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a implantação do Protheus.'},['acomp','Acompanhamento diário do Protheus'])}
+const MODELO_VER=5;
+/* fluxo do WAE, nesta ordem (padrão do contas a pagar) */
+const FLUXO_WAE=['Pagamento','Comprovantes','Controladoria','Lançamento','Baixa','Conciliação','Impressão de caixas'];
+/* rotinas que saíram do modelo: ficam pausadas (nada é apagado; dá para reativar em Editar) */
+const PAUSAR_MODELO=['ident-wae','confer-wae','pagnov-wae','pagd1-wae','impnov-wae','pagnov-pro','impnov-pro'];
+function modeloCron(){const EV='Evandro (Protheus)',N0='2026-11-01',L=[];
+ // responsáveis não ficam no modelo: cada rotina mantém quem já estava nela e a equipe define o resto
+ const r=(chave,etapa,t,sis,x,alias)=>L.push({chave,etapa,t,sis:[sis],rs:[],apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:N0,fim:'',ativo:true,mv:MODELO_VER,...(x||{}),_alias:alias||[]});
+ const W='WAE',P='Protheus',D5='D-5: pagar 5 dias úteis antes do vencimento.';
+ // WAE: Pagamento no banco > Envio de comprovantes > Envio para controladoria > Lançamentos > Pagar títulos > Conciliar > Impressão de caixas
+ r('pag1430-wae','Pagamento','Pagamento no banco (D-5)',W,{obs:D5+' WAE a partir das 14:30.'},['pag-wae','Pagamento · WAE','Pagamento · WAE a partir das 14:30']);
+ r('comprov-wae','Comprovantes','Envio de comprovantes',W,{obs:'Depois do pagamento no banco.'});
+ r('controla-wae','Controladoria','Envio para a controladoria',W,{obs:'Comprovantes enviados para controladoria@fatecie.edu.br.'});
+ r('lanc-wae','Lançamento','Lançamentos no WAE',W,{},['Lançamento no WAE']);
+ r('baixa-wae','Baixa','Pagar títulos no WAE',W,{},['Baixa no WAE']);
+ r('concil-wae','Conciliação','Conciliar',W,{},['concil','Conciliação bancária']);
+ r('caixas-wae','Impressão de caixas','Impressão de caixas',W,{});
+ r('polos-wae','Pagamento','Pagamento dos polos',W,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'},['pag-polos','Pagamento dos polos']);
+ r('folha-wae','Pagamento','Folha de pagamento',W,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'},['folha','Folha de pagamento']);
+ r('imp-wae','Pagamento','Impostos do dia 20 (D-5)',W,{prio:'atencao',freq:'mensal_dia',n:20,antes:5,obs:'Atenção: confira as guias. '+D5},['impd1-wae','imp','Impostos do dia 20 (D-1)']);
+ r('repasse-polos','Pagamento','Repasse de polos',W,{freq:'avulsa',ini:''},['Repasse de polos']);
+ // Protheus: mesmo fluxo de antes, com pagamento em D-5
+ r('ident-pro','Identificação','Identificar as contas a pagar (D-5)',P,{obs:'Contas que vencem daqui a 5 dias úteis.'});
+ r('confer-pro','Conferência','Conferir documentos, valores, vencimentos e centro de custo',P,{obs:'Contas identificadas no D-5.'});
+ r('lanc-pro','Lançamento','Lançamento no Protheus',P,{apoio:EV},['Lançamento no Protheus']);
+ r('baixa-pro','Baixa','Baixa no Protheus',P,{apoio:EV},['Baixa no Protheus']);
+ r('pagd5-pro','Pagamento','Pagamento · todas as contas (D-5)',P,{obs:D5},['pagd1-pro']);
+ r('polos-pro','Pagamento','Pagamento dos polos',P,{obs:'Os polos têm outro horário. Ajuste o horário nesta rotina.'});
+ r('folha-pro','Pagamento','Folha de pagamento',P,{prio:'atencao',freq:'mensal_util',n:5,obs:'Atenção: prazo até o 5º dia útil. Confirme valores e data com o RH.'});
+ r('imp-pro','Pagamento','Impostos do dia 20 (D-5)',P,{prio:'atencao',freq:'mensal_dia',n:20,antes:5,obs:'Atenção: confira as guias. '+D5},['impd1-pro']);
+ r('concil-pro','Conciliação','Conciliação bancária',P,{});
+ r('acomp','','Acompanhamento diário do Protheus',P,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a implantação do Protheus.'},['Acompanhamento diário do Protheus']);
  return L}
 const ANTIGOS=new Set(['Identificar as contas a pagar (D-5)','Identificar as contas que vencem em 5 dias úteis (D-5)','Identificar as contas que vencem no próximo dia útil','Conferir documentos, valores, vencimentos e centro de custo','Lançamento no WAE','Lançamento no Protheus','Baixa no WAE','Baixa no Protheus','Pagamento · todas as contas','Pagamento · todas as contas (D-2 em novembro)','Pagamento · todas as contas (D-1)','Pagamento · WAE','Pagamento dos polos','Folha de pagamento','Impostos (vencimento dia 20)','Impostos do dia 20 (D-2 em novembro)','Impostos do dia 20 (D-1)','Conciliação bancária','Acompanhamento diário do Protheus'].map(norm));
 const orgPendente=()=>podeCron()&&D.cronograma.some(r=>r.freq!=='unica'&&(r.mv||0)<MODELO_VER&&(r.chave||ANTIGOS.has(norm(r.t))));
@@ -1635,7 +1740,7 @@ async function pessoasModelo(faltam){
  return {NA:[nt].filter(Boolean),JN:[jf,ns].filter(Boolean)}}
 async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode montar o cronograma.');return}
  if(D.cronograma.length){return organizarModelo()}
- const faltam=[],M=modeloCron(await pessoasModelo(faltam)),hoje=HJ;let k=0;
+ const faltam=[],M=modeloCron(),hoje=HJ;let k=0;
  for(const {_alias,somarRs,...r} of M){const x={...r,ini:r.ini&&r.ini<hoje?hoje:r.ini,criado:HJ};if(await salvar('cronograma',null,x,false,false))k++}
  log(`Montou o cronograma do departamento com ${k} rotinas`);
  toast(faltam.length?`${k} rotinas criadas. Cadastre ${faltam.join(', ')} e defina nas rotinas.`:`${k} rotinas criadas. Ajuste o que precisar.`);
@@ -1643,17 +1748,18 @@ async function montarModelo(){if(!podeCron()){toast('Só quem cadastra pode mont
 /* atualiza as rotinas existentes no lugar (mantém o histórico de marcações), cria as que faltam e não apaga nada */
 async function organizarModelo(sil){if(!podeCron()){if(!sil)toast('Só quem cadastra pode organizar o cronograma.');return}
  if(!sil&&!S.confOrg){S.confOrg=true;toast('Clique de novo para confirmar. As rotinas são atualizadas sem apagar nada.');setTimeout(()=>S.confOrg=false,6000);return}
- S.confOrg=false;const faltam=[],ids=await pessoasModelo(faltam),M=modeloCron(ids),usados=new Set(),quem=pessoa(S.perfil)?.n||quemSou(),agora=new Date().toISOString();let up=0,cr=0;
+ S.confOrg=false;const faltam=[],M=modeloCron(),usados=new Set(),quem=pessoa(S.perfil)?.n||quemSou(),agora=new Date().toISOString();let up=0,cr=0;
  for(const {_alias,somarRs,...sp} of M){const al=_alias.map(norm),sis0=sp.sis[0];
   const ant=D.cronograma.find(r=>!usados.has(r.id)&&r.chave===sp.chave)||D.cronograma.find(r=>!usados.has(r.id)&&(r.mv||0)<MODELO_VER&&r.chave&&_alias.includes(r.chave))||D.cronograma.find(r=>!usados.has(r.id)&&(r.mv||0)<MODELO_VER&&!r.chave&&al.includes(norm(r.t))&&(!(r.sis||[]).length||(r.sis||[]).includes(sis0)));
   if(ant){usados.add(ant.id);const {id,...b}=ant;
    if(await salvar('cronograma',id,{...b,...sp,rs:rsDe(ant).length?[...new Set([...(ant.rs||[]),...(somarRs||[])])]:sp.rs,hora:ant.horaEditada?ant.hora:sp.hora,horaLimpa:true,apoio:ant.apoio||sp.apoio,ini:ant.ini&&ant.ini<sp.ini&&!sp.fim&&!sp.ini.startsWith('2026-12')?ant.ini:sp.ini,editadoPor:quem,editadoEm:agora},false,false))up++}
   else if(await salvar('cronograma',null,{...sp,criado:HJ},false,false))cr++}
- log(`Organizou o cronograma: ${up} rotinas atualizadas e ${cr} criadas`);
- if(!sil)toast(`${up} rotinas atualizadas e ${cr} criadas.${faltam.length?` Cadastre ${faltam.join(', ')}.`:''}`);
+ let pa=0;for(const x of D.cronograma.filter(r=>!usados.has(r.id)&&PAUSAR_MODELO.includes(r.chave)&&r.ativo!==false)){const {id,...b}=x;if(await salvar('cronograma',id,{...b,ativo:false,mv:MODELO_VER,obs:'Pausada: saiu do fluxo novo (pagamento D-5). Para voltar, edite e marque como ativa.',editadoPor:quem,editadoEm:agora},false,false))pa++}
+ log(`Organizou o cronograma: ${up} rotinas atualizadas, ${cr} criadas e ${pa} pausadas`);
+ if(!sil)toast(`${up} rotinas atualizadas, ${cr} criadas e ${pa} pausadas. Nada foi apagado.`);
  if(sil)return;if(FORM)fechar();S.cTab='rotinas';ir('rotinas')}
 
-function cronPainel(){if(!D.cronograma.length)return podeCron()?`<div class="panel"><div class="ph"><h2>Cronograma do departamento</h2></div>${vazio('Cronograma ainda não montado','Monte as rotinas de WAE e Protheus com os responsáveis de cada etapa.',null)}<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="montarModelo()">Montar o cronograma de novembro</button></div></div>`:'';
+function cronPainel(){if(!D.cronograma.length)return podeCron()?`<div class="panel"><div class="ph"><h2>Cronograma do departamento</h2></div>${vazio('Cronograma ainda não montado','Monte as rotinas de WAE e Protheus com os responsáveis de cada etapa.',null)}<div style="text-align:center;margin-top:-8px;padding-bottom:12px"><button class="btn pri" onclick="montarModelo()">Montar o cronograma</button></div></div>`:'';
  const ps=pessoasCron(),ant=atrasosCron().filter(o=>o.dia<HJ),hoje=D.cronograma.filter(r=>ocorre(r,HJ)).sort(ordR);
  const vivo=hoje.filter(r=>{const s=stOc(r,HJ)[0];return s==='ac'||s==='bad'});
  return `<div class="panel"><div class="ph"><h2>Cronograma de hoje</h2><button class="btn ghost" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button></div>
@@ -1773,7 +1879,7 @@ function chegadaPainel(enxuto){if(!(dir()||pode('painel_chamados')))return '';co
  <div class="stat"><p>Chegaram atrasados</p><strong style="color:${at?'var(--bad)':'var(--ink)'}">${at}</strong><small>${pc(at)}% · sem data ou com menos de ${chegTxt()}</small></div>
  <div class="stat"><p>Nossa entrega atrasada</p><strong style="color:${nossa?'var(--bad)':'var(--ink)'}">${nossa}</strong><small>passou do prazo combinado</small></div></div>`}
  <div class="dgrid"><div><div class="dh"><h3>Por departamento</h3>${leg}</div>${barras}</div><div><div class="dh"><h3>% que chegou atrasado</h3><span class="meta">últimos 6 meses</span></div>${svg}</div></div>
- ${extra}${tabela}<p class="meta" style="margin:4px 0 0">Automático: chegou em dia o e-mail que traz a data pedida com pelo menos ${chegTxt()} de antecedência (D-${CHEG_MIN()}). Sem data, ou com menos tempo, chegou atrasado. A equipe pode corrigir no detalhe do chamado.</p></div>`}
+ ${padraoBloco(L)}${extra}${tabela}<p class="meta" style="margin:4px 0 0">Automático: chegou em dia o e-mail que traz a data pedida com pelo menos ${chegTxt()} de antecedência (D-${CHEG_MIN()}). Sem data, ou com menos tempo, chegou atrasado. A equipe pode corrigir no detalhe do chamado.</p></div>`}
 
 /* ---------- painel do diretor: cada um organiza a ordem dos blocos ---------- */
 const BLOCOS_PAINEL=[['numeros','Números principais'],['chegada','Pedidos dos departamentos · em dia ou atrasados'],['andamento','Andamento do dia no cronograma'],['atencao','Precisa da sua atenção'],['prazos','Próximos prazos'],['destaques','Destaques do mês'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas por departamento'],['atrasosDep','Atrasos de departamentos'],['estrutura','Estruturação do departamento']];
@@ -1802,7 +1908,7 @@ function linhaCh(c){const ch=chegadaDe(c),sp=stPrazo(c),an=c.prazoEnv?antecDias(
  return {'Protocolo':c.proto||'','Recebido em':dataHora(c.recebidoEm||c.abertoEm)||fmtAno(c.aberto),'Assunto':c.assunto||'','Tipo':c.tipo||'','Departamento':c.dep?depNome(c.dep):'Sem setor','Remetente':remNomeCh(c),'E-mail do remetente':r?.email||'','Origem':c.origem==='email'?'E-mail':'Portal',
   'Data pedida no e-mail':c.prazoEnv?fmtAno(c.prazoEnv):'','Antecedência (dias)':an??'','Chegada':ch==='prazo'?'Em dia':ch==='atrasado'?'Atrasado':'Sem marcação','Categoria':c.cat||c.subcat?catTxt(c):'','Etapa':nomeEt(c.st),'Situação na etapa':c.sub||'',
   'Responsável':c.resp?respNome(c.resp):'','Aceito em':dataHora(c.aceitoEm),'Aceito por':c.aceitoNome||'','Prazo de entrega':c.prazo?fmtAno(c.prazo):'','Concluído em':c.concl?fmtAno(c.concl):'','Concluído por':c.st==='Concluído'?quemFezNome(c):'','Nossa entrega':sp?sp[1]:(c.st==='Concluído'?'Concluída':'Sem prazo'),
-  'Vencimento do pagamento':c.venc?fmtAno(c.venc):'','Fornecedor ou favorecido':c.favorecido||'','NF ou documento':c.nf||'','Pendência':c.pend||'','Devoluções':+c.devolucoes||0}}
+  'Vencimento do pagamento':vencDe(c)?fmtAno(vencDe(c)):'',...(()=>{const p=pagSit(c);return {'Limite D-5':p?fmtAno(p.lim):'','Pago ou programado em':p&&p.pg?fmtAno(p.pg):'','Pagamento no D-5':p?(p.pend?'Passou do limite, não pago':p.ok?'No prazo':'Fora do prazo'):'','Justificativa do pagamento':c.pagJust||''}})(),'Padrão da solicitação':Array.isArray(c.falta)?(foraPadrao(c)?'Fora do padrão':'No padrão'):'Não conferido','O que faltou':padraoTxt(c),'Fornecedor ou favorecido':c.favorecido||'','NF ou documento':c.nf||'','Pendência':c.pend||'','Devoluções':+c.devolucoes||0}}
 function agrupaCh(L,chave,nome){const g={};L.forEach(c=>{const k=chave(c);(g[k]=g[k]||[]).push(c)});
  return Object.entries(g).map(([k,l])=>{const m=l.filter(c=>chegadaDe(c)),at=m.filter(c=>chegadaDe(c)==='atrasado').length,ans=l.map(c=>c.prazoEnv?antecDias(c.recebidoEm||c.abertoEm,c.prazoEnv):null).filter(x=>x!==null),cats={};
   l.forEach(c=>{const t=c.cat||c.subcat?catTxt(c):(c.tipo||'Outros');cats[t]=(cats[t]||0)+1});
@@ -2470,7 +2576,7 @@ metas(){const mes=S.mM||MES_ATUAL,ps=colabs(),eu=ps.find(p=>p.id===S.perfil),out
  note('Clique na situação para passar de A fazer para Em andamento e Feito. Use "Levar pendentes" para copiar o que ficou para o mês seguinte.')},
 rotinas(){const t=S.cTab||'dia',pc=podeEditRot();
  const btns=`${pc?`<button class="btn" onclick="editRot()">Nova rotina fixa</button>`:''}<button class="btn" onclick="editEv()">Novo prazo</button>${podeAdmin()?`<button class="btn" onclick="cfgCron()">Ajustes</button>`:''}`;
- return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`${procs().join(' → ')}. As rotinas do dia já vêm prontas: cada pessoa clica no que fez.`,btns)+cronAbas()+
+ return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Cronograma do <em>departamento</em>',`WAE: ${FLUXO_WAE.join(' → ')}. Protheus: ${procs().filter(x=>!['Comprovantes','Controladoria','Impressão de caixas'].includes(x)).join(' → ')}. Pagamento em D-${PAG_D()}. As rotinas do dia já vêm prontas: cada pessoa clica no que fez.`,btns)+cronAbas()+
  (t==='semana'?cronSemana():t==='quem'?cronQuem():t==='rotinas'?cronRotinas():t==='tri'?cronTri():cronDia())+
  (t==='dia'?note('Cada pessoa clica no quadrado do que ela fez. Se outra pessoa também fez, ela marca o dela. O diretor vê no Painel quem fez o quê, com a hora.'):'')},
 
