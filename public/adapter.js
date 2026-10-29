@@ -35,7 +35,7 @@
     if (!el) { el = document.createElement('div'); el.id = 'login'; document.body.appendChild(el); }
     const t = { entrar: 'Entrar no Prumo', criar: 'Criar conta', esqueci: 'Recuperar senha', nova: 'Criar nova senha' }[modo];
     el.innerHTML = `<div class="card" role="dialog" aria-labelledby="lg_t">
-      <div class="brand"><div class="mark">P</div><div><b>Prumo</b><span>Financeiro e Contábil</span></div></div>
+      <div class="brand"><div class="mark"><svg viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="88" height="104" rx="22" fill="#F47B20"/><path d="M28 36H76M28 56H68M28 76H52" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/><circle cx="88" cy="88" r="26" fill="#FDB913" stroke="#FFFFFF" stroke-width="5"/><path d="M76 88l8 8l16-17" stroke="#2E2E2E" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><b>Prumo</b><span>Financeiro e Contábil</span></div></div>
       <h1 id="lg_t">${t}</h1>
       ${msg ? `<p class="msg ${erro ? 'erro' : ''}">${esc(msg)}</p>` : ''}
       ${msAtivo && (modo === 'entrar' || modo === 'criar') ? `<button class="btn ms" id="lg_ms" type="button"><svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>Entrar com a conta Microsoft da empresa</button><div class="ou">ou com e-mail e senha</div>` : ''}
