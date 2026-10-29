@@ -3175,8 +3175,13 @@ function vigiarDB(db){const marca=p=>{const c=String(p).split('/')[0];if(FORM&&!
 /* ---------- render ---------- */
 function nav(){const pm=pode('whats')?pendMsg():0,na=alertas().filter(a=>a.c==='bad').length,nc=D.chamados.filter(c=>c.st==='Aberto'&&!c.resp).length,nt=emPend().length,np=D.pedidos.filter(p=>!acessoDe(p.id)).length;
  const nr=atrasosCron(vejoRot).length;const badge=(k)=>k==='rotinas'&&nr?`<span class="count" style="background:var(--bad-bg);color:var(--bad)" title="Rotinas em atraso">${nr}</span>`:k==='whats'&&pm?`<span class="count">${pm}</span>`:k==='chamados'&&(nc||(pode('email')&&nt))?`<span class="count" style="background:var(--accent-soft);color:var(--accent-ink)" title="${nc} sem responsável${pode('email')&&nt?` · ${nt} e-mails para revisar`:''}">${nc+(pode('email')?nt:0)}</span>`:k==='usuarios'&&np?`<span class="count">${np}</span>`:k==='alertas'&&na?`<span class="count" style="background:var(--bad-bg);color:var(--bad)">${na}</span>`:'';
- document.getElementById('nav').innerHTML=(solic()||S.perfil==='pendente'||S.modo==='carregando'?'':`<button class="nav reg ${S.tela==='registrar'?'on':''}" onclick="ir('registrar')">${ic('reg')}<span>Registrar</span></button>`)+
- (S.modo==='carregando'?'':vis().map(([k,n])=>`<button class="nav ${(MENU_PAI[S.tela]||S.tela)===k?'on':''}" onclick="ir('${k}')">${ic(k)}<span>${n}</span>${badge(k)}</button>`).join(''))}
+ document.getElementById('nav').innerHTML=(solic()||S.perfil==='pendente'||S.modo==='carregando'?'':`<button class="nav reg ${S.tela==='registrar'?'on':''}" onclick="ir('registrar')" title="Registrar">${ic('reg')}<span>Registrar</span></button>`)+
+ (S.modo==='carregando'?'':vis().map(([k,n])=>`<button class="nav ${(MENU_PAI[S.tela]||S.tela)===k?'on':''}" onclick="ir('${k}')" title="${esc(n)}">${ic(k)}<span>${n}</span>${badge(k)}</button>`).join(''))}
+/* menu lateral recolhido: só os ícones, e a área de trabalho fica maior (fica lembrado neste computador) */
+function tgLateral(f){const a=document.getElementById('app');if(!a)return;const on=f===undefined?!a.classList.contains('menumini'):!!f;a.classList.toggle('menumini',on);
+ const b=document.getElementById('recolher');if(b){b.textContent=on?'›':'‹';b.setAttribute('aria-label',on?'Abrir o menu':'Recolher o menu');b.title=on?'Abrir o menu':'Recolher o menu'}
+ if(f===undefined)try{localStorage.setItem('menuMini',on?'1':'0')}catch(e){}}
+try{if(localStorage.getItem('menuMini')==='1')tgLateral(true)}catch(e){}
 function perfis(){const q=document.getElementById('quem'),box=document.getElementById('simbox');
  q.innerHTML=S.modo==='carregando'?'':real()?`<button class="me mebtn" onclick="fotoSheet()" title="Mudar a foto de perfil">${avU(ME.uid)}<div style="min-width:0;text-align:left"><b>${esc(ME.nome||'Você')}</b><span>${esc(rotuloBase())} · foto</span></div></button>`:`<p class="meta" style="margin:0">Modo demonstração, sem login</p>`;
  box.hidden=S.modo==='carregando'||!podeSimular();if(box.hidden)return;

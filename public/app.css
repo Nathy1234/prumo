@@ -463,3 +463,19 @@ aside{--side:#2E2E2E;--panel:#3A3735;--bg:#2E2E2E;--line:#45413E;--line-soft:#3A
 aside .nav.reg,aside .nav.reg:hover{color:#FFFFFF}
 aside .nav.on{box-shadow:inset 3px 0 0 #F08A3C}
 aside .inp{border-color:#55504B}
+
+/* recolher o menu lateral */
+.brand{position:relative}.brtx{min-width:0;flex:1}
+.recolher{flex:none;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink-2);cursor:pointer;font-size:18px;line-height:1;display:grid;place-items:center}
+.recolher:hover{color:var(--ink);background:var(--line-soft)}
+@media (min-width:861px){
+ .app.menumini{grid-template-columns:72px minmax(0,1fr)}
+ .app.menumini aside{padding-left:12px;padding-right:12px;align-items:center;overflow-x:hidden}
+ .app.menumini .brand{flex-direction:column;gap:10px}.app.menumini .brtx,.app.menumini #simbox,.app.menumini .secure{display:none}
+ .app.menumini #quem .me>div{display:none}.app.menumini #quem .meta{display:none}.app.menumini #quem .mebtn{width:auto}
+ .app.menumini nav{width:100%}.app.menumini .nav{justify-content:center;padding:9px 0;position:relative}
+ .app.menumini .nav>span:not(.count){display:none}
+ .app.menumini .nav .count{position:absolute;top:2px;right:4px;margin:0;padding:0 5px;font-size:10px}
+ .app.menumini .wrap{max-width:1280px}
+}
+@media (max-width:860px){.recolher{display:none}}
