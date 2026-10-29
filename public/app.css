@@ -521,3 +521,11 @@ aside,.panel,.stats,.sheet{backdrop-filter:blur(18px) saturate(1.5);-webkit-back
 .nav.reg{border-radius:999px;justify-content:center}
 .app.menumini .nav.reg{justify-content:center}
 .recolher{border-radius:999px;border-color:var(--vborda)}
+
+/* foto no "Bom dia", no andamento e letras do calendário */
+.avg{width:46px!important;height:46px!important;font-size:18px!important;vertical-align:middle;margin-right:12px;display:inline-grid!important}
+.quemf{display:inline-flex!important;align-items:center;gap:6px}
+.avs{width:22px!important;height:22px!important;font-size:10px!important}
+.lets{display:flex;flex-wrap:wrap;gap:3px}
+.let{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:6px;background:var(--accent-soft);color:var(--accent-ink);font-size:10.5px;font-weight:700;cursor:default}
+.legend .let{margin-right:4px}
