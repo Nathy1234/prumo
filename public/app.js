@@ -693,6 +693,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-29','Equipe no trimestre compara o tempo percorrido com o L, B e C do calendário'],
  ['2026-10-29','Botão "Não teve" para os dias sem lançamento, baixa ou conciliação'],
  ['2026-10-29','Férias e ausências, aniversários e tempo de casa no painel; ajuste de outubro no cronograma'],
  ['2026-10-29','Resumo da semana no Teams do diretor (em teste)'],
@@ -3285,9 +3286,12 @@ function trimBloco(){const t=triAgora(),ini=mesesTri(t)[0]+'-01',fim=fimTri(t),T
  const rec=D.chamados.filter(c=>{const d=diaCh(c);return d>=ini&&d<=HJ}),res=rec.filter(c=>c.st==='Concluído').length,pR=rec.length?Math.round(res/rec.length*100):null;
  const barra=(rot,pct,sub,cor)=>`<div class="tq"><p><span>${rot}</span><b>${pct===null?'—':pct+'%'}</b></p><div class="bar"><i style="width:${pct||0}%;${cor?'background:'+cor:''}"></i></div><small>${sub}</small></div>`;
  const ps=colabs().map(p=>({p,r:realizadoPer(p.id,ini,HJ)}));
+ // calendário: rotinas previstas no cronograma até hoje × feitas (ou "não teve", ou pessoa de férias/atestado)
+ let cT=0,cO=0;const fS=r=>r.freq!=='avulsa'&&(r.sis||[]).some(x=>sists().includes(x)&&(ETAPAS_SIS[x]||[]).includes(r.etapa));for(const d of diasDe(ini,HJ)){const c=contaDia(d,fS);cT+=c.tot;cO+=c.ok}
+ const pC=cT?Math.round(cO/cT*100):null;
  return `<div class="panel"><div class="ph"><h2>Equipe no ${t.q}º trimestre de ${t.ano}</h2><span>${falta>0?`faltam ${falta} ${falta===1?'dia':'dias'} para o fechamento`:'trimestre encerrado'}</span></div>
  <div class="tqtop"><div class="tqbig"><span>A equipe realizou até agora</span><b>${T.total}</b><small>${T.ch} chamados concluídos · ${T.rot} rotinas do cronograma</small></div>
- <div class="tqbars">${barra('Trimestre percorrido',pT,`${pas} de ${tot} dias`)}${barra('Chamados resolvidos',pR,rec.length?`${res} de ${rec.length} recebidos no trimestre`:'nenhum recebido ainda','var(--ok)')}${barra('Chamados no prazo',T.pct,T.chPrazo?`${T.chOk} de ${T.chPrazo} concluídos até o prazo`:'sem chamados com prazo concluídos','var(--accent)')}</div></div>
+ <div class="tqbars">${barra('Trimestre percorrido',pT,`${pas} de ${tot} dias`)}${barra('L, B e C em dia (calendário)',pC,cT?`${cO} de ${cT} marcações previstas até hoje: feitas, "não teve" ou com férias`:'nada previsto ainda','var(--ok)')}${barra('Chamados resolvidos',pR,rec.length?`${res} de ${rec.length} recebidos no trimestre`:'nenhum recebido ainda','var(--ok)')}${barra('Chamados no prazo',T.pct,T.chPrazo?`${T.chOk} de ${T.chPrazo} concluídos até o prazo`:'sem chamados com prazo concluídos','var(--accent)')}</div></div>
  ${ps.length?`<div class="tqpess">${ps.map(({p,r})=>`<div class="tqp">${avP(p.id,p.n)}<div><b>${esc(p.n)}</b><small>${r.total} realizadas · ${r.pct===null?'—':r.pct+'% no prazo'}</small></div></div>`).join('')}</div>`:''}
  ${T.etapas.length?`<div class="chips2">${T.etapas.map(([g,n])=>`<span class="chip" style="cursor:default">${esc(g)} ${n}</span>`).join('')}</div>`:''}</div>`}
 /* resumo da semana no Teams (teste): o Prumo monta e manda para o Workflows do Teams, que entrega ao diretor */
