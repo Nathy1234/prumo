@@ -1312,7 +1312,9 @@ const ordR=(a,b)=>ordProc(a)-ordProc(b)||(a.hora||'99').localeCompare(b.hora||'9
 /* situação de uma rotina num dia */
 function stOc(r,dia){const x=exDe(r.id,dia);
  if(x?.s==='feita')return x.concl>dia?['wa','Concluída com atraso']:['ok','Concluída'];
- const late=dia<HJ||(dia===HJ&&r.hora&&agoraHM()>r.hora);
+ // Dia anterior sem marcação não vira alerta: nem todo dia tem tudo isso para fazer.
+ if(dia<HJ)return x?.s==='andamento'?['ac','Ficou em andamento']:['ne','Não marcada'];
+ const late=dia===HJ&&r.hora&&agoraHM()>r.hora;
  if(late)return ['bad',x?.s==='andamento'?'Atrasada · em andamento':'Atrasada'];
  if(x?.s==='andamento')return ['ac','Em andamento'];
  return ['ne',dia>HJ?'Prevista':'A fazer']}
