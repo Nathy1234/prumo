@@ -492,6 +492,9 @@ async function salvaEtapasCh(){const o={};ETAPAS.forEach((e,i)=>{const l=FORM.li
 function subCh(id,v){const c=D.chamados.find(x=>x.id===id);if(!c)return;patch('chamados',id,{sub:v},null,`Marcou o chamado ${c.proto} como "${v||c.st}"`)}
 
 /* aceitar demanda: assunto, prazo de entrega e responsável */
+/* prazo de pagamento no aceite: mostra até quando pagar pela regra D-5 */
+const vencInfo=v=>v?`Pagar até ${fmtAno(uteisAntes(v,PAG_D()))} (D-${PAG_D()})${uteisAntes(v,PAG_D())<HJ?' · já passou do D-5':''}`:'Se tiver vencimento, informe para o Prumo calcular o D-5.';
+function acVenc(){const el=document.getElementById('ac_venc_info');if(el)el.textContent=vencInfo(val('ac_venc'))}
 function aceitarSheet(ref){const em=ref.email?D.emails.find(x=>x.id===ref.email):null,c=ref.ch?D.chamados.find(x=>x.id===ref.ch):null;if(!em&&!c)return;
  const s=em?.sug||{},cat=c?(c.cat||''):(assIdPorNome(emCat(em))||(s.assunto&&assDe(s.assunto)&&!assDe(s.assunto).auto?s.assunto:'')),tipo=c?.tipo||s.tipo||'Outros',resp=c?.resp||respsDe(cat)[0]||(dir()?'':S.perfil),prazo=c?.prazo||prazoPadrao(cat),ja=!!c?.aceitoEm;
  FORM={tipo:'_aceitar',ref:em?'e:'+em.id:'c:'+c.id,email:em?.id||'',ch:c?.id||'',prazoMexido:!!c?.prazo,cat0:cat,catMan0:!!c?.catManual};
@@ -503,6 +506,7 @@ function aceitarSheet(ref){const em=ref.email?D.emails.find(x=>x.id===ref.email)
   <div><label class="lbl" for="ac_cat">Assunto</label><select class="inp" id="ac_cat" onchange="acCat()"><option value="">Sem assunto</option>${assLista().map(a=>`<option value="${esc(a.id)}" ${a.id===cat?'selected':''}>${esc(a.n)}</option>`).join('')}</select>${!D.assuntos.length&&pode('cadastros')?'<p class="meta" style="margin:4px 0 0">Crie assuntos em Chamados › Assuntos.</p>':''}</div>
   <div><label class="lbl" for="ac_sub">Subcategoria</label><select class="inp" id="ac_sub">${subOpts(cat,c?.subcat||'')}</select></div>
   <div><label class="lbl" for="ac_tipo">Tipo</label><select class="inp" id="ac_tipo">${TIPOS_CH.map(t=>`<option ${t===tipo?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div><label class="lbl" for="ac_venc">Prazo de pagamento · vencimento</label><input class="inp" id="ac_venc" type="date" value="${esc(c?.venc||em?.prazoEnv||'')}" oninput="acVenc()"><p class="meta" id="ac_venc_info" style="margin:4px 0 0">${vencInfo(c?.venc||em?.prazoEnv||'')}</p></div>
   <div><label class="lbl" for="ac_prazo">Prazo de entrega</label><input class="inp" id="ac_prazo" type="date" value="${esc(prazo)}" oninput="FORM.prazoMexido=true"><p class="ferr" id="ace_prazo"></p></div>
   <div class="full"><label class="lbl" for="ac_resp">Responsável</label><select class="inp" id="ac_resp"><option value="">Selecione</option><option value="dir" ${resp==='dir'?'selected':''}>Diretor</option>${colabs().map(p=>`<option value="${esc(p.id)}" ${p.id===resp?'selected':''}>${esc(p.n)}</option>`).join('')}</select><p class="ferr" id="ace_resp"></p><p class="meta" id="ac_dica" style="margin:4px 0 0">${dicaResp(cat)}</p></div>
  </div>
@@ -516,7 +520,7 @@ async function salvaAceite(){const tit=val('ac_tit'),prazo=val('ac_prazo'),resp=
  if(!prazo){errEl('ace_prazo','Defina o prazo de entrega.');ok=false}
  if(!resp){errEl('ace_resp','Escolha o responsável.');ok=false}
  if(!ok||S.triando)return;
- const campos={assunto:tit.slice(0,200),cat:val('ac_cat'),catManual:FORM.catMan0||val('ac_cat')!==FORM.cat0,subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
+ const campos={venc:val('ac_venc'),assunto:tit.slice(0,200),cat:val('ac_cat'),catManual:FORM.catMan0||val('ac_cat')!==FORM.cat0,subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
  const aceite={aceito:HJ,aceitoEm:new Date().toISOString(),aceitoPor:S.perfil,aceitoUid:ME.uid||null,aceitoNome:euNome()};
  const desc=`prazo ${fmt(prazo)} · ${respNome(resp)}${campos.cat?' · '+catTxt(campos):''}`;
  if(FORM.email){const em=D.emails.find(x=>x.id===FORM.email);if(!em)return;S.triando=true;
