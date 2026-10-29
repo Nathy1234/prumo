@@ -684,7 +684,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=94;
+const PRUMO_ATUALIZACOES=95;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -692,6 +692,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-29','Resumo da semana no Teams do diretor (em teste)'],
  ['2026-10-29','Tela Sobre o sistema para o administrador e o diretor, com o resumo do Prumo'],
  ['2026-10-29','Cronograma por sistema: WAE com Lançamento, Baixa e Conciliação; Protheus com Lançar, Pagar e Conciliar'],
  ['2026-10-29','Calendário com o dia em que foi feito e o dia de referência'],
@@ -2866,7 +2867,7 @@ painel(){
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>`,
  estrutura:()=>`<div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
    <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div></div>`};
- return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span><button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}"><button class="pbx" onclick="painelVer('${k}',false)" title="Tirar este bloco do painel" aria-label="Tirar ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])} do painel">×</button>${h}</section>`:''}).join('')}</div>`+
+ return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span><button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button>`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button><button class="btn ghost" onclick="teamsSheet()" title="Resumo da semana no Teams do diretor">Resumo no Teams</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}"><button class="pbx" onclick="painelVer('${k}',false)" title="Tirar este bloco do painel" aria-label="Tirar ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])} do painel">×</button>${h}</section>`:''}).join('')}</div>`+
  (painelOculto().filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k)).length?`<div class="pocult"><span class="meta">Fora do painel, clique para voltar:</span>${painelOculto().filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k)).map(k=>`<button class="chip" onclick="painelVer('${k}',true)">+ ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])}</button>`).join('')}</div>`:'')},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
@@ -3203,6 +3204,20 @@ function trimBloco(){const t=triAgora(),ini=mesesTri(t)[0]+'-01',fim=fimTri(t),T
  <div class="tqbars">${barra('Trimestre percorrido',pT,`${pas} de ${tot} dias`)}${barra('Chamados resolvidos',pR,rec.length?`${res} de ${rec.length} recebidos no trimestre`:'nenhum recebido ainda','var(--ok)')}${barra('Chamados no prazo',T.pct,T.chPrazo?`${T.chOk} de ${T.chPrazo} concluídos até o prazo`:'sem chamados com prazo concluídos','var(--accent)')}</div></div>
  ${ps.length?`<div class="tqpess">${ps.map(({p,r})=>`<div class="tqp">${avP(p.id,p.n)}<div><b>${esc(p.n)}</b><small>${r.total} realizadas · ${r.pct===null?'—':r.pct+'% no prazo'}</small></div></div>`).join('')}</div>`:''}
  ${T.etapas.length?`<div class="chips2">${T.etapas.map(([g,n])=>`<span class="chip" style="cursor:default">${esc(g)} ${n}</span>`).join('')}</div>`:''}</div>`}
+/* resumo da semana no Teams (teste): o Prumo monta e manda para o Workflows do Teams, que entrega ao diretor */
+function teamsSheet(){FORM={tipo:'_teams'};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Teams</p><h2 id="sheet-title">Resumo da semana no Teams</h2><p class="sub" style="font-size:13px">O Prumo manda para o Teams do diretor: chamados em aberto e atrasados, o que chegou e foi concluído na semana e o que a equipe fez no cronograma. Sem custo: usa o Workflows do próprio Teams.</p></div>
+ <ol class="passos"><li>No Teams, o fluxo <b>Workflows</b> que recebe o aviso do Prumo e manda ao diretor precisa estar criado.</li><li>O endereço que o Teams gera fica guardado no Supabase como <b>TEAMS_WEBHOOK_URL</b>.</li><li>Clique em <b>Enviar teste agora</b> e confira se a mensagem chegou.</li></ol>
+ <p class="meta" id="tm_res" style="margin:0"></p>
+ <div class="foot"><button class="btn" onclick="fechar()">Fechar</button><button class="btn pri" id="tm_btn" onclick="teamsTeste()">Enviar teste agora</button></div>`;
+ document.getElementById('ov').hidden=false}
+async function teamsTeste(){const sb=window.portalSupabase,b=document.getElementById('tm_btn'),o=document.getElementById('tm_res');if(!sb?.functions){toast('Funciona no sistema publicado, com login.');return}
+ b.disabled=true;b.textContent='Enviando…';
+ try{const {data,error}=await sb.functions.invoke('teams-resumo',{body:{}});
+  if(error){let j=null;try{j=await error.context?.json()}catch(e){}const M={sem_webhook:'Falta guardar o endereço do Teams (TEAMS_WEBHOOK_URL) nos Secrets do Supabase.',sem_permissao:'Só o diretor ou um admin pode enviar.',teams_recusou:'O Teams recusou a mensagem. Confira se o endereço do fluxo está certo e se o fluxo está ligado.'};
+   o.textContent=M[j?.erro]||(String(error.message||'').includes('Failed to send')||error.name==='FunctionsFetchError'?'A função teams-resumo ainda não foi publicada no Supabase.':'Não foi possível enviar agora.');o.style.color='var(--bad)';return}
+  o.textContent=`Enviado. ${data?.atrasados??0} chamados atrasados e ${data?.feitas??0} marcações do cronograma na semana. Confira no Teams.`;o.style.color='var(--ok)';log('Enviou o resumo da semana para o Teams (teste)')}
+ catch(e){o.textContent='Não foi possível enviar agora.'}finally{b.disabled=false;b.textContent='Enviar teste agora'}}
 function emitirSheet(){FORM={tipo:'_emit'};const R=proxReunioes(1),k=R[0]?`${R[0].d}|${R[0].h}`:'';
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Para a reunião ou para o diretor</p><h2 id="sheet-title">Emitir relatório ou slides</h2><p class="sub" style="font-size:13px">Painel dos chamados, atrasos, o que a equipe realizou e, se quiser, a pauta da próxima reunião. Com o fundo, o logo e as fotos da equipe.</p></div>
  <div class="fgrid"><div class="full"><label class="lbl" for="em_per">Período</label><select class="inp" id="em_per"><option value="sem">Últimos 7 dias</option><option value="mes">Este mês até hoje</option><option value="ant">Mês passado</option><option value="tri">Trimestre</option></select></div>
@@ -3390,7 +3405,7 @@ window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
 /* rascunhos: o que foi digitado num formulário volta quando você reabre */
 const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
 (function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
-const SEM_RASC=new Set(['_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+const SEM_RASC=new Set(['_teams','_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
 function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
 function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
 const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);
