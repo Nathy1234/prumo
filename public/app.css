@@ -588,3 +588,5 @@ table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;col
 .hj-row{background:var(--ok-bg);border-radius:10px;padding-left:8px;padding-right:8px}
 
 .let.nt{background:var(--line-soft);color:var(--ink-3);text-decoration:line-through}.pill.ntp,.dashp .pill.ntp{background:var(--line-soft);color:var(--ink-3)}
+
+.let{position:relative}.refp{position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--accent);border:1px solid var(--panel)}
