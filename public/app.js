@@ -2084,7 +2084,7 @@ function htmlRelCh(L,f,an){const R=resumoCh(L),e=esc,mx=Math.max(1,...R.deps.map
  table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid #EEF0EF;vertical-align:top}th{background:#F1F3F2;font-weight:600;position:sticky;top:0}
  .wrap{overflow-x:auto;border:1px solid #E3E6E5;border-radius:12px}.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:600}
  .leg span{margin-right:14px;font-size:12px;color:#5B6663}.leg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
- blockquote{margin:8px 0 0;padding:10px 12px;background:#F6F7F7;border-left:3px solid #2E7D6B;border-radius:6px;white-space:pre-wrap}
+ blockquote{margin:8px 0 0;padding:10px 12px;background:#F6F7F7;border-left:3px solid #C4510A;border-radius:6px;white-space:pre-wrap}
  .foot{color:#8A9491;font-size:12px;margin-top:28px}@media print{body{background:#fff;padding:0}.card,.wrap{break-inside:avoid}}
  </style></head><body><main>
  <h1>Relatório de chamados</h1><p class="sub">${e(perTxt(f.de,f.ate))}${f.dep?' · '+e(f.dep==='_sem'?'Sem setor':depNome(f.dep)):''} · Regra: D-${CHEG_MIN()} (${CHEG_UTEIS()?'dias úteis':'dias corridos'}); sem data no e-mail conta como atrasado · Gerado em ${e(dataHora(new Date().toISOString()))} por ${e(euNome())}</p>
@@ -2196,7 +2196,7 @@ function dadosResumo(c){c=c||cfgRes();const it=c.itens||{},S2=[],m=MES_ATUAL,url
 function htmlResumo(r){const e=esc;
  return `<div style="font-family:Segoe UI,Arial,sans-serif;color:#1C2321;max-width:640px"><h2 style="margin:0 0 4px;font-size:18px">Resumo do Prumo · ${e(hojeTxt())}</h2><p style="margin:0 0 16px;color:#5B6663;font-size:13px">Financeiro e Contábil</p>
  ${r.secoes.length?r.secoes.map(x=>`<div style="border:1px solid #E3E6E5;border-radius:10px;padding:12px 14px;margin:0 0 10px"><b style="font-size:14px">${e(x.t)}</b>${x.linhas.length?`<ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${x.linhas.map(l=>`<li style="margin:2px 0">${e(l)}</li>`).join('')}</ul>`:''}</div>`).join(''):'<p>Nada atrasado ou pendente nos itens escolhidos. Tudo em dia.</p>'}
- <p style="margin:16px 0 0;font-size:13px"><a href="${e(r.url)}" style="color:#2E7D6B">Abrir o Prumo</a></p><p style="color:#8A9491;font-size:11.5px;margin-top:14px">Resumo automático do Prumo. Para mudar a data, o horário ou os itens, use Painel › Resumo para o diretor.</p></div>`}
+ <p style="margin:16px 0 0;font-size:13px"><a href="${e(r.url)}" style="color:#C4510A">Abrir o Prumo</a></p><p style="color:#8A9491;font-size:11.5px;margin-top:14px">Resumo automático do Prumo. Para mudar a data, o horário ou os itens, use Painel › Resumo para o diretor.</p></div>`}
 async function enviarResumoDir(manual){const c=cfgRes(),av=cfgAv(),para=c.ativo||manual?(c.para||[]).filter(emailOk):[],zap=av.resumoWhats&&(av.whatsNums||[]).length;
  const r=dadosResumo(c);if(!manual&&c.soSeHouver&&!r.secoes.length)return 'vazio';
  const tot=r.secoes.reduce((a,x)=>a+(x.k==='ia'?0:x.total),0);
@@ -2856,7 +2856,7 @@ function reuCard(k,l){const it=l.filter(x=>reuKey(x)===k),pe=it.filter(x=>!sugFe
 /* relatório e slides da reunião (arquivos HTML que abrem no navegador; dá para imprimir ou salvar em PDF) */
 const reuItens=k=>D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&reuKey(x)===k).sort((x,y)=>sugFeita(x)-sugFeita(y)||(x.criadoEm||x.criado||'').localeCompare(y.criadoEm||y.criado||''));
 const respQuando=x=>x.em?`${fmt(x.em.slice(0,10))} às ${new Date(x.em).toTimeString().slice(0,5)}`:'';
-const CSS_BASE=`:root{--ink:#16201E;--ink2:#3F4A48;--ink3:#5B6664;--acc:#1E5B55;--soft:#E4EFED;--line:#DDE3E1;--bg:#F6F7F7}*{box-sizing:border-box}body{margin:0;font-family:Onest,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:#fff}`;
+const CSS_BASE=`:root{--ink:#16201E;--ink2:#3F4A48;--ink3:#5B6664;--acc:#C4510A;--soft:#FFF0E2;--line:#DDE3E1;--bg:#F6F7F7}*{box-sizing:border-box}body{margin:0;font-family:Onest,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:#fff}`;
 const FONTE='<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&display=swap">';
 /* texto das respostas: linhas e itens com "*" ou "-" viram lista */
 function blocosTxt(t){const out=[];String(t||'').replace(/\r/g,'').split('\n').forEach(l=>{l=l.trim();if(!l)return;
@@ -2939,7 +2939,7 @@ function htmlReuSlides(k){const it=reuItens(k),[d,h]=k.split('|'),W=semanaDados(
  section{display:none;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));background:#fff;padding:4.5% 7% 7%;flex-direction:column;position:relative;font-size:min(2.1vw,3.75vh);overflow:hidden}
  section.on{display:flex}.ey{font-size:.58em;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);font-weight:600;margin:0 0 .6em}
  h1{font-size:2.6em;margin:0;letter-spacing:-.02em;line-height:1.05}h2{font-size:1.5em;margin:0 0 .7em;letter-spacing:-.01em;line-height:1.15}h2.t2{font-size:1.15em}h2.t3{font-size:.95em}
- .capa{justify-content:center;background:var(--acc);color:#fff}.capa .ey{color:#A9DAD2}.capa .sub{font-size:1.1em;margin:.8em 0 0;color:#D6ECE8}.capa .mini{font-size:.7em;margin:2em 0 0;color:#A9DAD2}
+ .capa{justify-content:center;background:var(--acc);color:#fff}.capa .ey{color:#FFE2C7}.capa .sub{font-size:1.1em;margin:.8em 0 0;color:#FFF1E4}.capa .mini{font-size:.7em;margin:2em 0 0;color:#FFE2C7}
  .pauta{list-style:none;margin:0;padding:0;display:grid;gap:.5em}.pauta li{display:flex;gap:.7em;align-items:flex-start}.pauta .pn{flex:none;width:1.6em;height:1.6em;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:.65em;font-weight:600;margin-top:.15em}
  .pauta b{display:block;font-weight:600;font-size:.82em}.pauta em{font-style:normal;color:var(--ink3);font-size:.58em}
  .det{background:var(--bg);border-radius:.6em;padding:.8em 1em;font-size:.72em;color:var(--ink2);line-height:1.45}.det p{margin:.15em 0}.det ul{margin:.2em 0;padding-left:1.2em}.cont{display:block;font-size:.8em;color:var(--ink3);margin-bottom:.3em}

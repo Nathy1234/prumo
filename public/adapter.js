@@ -187,7 +187,7 @@
   /* ------------------------------------------------------------------
      Usuário
      ------------------------------------------------------------------ */
-  const cores = ['#1E5B55', '#7A4E9C', '#9C5A2B', '#2F6B3A', '#2B5C9C', '#9C2F5A'];
+  const cores = ['#C4510A', '#7A4E9C', '#9C5A2B', '#2F6B3A', '#2B5C9C', '#9C2F5A'];
   const corDe = id => cores[[...String(id)].reduce((a, c) => a + c.charCodeAt(0), 0) % cores.length];
   function criarUser(u, nome, admin) {
     const cache = {};

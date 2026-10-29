@@ -4,26 +4,26 @@ img{max-width:100%}
 [hidden]{display:none!important}
 /* Layout: barra lateral fixa à esquerda + área de trabalho arejada; formulários abrem em painel lateral; no celular o menu vira faixa rolável */
 :root{
-  --bg:#F6F7F7; --panel:#FFFFFF; --line:#E3E6E5; --line-soft:#EEF0EF;
-  --ink:#16201E; --ink-2:#56625F; --ink-3:#8C9693;
-  --accent:#1E5B55; --accent-soft:#E4EFED; --accent-ink:#164641;
+  --bg:#F8F6F3; --panel:#FFFFFF; --line:#E9E4DE; --line-soft:#F2EEE9;
+  --ink:#2B2B2B; --ink-2:#5C5852; --ink-3:#847E76;
+  --accent:#C4510A; --accent-soft:#FFF0E2; --accent-ink:#9A3A06; --gold:#FDB913;
   --ok:#2F6B3A; --ok-bg:#E6F1E7; --warn:#8A5A0B; --warn-bg:#F7EDDA; --bad:#9C2F2B; --bad-bg:#F8E5E3;
-  --side:#EEF1F0; --scrim:rgba(14,22,20,.32);
+  --side:#FBF5EE; --scrim:rgba(30,20,10,.32);
   --f-ui:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-voice:"Newsreader",Georgia,"Times New Roman",serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#111615; --panel:#171D1C; --line:#28302E; --line-soft:#1F2624;
-  --ink:#E7ECEA; --ink-2:#A3AFAC; --ink-3:#6E7A77;
-  --accent:#7CC0B6; --accent-soft:#1D2F2C; --accent-ink:#A9DAD2;
+  --bg:#171513; --panel:#1F1C19; --line:#34302B; --line-soft:#29251F;
+  --ink:#F1EEEA; --ink-2:#BDB6AD; --ink-3:#8A847C;
+  --accent:#FF9A4D; --accent-soft:#3A2716; --accent-ink:#FFC48F; --gold:#FDB913;
   --ok:#8FCB98; --ok-bg:#1A2B1D; --warn:#E3B868; --warn-bg:#2E2412; --bad:#EE9C96; --bad-bg:#331A18;
-  --side:#141A19; --scrim:rgba(0,0,0,.55); color-scheme:dark}}
+  --side:#1A1816; --scrim:rgba(0,0,0,.55); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#111615; --panel:#171D1C; --line:#28302E; --line-soft:#1F2624;
-  --ink:#E7ECEA; --ink-2:#A3AFAC; --ink-3:#6E7A77;
-  --accent:#7CC0B6; --accent-soft:#1D2F2C; --accent-ink:#A9DAD2;
+  --bg:#171513; --panel:#1F1C19; --line:#34302B; --line-soft:#29251F;
+  --ink:#F1EEEA; --ink-2:#BDB6AD; --ink-3:#8A847C;
+  --accent:#FF9A4D; --accent-soft:#3A2716; --accent-ink:#FFC48F; --gold:#FDB913;
   --ok:#8FCB98; --ok-bg:#1A2B1D; --warn:#E3B868; --warn-bg:#2E2412; --bad:#EE9C96; --bad-bg:#331A18;
-  --side:#141A19; --scrim:rgba(0,0,0,.55); color-scheme:dark}
+  --side:#1A1816; --scrim:rgba(0,0,0,.55); color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
