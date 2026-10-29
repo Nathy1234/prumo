@@ -573,3 +573,14 @@ table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;col
 .let{gap:3px}.let small{font-size:9.5px;font-weight:500;opacity:.85}.lets .let{min-width:0}
 .let.pro{background:var(--line-soft);color:var(--ink)}.let.par{outline:1px dashed currentColor;outline-offset:-2px}
 .dashp .pill.okp{background:var(--ok-bg);color:var(--ok)}
+
+/* sobre o sistema */
+.sb-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sb-it{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.sb-it.off{opacity:.6}.sb-ic{flex:none;width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center}.sb-ic svg{width:18px;height:18px}
+.sb-it .t{flex:1;min-width:0}.sb-it b{display:block;font-size:14px;font-weight:600}.sb-it b .tag{font-size:10.5px;margin-left:4px;vertical-align:1px}.sb-it .t>span{display:block;font-size:12.5px;color:var(--ink-2)}.sb-it small{display:block;font-size:12px;color:var(--accent-ink);margin-top:4px;font-weight:500}
+@media (max-width:860px){.sb-list{grid-template-columns:1fr}}
+
+.sb-res p{margin:0;font-size:14.5px;line-height:1.6;color:var(--ink);max-width:90ch}
+.sb-fim{display:flex;align-items:center;gap:14px;padding:16px 18px;border-top:1px solid var(--line);margin-top:4px}.sb-logo{width:40px;height:40px;flex:none}.sb-logo svg{width:100%;height:100%}
+.sb-fim b{display:block;font-size:14px}.sb-fim span{display:block;font-size:12.5px;color:var(--ink-3)}.sb-fim>div:nth-child(2){flex:1}

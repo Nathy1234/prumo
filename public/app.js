@@ -14,6 +14,7 @@ proc:'<path d="M5 4h10l4 4v12H5z"/><path d="M14 4v5h5M8 13h8M8 17h5"/>',
 melhorias:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
 relat:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
 info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+sistema:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/>',
 evento:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 14h3"/>',
 pessoa:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
 alertas:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
@@ -657,6 +658,53 @@ function diaFeitosSheet(iso){const L=registrosCron(iso,iso),R=registrosCron('','
 function regTabela(L,max,cls){const l=L.slice(0,max);return l.length?`<table class="${cls||''}"><thead><tr><th>Feito em</th><th>Referente a</th><th>Sistema</th><th>Etapa</th><th>Quem</th><th>Situação</th></tr></thead><tbody>${l.map(o=>{const dd=o.par?0:Math.round((new Date(o.done+'T12:00')-new Date(o.ref+'T12:00'))/864e5);return `<tr><td>${fmt(o.done)}</td><td>${fmt(o.ref)}</td><td>${esc(o.sis)}</td><td>${esc(nomeEtS(o.g,o.sis))}</td><td><span class="pq">${fotoX(o.pid,o.nome,26)}${esc(o.nome||'—')}</span></td><td><span class="pill ${o.par?'at':'okp'}">${o.par?'Em parte':dd>0?`Finalizado · ${dd} ${dd===1?'dia':'dias'} depois`:'Finalizado'}</span></td></tr>`}).join('')}</tbody></table>${L.length>max?`<p class="vazio" style="margin-top:8px">e mais ${L.length-max}</p>`:''}`:'<p class="vazio">Nada marcado no cronograma no período.</p>'}
 function regResumo(L){const fin=L.filter(o=>!o.par),noDia=fin.filter(o=>o.done===o.ref).length,dep=fin.filter(o=>o.done>o.ref),porS={};fin.forEach(o=>porS[o.sis]=(porS[o.sis]||0)+1);
  return {tot:fin.length,noDia,pct:fin.length?Math.round(noDia/fin.length*100):null,dep:dep.length,refs:[...new Set(dep.map(o=>fmt(o.ref)))],porS}}
+/* resumo de cada área para a tela Sobre o sistema: [o que tem, número ao vivo] */
+const SOBRE={
+ painel:['Visão geral do dia: números dos chamados, equipe no trimestre, atrasos, andamento e o que foi feito no cronograma. Cada pessoa escolhe os blocos.',()=>`${BLOCOS_PAINEL.length} blocos disponíveis`],
+ alertas:['Rotinas atrasadas e pendências que precisam de atenção.',()=>{const a=alertas().length;return a?`${a} ${a===1?'alerta':'alertas'} agora`:'nenhum alerta agora'}],
+ ferramentas:['Atalhos para os sistemas e sites que o departamento usa.',()=>`${D.ferramentas.length} ferramentas`],
+ chamados:['Pedidos dos departamentos: leitura da caixa do contas a pagar, triagem por categoria, regra D-8, padrão do contas a pagar, D-5 com justificativa.',()=>`${D.chamados.filter(c=>c.st!=='Concluído').length} em aberto · ${emPend().length} e-mails para revisar · ${D.chamados.filter(chAtrasado).length} atrasados`],
+ rotinas:['Cronograma por sistema (WAE: Lançamento, Baixa, Conciliação · Protheus: Lançar, Pagar, Conciliar), com quem fez, a hora e o dia de referência.',()=>`${D.cronograma.filter(r=>r.ativo!==false).length} rotinas ativas · sistemas: ${sists().join(', ')}`],
+ metas:['Metas e lista do que fazer no mês, do departamento e de cada pessoa.',()=>{const i=itensMeta(MES_ATUAL,'dep').length;return `${i} itens do departamento em ${mesCurto(MES_ATUAL)}`}],
+ entregas:['Entregas que os departamentos devem ao financeiro, com prazo e cobrança.',()=>`${D.entregas.filter(e=>!e.recebido).length} pendentes`],
+ destaques:['Conquistas e reconhecimentos da equipe no mês.',()=>`${D.destaques.filter(d=>d.mes===MES_ATUAL).length} neste mês`],
+ fechamento:['Acompanhamento do fechamento mensal (D+N).',()=>''],
+ calendario:['Calendário com as letras do que foi feito em cada dia, a referência e as reuniões.',()=>`${registrosCron(MES_ATUAL+'-01',HJ).length} registros no mês · ${D.eventos.length} compromissos`],
+ equipe:['Equipe e feedbacks: o que cada pessoa realizou no trimestre e o acompanhamento.',()=>`${colabs().length} pessoas`],
+ feedbacks:['Feedbacks mensais e trimestrais, com modelos de texto.',()=>`${D.feedbacks.length} feedbacks registrados`],
+ realizadas:['Histórico das demandas concluídas.',()=>`${D.chamados.filter(c=>c.st==='Concluído').length} concluídas`],
+ bancos:['Troca de dados bancários com conferência antifraude.',()=>''],
+ whats:['Mensagens de WhatsApp aprovadas pelo diretor.',()=>''],
+ proc:['Procedimentos: o passo a passo de cada atividade.',()=>`${D.procedimentos.length} procedimentos`],
+ melhorias:['Pauta das reuniões (assuntos e respostas da equipe, relatório e slides) e ideias para o sistema.',()=>`${D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&!sugFeita(x)).length} assuntos a falar · ${D.sugestoes.filter(x=>sugCat(x)==='sistema').length} ideias`],
+ relat:['Relatórios do trimestre: o que a equipe realizou, entregas e destaques.',()=>''],
+ indicadores:['Indicadores por área, com envio do resumo aos gestores.',()=>''],
+ logs:['Registro de tudo o que foi feito no sistema, com arquivo dos meses anteriores.',()=>`${D.logs.length} ações recentes`],
+ usuarios:['Quem acessa o Prumo, perfis e permissões. Também escolhe as áreas e sistemas que aparecem.',()=>{const p=D.pedidos.filter(x=>!acessoDe(x.id)).length;return `${D.acessos.length} acessos${p?` · ${p} pedidos esperando`:''}`}],
+ backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
+/* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
+const PRUMO_INICIO='outubro de 2026';
+const PRUMO_ATUALIZACOES=94;
+const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
+async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
+ <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCriador()">Salvar</button></div></div>`;document.getElementById('ov').hidden=false}
+async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
+/* novidades: a mudança mais recente primeiro */
+const NOVIDADES=[
+ ['2026-10-29','Tela Sobre o sistema para o administrador e o diretor, com o resumo do Prumo'],
+ ['2026-10-29','Cronograma por sistema: WAE com Lançamento, Baixa e Conciliação; Protheus com Lançar, Pagar e Conciliar'],
+ ['2026-10-29','Calendário com o dia em que foi feito e o dia de referência'],
+ ['2026-10-29','Painel com equipe no trimestre, painel dos chamados, atrasos e realizado no cronograma'],
+ ['2026-10-29','Relatório e slides com fotos, painel dos chamados e o fundo do sistema'],
+ ['2026-10-29','Administrador escolhe as áreas e sistemas que aparecem no menu'],
+ ['2026-10-29','Estilo vidro com marca d’água e novo logo'],
+ ['2026-10-29','Caixa dos chamados conectada com a conta do contas a pagar'],
+ ['2026-10-29','Categorias automáticas, pesquisa e ajuste manual nos e-mails para revisar'],
+ ['2026-10-29','Padrão do contas a pagar: conferência das solicitações e pagamento em D-5'],
+ ['2026-10-29','Reuniões: assuntos, respostas da equipe, relatório e slides'],
+ ['2026-10-29','Foto de perfil, inclusive a do Microsoft 365'],
+ ['2026-10-29','Registro de atividades com arquivo de 60 dias e backup de 7 dias']];
 const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'};
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
@@ -2496,12 +2544,12 @@ async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FOR
  const e=D.eventos.find(x=>x.id===FORM.id);try{await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
 
 /* ---------- telas ---------- */
-const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['usuarios','Usuários e permissões'],['backup','Backup']];
+const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['sistema','Sobre o sistema'],['usuarios','Usuários e permissões'],['backup','Backup']];
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
 const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
-const NAO_OCULTA=['painel','usuarios'];
+const NAO_OCULTA=['painel','usuarios','sistema'];
 const ocultos=()=>Array.isArray(CFG.ocultos)?CFG.ocultos:['whats'];
-const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(NAO_OCULTA.includes(k)||!ocultos().includes(k))&&(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='feedbacks'||fbPode()));
+const vis=()=>S.perfil==='pendente'?[['acesso','Meu acesso']]:solic()?MENU_SOL:MENU.filter(([k])=>(NAO_OCULTA.includes(k)||!ocultos().includes(k))&&(!['fechamento','entregas'].includes(k)||modOn(k))&&(!MENU_PERM[k]||pode(MENU_PERM[k])||(k==='chamados'&&pode('email')))&&(!['usuarios','backup'].includes(k)||podeAdmin())&&(k!=='sistema'||podeAdmin()||dir())&&(k!=='feedbacks'||fbPode()));
 function chAbas(on){if(!(pode('chamados')&&pode('email')))return '';const nt=emPend().length;
  return `<div class="tabs big" role="tablist" aria-label="Chamados e e-mails"><button role="tab" aria-selected="${on==='ch'}" class="${on==='ch'?'on':''}" onclick="ir('chamados')">Chamados</button><button role="tab" aria-selected="${on==='em'}" class="${on==='em'?'on':''}" onclick="ir('triagem')">E-mails para revisar ${nt?`<span class="tag wa" style="font-size:11px;margin-left:4px">${nt}</span>`:''}</button></div>`}
 function chEmail(){if(!pode('email'))return '';
@@ -2890,6 +2938,21 @@ melhorias(){const ab=S.sugAba==='sistema'?'sistema':'reuniao',l=D.sugestoes.filt
  `<div class="reugrid">${[...pasPend,...fut,...sem].map(k=>reuCard(k,l)).join('')}</div>`+
  (pasOk.length?`<details class="panel dmais"><summary>Reuniões anteriores <span class="meta">${pasOk.length}</span></summary><div class="reugrid" style="margin-top:12px">${pasOk.slice(0,24).map(k=>reuCard(k,l)).join('')}</div></details>`:'')+
  note('Abra a reunião para criar um assunto. Qualquer pessoa da equipe pode criar assuntos e responder a cada um, para ninguém esquecer de falar no dia.')},
+/* ---------- sobre o sistema (só admin): o que o Prumo tem hoje, com números ao vivo e o link de cada parte.
+   A lista vem do próprio menu: uma área nova aparece aqui sozinha. Novidades: acrescentar em NOVIDADES a cada mudança. ---------- */
+sistema(){if(!podeAdmin()&&!dir())return V.painel();
+ const ok=f=>{try{return f()}catch(e){return ''}},n=(x,s1,sN)=>`${x} ${x===1?s1:sN}`,oc=ocultos();
+ const vs=(()=>{const sc=[...document.querySelectorAll('script[src]')].map(x=>x.getAttribute('src')).find(x=>/app\.js/.test(x))||'';return (sc.match(/v=(\d+)/)||[])[1]||''})();
+ const L=MENU.filter(([k])=>k!=='sistema').map(([k,nome])=>{const d=SOBRE[k]||['Área do sistema.',()=>''],vivo=ok(d[1]),oculta=!NAO_OCULTA.includes(k)&&oc.includes(k),desl=(['fechamento','entregas'].includes(k)&&!modOn(k));
+  return `<div class="sb-it ${oculta||desl?'off':''}"><span class="sb-ic">${ic(k)}</span><div class="t"><b>${esc(nome)}${oculta?' <span class="tag ne">oculta no menu</span>':''}${desl?' <span class="tag ne">módulo desligado</span>':''}</b><span>${esc(d[0])}</span>${vivo?`<small>${vivo}</small>`:''}</div>${oculta?(podeAdmin()?`<button class="btn ghost" onclick="menuSheet()">Mostrar</button>`:''):desl?'':`<button class="btn" onclick="ir('${k}')">Abrir</button>`}</div>`}).join('');
+ const T=realizadoPer(null,mesesTri(triAgora())[0]+'-01',HJ);
+ return head('Administração','Sobre o <em>sistema</em>','O que o Prumo tem hoje, com os números de agora e o atalho para cada parte. Atualiza sozinho conforme o sistema é usado e ganha partes novas.',podeAdmin()?`<button class="btn" onclick="menuSheet()">Mostrar e ocultar áreas</button>`:'')+
+ `<div class="panel sb-res"><div class="ph"><h2>O que o Prumo faz hoje</h2></div><p>${esc(RESUMO_PRUMO)}</p></div>`+
+ `<div class="stats"><div class="stat"><p>Áreas no sistema</p><strong>${MENU.length-1}</strong><small>${oc.filter(k=>!NAO_OCULTA.includes(k)).length} ocultas no menu</small></div><div class="stat"><p>Pessoas com acesso</p><strong>${D.acessos.filter(a=>a.ativo!==false).length}</strong><small>${n(colabs().length,'pessoa na equipe','pessoas na equipe')}</small></div><div class="stat"><p>Chamados registrados</p><strong>${D.chamados.length}</strong><small>${D.chamados.filter(c=>c.st!=='Concluído').length} em aberto</small></div><div class="stat"><p>Realizado no trimestre</p><strong>${T.total}</strong><small>${T.ch} chamados · ${T.rot} rotinas</small></div></div>
+ <div class="panel"><div class="ph"><h2>Partes do sistema</h2><span>${MENU.length-1} áreas${vs?` · versão ${esc(vs)}`:''}</span></div><div class="sb-list">${L}</div></div>
+ <div class="panel"><div class="ph"><h2>Novidades recentes</h2><span>últimas mudanças no Prumo</span></div>${NOVIDADES.slice(0,15).map(([d,t])=>`<div class="row"><span class="meta" style="width:52px">${fmt(d)}</span><div class="t"><b style="font-weight:400">${esc(t)}</b></div></div>`).join('')}</div>`+
+ `<div class="sb-fim"><div class="sb-logo">${document.querySelector('.brand .mark')?.innerHTML||''}</div><div><b>Prumo · Financeiro e Contábil</b><span>Criado por ${esc(CFG.criador||'Natalia Araujo')} em ${esc(PRUMO_INICIO)} · ${PRUMO_ATUALIZACOES} atualizações publicadas${vs?` · versão ${esc(vs)}`:''}</span></div>${podeAdmin()?`<button class="btn ghost" onclick="editCriador()">Editar nome</button>`:''}</div>`+
+ note('Só administradores e o diretor veem esta tela. Os números são do momento em que você abre e mudam sozinhos conforme a equipe usa o Prumo.')},
 relat(){const tf=D.tarefas,f=tf.filter(x=>x.s==='feita').length,ms=mesesTri(S.tri),dq=D.destaques.filter(d=>ms.includes(d.mes));
  return head('Para as reuniões','Relatórios','Montados a partir de tudo o que foi registrado no portal.',triNav())+
  `<div class="panel"><div class="ph"><h2>Situação atual</h2><span>atualizado agora</span></div>
@@ -3327,7 +3390,7 @@ window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
 /* rascunhos: o que foi digitado num formulário volta quando você reabre */
 const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
 (function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
-const SEM_RASC=new Set(['_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+const SEM_RASC=new Set(['_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
 function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
 function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
 const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);
