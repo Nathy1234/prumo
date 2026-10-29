@@ -584,3 +584,7 @@ table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;col
 .sb-res p{margin:0;font-size:14.5px;line-height:1.6;color:var(--ink);max-width:90ch}
 .sb-fim{display:flex;align-items:center;gap:14px;padding:16px 18px;border-top:1px solid var(--line);margin-top:4px}.sb-logo{width:40px;height:40px;flex:none}.sb-logo svg{width:100%;height:100%}
 .sb-fim b{display:block;font-size:14px}.sb-fim span{display:block;font-size:12.5px;color:var(--ink-3)}.sb-fim>div:nth-child(2){flex:1}
+
+.hj-row{background:var(--ok-bg);border-radius:10px;padding-left:8px;padding-right:8px}
+
+.let.nt{background:var(--line-soft);color:var(--ink-3);text-decoration:line-through}.pill.ntp,.dashp .pill.ntp{background:var(--line-soft);color:var(--ink-3)}

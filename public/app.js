@@ -54,7 +54,7 @@ const fimTri=t=>{const m=mesesTri(t)[2];const [y,mm]=m.split('-').map(Number);re
 const diasAte=iso=>Math.round((new Date(iso+'T12:00')-new Date(HJ+'T12:00'))/864e5);
 const hrs=n=>{const v=Math.round((+n||0)*10)/10;return `${String(v).replace('.',',')} h`};
 
-const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes','cronitens','feitos','metas','fluxo','analises'];
+const COLS=['equipe','tarefas','mensagens','chamados','sugestoes','destaques','ponto','eventos','procedimentos','departamentos','entregas','acessos','pedidos','emails','categorias','ferramentas','feedbacks','observacoes','modelos','frases','verificacoes','etapas','fechamentos','assuntos','remetentes','cronograma','execucoes','cronitens','feitos','ausencias','semmov','metas','fluxo','analises'];
 const D={logs:[],backups:[]};COLS.forEach(c=>D[c]=[]);
 let CFG={};
 const S={tela:'painel',perfil:'dir',modo:'carregando',sim:'',online:null,mesDest:MES_ATUAL,tri:triDe(MESES_ATUAL_FIX()),cal:MES_ATUAL,busca:'',limpar:false,loaded:0};
@@ -580,11 +580,11 @@ function notifs(){
  return L.slice(0,30)}
 function lido(){if(S.prefs?.lido&&!S.sim)return S.prefs.lido;try{return localStorage.getItem('lido_'+(ME.uid||'')+S.perfil)||''}catch(e){return S['lido_'+S.perfil]||''}}
 function marcarLido(){const v=new Date().toISOString();try{localStorage.setItem('lido_'+(ME.uid||'')+S.perfil,v)}catch(e){S['lido_'+S.perfil]=v}if(DB&&ME.uid&&!S.sim){S.prefs={...(S.prefs||{}),lido:v};DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs).catch(()=>{})}}
-function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs().filter(l=>/^(Aceitou a demanda|Concluiu o chamado)/.test(l.acao||'')),lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5,!dir()),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph;
+function bell(){const AN=aniversarios(1),A=alertas().filter(a=>a.c==='bad'),N=notifs().filter(l=>/^(Aceitou a demanda|Concluiu o chamado)/.test(l.acao||'')),lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5,!dir()),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph+AN.length;
  return `<div class="tb"><span class="meta">${esc(quemSou())}</span>${temaBox()}<div style="position:relative"><button class="btn bell" id="bellbtn" onclick="tgBell()" aria-label="Notificações" aria-expanded="${!!S.bell}">${ic('alertas').replace('aria-hidden','style="width:18px;height:18px" aria-hidden')}${novos?`<span class="dot">${novos}</span>`:''}</button>
  ${S.bell?`<div class="pop" role="dialog" aria-label="Notificações"><div class="ph" style="padding:12px 14px 4px"><h2>Notificações</h2><button class="btn ghost" onclick="ir('alertas')">Ver tudo</button></div>
  ${avPodePedir()?`<div style="padding:4px 14px 8px"><button class="btn pri" style="width:100%" onclick="ativarAvisos()">Ativar avisos no canto da tela</button></div>`:''}
- ${A.map(a=>`<button class="pi" onclick="ir('${a.ir}')"><span class="tag bad" style="flex:none">Alerta</span><span><b>${esc(a.t)}</b><small>${esc(a.s)}</small></span></button>`).join('')}
+ ${AN.map(x=>`<button class="pi new" onclick="ir('painel')"><span class="tag ok" style="flex:none">${x.em===0?'Hoje':'Amanhã'}</span><span><b>${x.tipo==='aniv'?'Aniversário':'Tempo de casa'} de ${esc(x.p.n)}</b><small>${x.tipo==='aniv'?'Dê os parabéns!':`${x.anos} ${x.anos===1?'ano':'anos'} no departamento`}</small></span></button>`).join('')}${A.map(a=>`<button class="pi" onclick="ir('${a.ir}')"><span class="tag bad" style="flex:none">Alerta</span><span><b>${esc(a.t)}</b><small>${esc(a.s)}</small></span></button>`).join('')}
  ${P.length?`<p class="eyebrow" style="margin:8px 14px 2px">Próximos prazos</p>${P.map(x=>`<button class="pi ${x.d===HJ?'new':''}" onclick="ir('calendario')"><span class="meta" style="flex:none;width:72px">${x.d===HJ?'Hoje':fmt(x.d)}${x.h?' '+x.h:''}</span><span><b style="font-weight:400">${esc(x.t)}</b><small>${esc(x.g)}${x.fixo?' · fixo':''}${x.quem&&x.quem!=='Todos'?' · '+esc(x.quem):''}</small></span></button>`).join('')}`:''}
  ${N.length?`<p class="eyebrow" style="margin:8px 14px 2px">Chamados aceitos e concluídos</p>${N.map(n=>`<button class="pi ${n.em>lv?'new':''}" onclick="${/CH-\d+/.test(n.acao)?`abrirLogCh('${(n.acao.match(/CH-\d+/)||[''])[0]}')`:`ir('chamados')`}"><span class="meta" style="flex:none;width:72px">${fmtHora(n.em)}</span><span><b style="font-weight:400">${esc(n.acao)}</b><small>${esc(quemLog(n))}</small></span></button>`).join('')}`:''}
  ${!A.length&&!P.length&&!N.length?'<p class="empty">Nenhum alerta, prazo próximo ou chamado novo.</p>':''}${pode('logs')?`<div style="padding:6px 14px 12px"><button class="btn ghost" style="width:100%" onclick="S.bell=false;ir('logs')">Ver o registro de atividades</button></div>`:''}</div>`:''}</div></div>`}
@@ -646,6 +646,7 @@ function registrosCron(de,ate){const out=[],den=d=>d&&(!de||d>=de)&&(!ate||d<=at
   const ini=(f.ini||'').slice(0,10);
   if(f.st==='feita'){const done=f.feitoEm||(f.fim||'').slice(0,10)||f.dia;if(ini&&ini<done)push({...base,done:ini,par:true,hora:hmDe(f.ini)});push({...base,done,par:false,hora:f.hora||''})}
   else if(f.st==='andamento'&&ini)push({...base,done:ini,par:true,hora:hmDe(f.ini)})}
+ for(const m of (D.semmov||[]).filter(m=>!m.desfeito)){const r=D.cronograma.find(x=>x.id===m.rot);if(!r)continue;const d0=(m.em||'').slice(0,10)||m.dia;push({rid:r.id,t:r.t,g:r.etapa||'Outras atividades',sis:m.sis||(r.sis||[])[0]||'',ref:m.dia,done:d0<m.dia?m.dia:d0,quem:m.por||'',pid:m.por,nome:m.nome||nomeDe(m.por),par:false,nt:true,hora:''})}
  for(const x of (D.execucoes||[]).filter(x=>x.s==='feita')){const r=D.cronograma.find(y=>y.id===x.rot);if(!r)continue;push({rid:r.id,t:r.t,g:r.etapa||'Outras atividades',sis:(r.sis||[])[0]||'',ref:x.dia,done:x.concl||x.dia,quem:x.por||'',pid:x.por,nome:x.porNome||nomeDe(x.por),par:false,hora:x.hora||''})}
  return out.sort((a,b)=>b.done.localeCompare(a.done)||(b.hora||'').localeCompare(a.hora||''))}
 const letraS=(g,sis)=>sis==='Protheus'&&g==='Pagamento'?'P':letraDe(g);
@@ -655,8 +656,8 @@ function diaFeitosSheet(iso){const L=registrosCron(iso,iso),R=registrosCron('','
  <div><h3 style="font-size:14px;margin:0 0 8px">Feito neste dia</h3>${L.length?tab(L):'<p class="meta">Nada marcado como feito neste dia.</p>'}</div>
  ${R.length?`<div><h3 style="font-size:14px;margin:12px 0 8px">Do dia ${fmt(iso)}, feito em outros dias</h3>${tab(R.map(o=>({...o,ref:o.done})))}<p class="meta" style="margin:6px 0 0">Nesta tabela, "Referente a" mostra o dia em que foi feito.</p></div>`:''}
  <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;document.getElementById('ov').hidden=false}
-function regTabela(L,max,cls){const l=L.slice(0,max);return l.length?`<table class="${cls||''}"><thead><tr><th>Feito em</th><th>Referente a</th><th>Sistema</th><th>Etapa</th><th>Quem</th><th>Situação</th></tr></thead><tbody>${l.map(o=>{const dd=o.par?0:Math.round((new Date(o.done+'T12:00')-new Date(o.ref+'T12:00'))/864e5);return `<tr><td>${fmt(o.done)}</td><td>${fmt(o.ref)}</td><td>${esc(o.sis)}</td><td>${esc(nomeEtS(o.g,o.sis))}</td><td><span class="pq">${fotoX(o.pid,o.nome,26)}${esc(o.nome||'—')}</span></td><td><span class="pill ${o.par?'at':'okp'}">${o.par?'Em parte':dd>0?`Finalizado · ${dd} ${dd===1?'dia':'dias'} depois`:'Finalizado'}</span></td></tr>`}).join('')}</tbody></table>${L.length>max?`<p class="vazio" style="margin-top:8px">e mais ${L.length-max}</p>`:''}`:'<p class="vazio">Nada marcado no cronograma no período.</p>'}
-function regResumo(L){const fin=L.filter(o=>!o.par),noDia=fin.filter(o=>o.done===o.ref).length,dep=fin.filter(o=>o.done>o.ref),porS={};fin.forEach(o=>porS[o.sis]=(porS[o.sis]||0)+1);
+function regTabela(L,max,cls){const l=L.slice(0,max);return l.length?`<table class="${cls||''}"><thead><tr><th>Feito em</th><th>Referente a</th><th>Sistema</th><th>Etapa</th><th>Quem</th><th>Situação</th></tr></thead><tbody>${l.map(o=>{const dd=o.par?0:Math.round((new Date(o.done+'T12:00')-new Date(o.ref+'T12:00'))/864e5);return `<tr><td>${fmt(o.done)}</td><td>${fmt(o.ref)}</td><td>${esc(o.sis)}</td><td>${esc(nomeEtS(o.g,o.sis))}</td><td><span class="pq">${fotoX(o.pid,o.nome,26)}${esc(o.nome||'—')}</span></td><td><span class="pill ${o.nt?'ntp':o.par?'at':'okp'}">${o.nt?'Não teve no dia':o.par?'Em parte':dd>0?`Finalizado · ${dd} ${dd===1?'dia':'dias'} depois`:'Finalizado'}</span></td></tr>`}).join('')}</tbody></table>${L.length>max?`<p class="vazio" style="margin-top:8px">e mais ${L.length-max}</p>`:''}`:'<p class="vazio">Nada marcado no cronograma no período.</p>'}
+function regResumo(L){const fin=L.filter(o=>!o.par&&!o.nt),noDia=fin.filter(o=>o.done===o.ref).length,dep=fin.filter(o=>o.done>o.ref),porS={};fin.forEach(o=>porS[o.sis]=(porS[o.sis]||0)+1);
  return {tot:fin.length,noDia,pct:fin.length?Math.round(noDia/fin.length*100):null,dep:dep.length,refs:[...new Set(dep.map(o=>fmt(o.ref)))],porS}}
 /* resumo de cada área para a tela Sobre o sistema: [o que tem, número ao vivo] */
 const SOBRE={
@@ -684,7 +685,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=95;
+const PRUMO_ATUALIZACOES=97;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -692,6 +693,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-29','Botão "Não teve" para os dias sem lançamento, baixa ou conciliação'],
+ ['2026-10-29','Férias e ausências, aniversários e tempo de casa no painel; ajuste de outubro no cronograma'],
  ['2026-10-29','Resumo da semana no Teams do diretor (em teste)'],
  ['2026-10-29','Tela Sobre o sistema para o administrador e o diretor, com o resumo do Prumo'],
  ['2026-10-29','Cronograma por sistema: WAE com Lançamento, Baixa e Conciliação; Protheus com Lançar, Pagar e Conciliar'],
@@ -706,6 +709,84 @@ const NOVIDADES=[
  ['2026-10-29','Reuniões: assuntos, respostas da equipe, relatório e slides'],
  ['2026-10-29','Foto de perfil, inclusive a do Microsoft 365'],
  ['2026-10-29','Registro de atividades com arquivo de 60 dias e backup de 7 dias']];
+/* ausências: férias, atestado, folga e licença tiram as rotinas da pessoa da conta naquele dia (indicador fica 100%); home office só fica anotado */
+const AUS_TIPOS=['Férias','Atestado','Folga','Licença','Home office'];
+const ausExcusa=t=>t!=='Home office';
+const ausDe=(pid,dia)=>(D.ausencias||[]).find(a=>a.pid===pid&&a.de<=dia&&(a.ate||a.de)>=dia);
+// rotina sem ninguém disponível no dia: todos os responsáveis estão de férias, atestado etc.
+function ausRot(r,dia){const rs=rsDe(r).filter(x=>x!=='dir');if(!rs.length)return null;const L=rs.map(p=>ausDe(p,dia));return L.every(a=>a&&ausExcusa(a.tipo))?L[0]:null}
+const ausHoje=(dia)=>(D.ausencias||[]).filter(a=>a.de<=dia&&(a.ate||a.de)>=dia);
+function ausSheet(){FORM={tipo:'_aus'};const pode2=dir()||podeAdmin()||pode('cadastros'),ps=pode2?colabs():colabs().filter(p=>p.id===S.perfil);
+ const L=[...(D.ausencias||[])].filter(a=>(a.ate||a.de)>=addDia(HJ,-60)).sort((a,b)=>b.de.localeCompare(a.de));
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Equipe</p><h2 id="sheet-title">Férias e ausências</h2><p class="sub" style="font-size:13px">Nos dias de férias, atestado, folga ou licença, as rotinas da pessoa não contam como atraso e o indicador dela fica 100%. Home office fica só anotado.</p></div>
+ <div class="fgrid"><div><label class="lbl" for="au_p">Pessoa</label><select class="inp" id="au_p">${ps.map(p=>`<option value="${esc(p.id)}" ${p.id===S.perfil?'selected':''}>${esc(p.n)}</option>`).join('')}</select></div>
+ <div><label class="lbl" for="au_t">Tipo</label><select class="inp" id="au_t">${AUS_TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+ <div><label class="lbl" for="au_de">De</label><input class="inp" id="au_de" type="date" value="${HJ}"></div><div><label class="lbl" for="au_ate">Até</label><input class="inp" id="au_ate" type="date" value="${HJ}"></div>
+ <div class="full"><label class="lbl" for="au_o">Observação · opcional</label><input class="inp" id="au_o" maxlength="160"></div></div>
+ <div style="display:flex;justify-content:flex-end"><button class="btn pri" onclick="salvaAus()">Registrar</button></div>
+ <div><h3 style="font-size:14px;margin:8px 0">Registradas</h3>${L.length?L.map(a=>`<div class="row"><span class="quemf">${avP(a.pid,nomeDe(a.pid),'avs')}<b style="font-weight:500">${esc(nomeDe(a.pid))}</b></span><div class="t"><span>${esc(a.tipo)} · ${fmt(a.de)}${(a.ate||a.de)!==a.de?' a '+fmt(a.ate):''}${a.obs?' · '+esc(a.obs):''}</span></div>${pode2||a.pid===S.perfil?`<button class="btn ghost" onclick="cancelaAus('${esc(a.id)}')">Cancelar</button>`:''}</div>`).join(''):'<p class="meta">Nenhuma ausência registrada.</p>'}</div>
+ <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;document.getElementById('ov').hidden=false}
+async function salvaAus(){const pid=val('au_p'),tipo=val('au_t'),de=val('au_de'),ate=val('au_ate')||de,obs=val('au_o').slice(0,160);if(!pid||!de){toast('Escolha a pessoa e a data.');return}if(ate<de){toast('A data final vem antes da inicial.');return}
+ if(await salvar('ausencias',null,{pid,tipo,de,ate,obs,criado:HJ,criadoPor:S.perfil,criadoNome:euNome()},'Registrado',`Registrou ${tipo.toLowerCase()} de ${nomeDe(pid)}: ${fmt(de)}${ate!==de?' a '+fmt(ate):''}`))ausSheet()}
+async function cancelaAus(id){const a=(D.ausencias||[]).find(x=>x.id===id);if(!a)return;if(await patch('ausencias',id,{ate:addDia(a.de,-1),cancelada:true,canceladaPor:euNome()},'Cancelado',`Cancelou ${a.tipo.toLowerCase()} de ${nomeDe(a.pid)} (${fmt(a.de)})`))setTimeout(ausSheet,200)}
+/* aniversários (todos veem) e tempo de casa (diretor e admin) */
+function aniversarios(dias){const out=[],hoje=new Date(HJ+'T12:00');
+ for(const p of colabs()){const m=String(p.nasc||'').match(/^(\d{1,2})\D(\d{1,2})/);if(m){for(let i=0;i<=dias;i++){const d=new Date(hoje);d.setDate(d.getDate()+i);if(d.getDate()===+m[1]&&d.getMonth()+1===+m[2]){out.push({p,tipo:'aniv',d:isoD(d),em:i});break}}}
+  if((dir()||podeAdmin())&&p.desde&&/^\d{4}-\d{2}-\d{2}$/.test(p.desde)){for(let i=0;i<=dias;i++){const d=new Date(hoje);d.setDate(d.getDate()+i);if(d.getDate()===+p.desde.slice(8,10)&&d.getMonth()+1===+p.desde.slice(5,7)&&d.getFullYear()>+p.desde.slice(0,4)){out.push({p,tipo:'casa',d:isoD(d),em:i,anos:d.getFullYear()-+p.desde.slice(0,4)});break}}}}
+ return out.sort((a,b)=>a.em-b.em)}
+function anivBloco(){const L=aniversarios(30),casa=(dir()||podeAdmin())?colabs().filter(p=>/^\d{4}-\d{2}-\d{2}$/.test(p.desde||'')&&!isNaN(new Date(p.desde))).map(p=>({p,anos:Math.floor((new Date(HJ)-new Date(p.desde))/(365.25*864e5))})).sort((a,b)=>a.p.desde.localeCompare(b.p.desde)):[];
+ const quando=x=>x.em===0?'hoje':x.em===1?'amanhã':fmt(x.d);
+ return `<div class="panel"><div class="ph"><h2>Aniversários${dir()||podeAdmin()?' e tempo de casa':''}</h2><span>próximos 30 dias</span></div>
+ ${L.length?L.map(x=>`<div class="row ${x.em===0?'hj-row':''}"><span class="quemf">${avP(x.p.id,x.p.n)}</span><div class="t"><b style="font-weight:500">${esc(x.p.n)}</b><span>${x.tipo==='aniv'?'Aniversário':`${x.anos} ${x.anos===1?'ano':'anos'} de casa`}</span></div><span class="tag ${x.em===0?'ok':'ne'}">${quando(x)}</span></div>`).join(''):'<p class="meta" style="margin:0">Nenhum aniversário nos próximos 30 dias.</p>'}
+ ${casa.length?`<p class="meta" style="margin:10px 0 4px">Tempo de casa</p><div class="tqpess">${casa.map(x=>`<div class="tqp">${avP(x.p.id,x.p.n)}<div><b>${esc(x.p.n)}</b><small>desde ${fmtAno(x.p.desde)} · ${x.anos<1?'menos de 1 ano':x.anos+(x.anos===1?' ano':' anos')}</small></div></div>`).join('')}</div>`:''}
+ ${colabs().some(p=>!p.nasc)?`<p class="meta" style="margin:8px 0 0">Para aparecer aqui, preencha o aniversário (dd/mm)${dir()||podeAdmin()?' e a data de contratação':''} no cadastro de cada pessoa em Equipe e metas.</p>`:''}</div>`}
+function ausBloco(){const H=ausHoje(HJ),P=(D.ausencias||[]).filter(a=>a.de>HJ&&a.de<=addDia(HJ,14)).sort((a,b)=>a.de.localeCompare(b.de));
+ return `<div class="panel"><div class="ph"><h2>Férias e ausências</h2><button class="btn ghost" onclick="ausSheet()">Registrar</button></div>
+ ${H.length?H.map(a=>`<div class="row"><span class="quemf">${avP(a.pid,nomeDe(a.pid))}</span><div class="t"><b style="font-weight:500">${esc(nomeDe(a.pid))}</b><span>${esc(a.tipo)} hoje${(a.ate||a.de)>HJ?' · até '+fmt(a.ate):''}</span></div><span class="tag ${ausExcusa(a.tipo)?'wa':'ne'}">${esc(a.tipo)}</span></div>`).join(''):'<p class="meta" style="margin:0">Todos no departamento hoje.</p>'}
+ ${P.length?`<p class="meta" style="margin:10px 0 4px">Próximos 14 dias</p>${P.map(a=>`<div class="row"><div class="t"><b style="font-weight:500">${esc(nomeDe(a.pid))}</b><span>${esc(a.tipo)} · ${fmt(a.de)}${(a.ate||a.de)!==a.de?' a '+fmt(a.ate):''}</span></div></div>`).join('')}`:''}</div>`}
+/* "Realizado no cronograma": números e uma janela com rolagem para ver o detalhe */
+function realizadoSheet(dias){dias=dias||30;const L=registrosCron(addDia(HJ,-(dias-1)),HJ);FORM={tipo:'_real'};
+ document.getElementById('sheet').classList.add('sheet-reu');
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">O que foi realizado</h2><p class="sub" style="font-size:13px">Últimos ${dias} dias, do mais recente para o mais antigo. "Referente a" é o dia a que a marcação se refere.</p></div>
+ <div class="seg" style="align-self:flex-start">${[7,30,90].map(n=>`<button class="${n===dias?'on':''}" onclick="realizadoSheet(${n})">${n} dias</button>`).join('')}</div>
+ <div class="dashp" style="max-height:62vh;overflow:auto"><div class="glass bloco">${regTabela(L,500,'tbx')}</div></div>
+ <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;document.getElementById('ov').hidden=false}
+/* ajuste de outubro/2026 combinado com a equipe: substitui as marcações de outubro (as antigas ficam desconsideradas, nada é apagado) */
+function ajusteOutPlano(){const pes=k=>colabs().find(p=>norm(p.n).startsWith(k))?.id,J=pes('jeferson'),NS=pes('natasha'),NL=pes('natalia');
+ const rot=(ch,et)=>(D.cronograma.find(r=>r.chave===ch)||D.cronograma.find(r=>r.etapa===et&&(r.sis||[]).includes('WAE')&&(r.sis||[]).length===1));
+ const RL=rot('lanc-wae','Lançamento'),RB=rot('baixa-wae','Baixa'),RC=rot('concil-wae','Conciliação');
+ const falta=[!J&&'Jeferson',!NS&&'Natasha',!NL&&'Natalia',!RL&&'rotina de Lançamento do WAE',!RB&&'rotina de Baixa do WAE',!RC&&'rotina de Conciliação do WAE'].filter(Boolean);
+ const novos=[];const add=(r,dia,pid)=>novos.push({r,dia,pid});
+ for(let d=1;d<=27;d++){const dia=`2026-10-${pad(d)}`,wd=new Date(dia+'T12:00').getDay();if(wd===0||wd===6||(d>23&&d<26))continue;
+  if(d<=18){add(RL,dia,J);add(RB,dia,NS);add(RC,dia,NS)}
+  else if(d<=23){add(RL,dia,NL);add(RL,dia,J);add(RB,dia,NS);add(RC,dia,NS)}
+  else if(d===26){add(RL,dia,NL);add(RL,dia,J);add(RB,dia,NS)}
+  else if(d===27){add(RL,dia,NL);add(RB,dia,NS)}}
+ const velhosF=D.feitos.filter(f=>!f.ajuste&&(String(f.dia).startsWith('2026-10')||String(f.feitoEm||'').startsWith('2026-10'))),velhosE=D.execucoes.filter(x=>String(x.dia).startsWith('2026-10'));
+ return {falta,novos,velhosF,velhosE,J}}
+function ajusteOutSheet(){if(!podeAdmin())return;const P=ajusteOutPlano();FORM={tipo:'_ajout'};
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Cronograma</p><h2 id="sheet-title">Ajuste de outubro</h2><p class="sub" style="font-size:13px">Deixa outubro como combinado: L, B e C de 01 a 23/10 (dias úteis), só L e B em 26 e 27/10. L até 18/10 com o Jeferson e, a partir de 19/10, com a Natalia e o Jeferson (dia 27 só Natalia, Jeferson em home office). B e C com a Natasha.</p></div>
+ ${P.falta.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>Não encontrei: ${esc(P.falta.join(', '))}. Confira os nomes em Equipe e metas e as rotinas no cronograma.</span></div>`:''}
+ <div class="stats"><div class="stat"><p>Marcações novas</p><strong>${P.novos.length}</strong></div><div class="stat"><p>Desconsideradas</p><strong>${P.velhosF.length}</strong><small>ficam guardadas, não contam</small></div><div class="stat"><p>Home office</p><strong>1</strong><small>Jeferson em 27/10</small></div></div>
+ <div class="foot"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" id="ajo_btn" ${P.falta.length?'disabled':''} onclick="ajusteOutAplicar()">Aplicar ajuste</button></div>`;document.getElementById('ov').hidden=false}
+async function ajusteOutAplicar(){const P=ajusteOutPlano();if(P.falta.length||!DB)return;const b=document.getElementById('ajo_btn');b.disabled=true;b.textContent='Aplicando…';
+ const agora=new Date().toISOString(),quem=euNome();
+ try{for(const f of P.velhosF){const {id,...r}=f;await DB.collection('feitos').doc(id).set({...r,anulado:true,anuladoPor:quem,anuladoEm:agora,anuladoMotivo:'ajuste de outubro'})}
+  for(const n of P.novos){const nm=nomeDe(n.pid),id=`aj10_${n.dia}_${n.r.id}_${n.pid}`;await DB.collection('feitos').doc(id).set({rot:n.r.id,dia:n.dia,sis:'WAE',pid:n.pid,uid:null,nome:nm,st:'feita',ini:n.dia+'T12:00:00.000Z',fim:n.dia+'T20:00:00.000Z',hora:'',feitoEm:n.dia,em:agora,ajuste:'outubro-2026',criadoPor:quem})}
+  // resumo de cada dia: refeito a partir das marcações novas; o que não tem marcação nova fica desconsiderado
+  const chaves=new Set(P.novos.map(n=>n.dia+'_'+n.r.id));
+  for(const x of P.velhosE)if(!chaves.has(x.id)){const {id,...r}=x;await DB.collection('execucoes').doc(id).set({...r,anulado:true,anuladoPor:quem,anuladoEm:agora})}
+  for(const k of chaves){const [dia,rid]=[k.slice(0,10),k.slice(11)];const lista=P.novos.filter(n=>n.dia===dia&&n.r.id===rid).map(n=>({pid:n.pid,nome:nomeDe(n.pid),st:'feita',ini:dia+'T12:00:00.000Z',fim:dia+'T20:00:00.000Z',feitoEm:dia,hora:'',em:agora}));
+   const p0=lista[0];await DB.collection('execucoes').doc(k).set({rot:rid,dia,s:'feita',ini:p0.ini,por:p0.pid,porNome:p0.nome,em:agora,concl:dia,hora:'',ajuste:'outubro-2026'})}
+  if(!(D.ausencias||[]).some(a=>a.pid===P.J&&a.de==='2026-10-27'&&a.tipo==='Home office'))await DB.collection('ausencias').add({pid:P.J,tipo:'Home office',de:'2026-10-27',ate:'2026-10-27',obs:'',criado:HJ,criadoPor:S.perfil,criadoNome:quem});
+  await DB.doc('config/estrutura').set({...CFG,ajusteOut26:true});CFG.ajusteOut26=true;
+  log(`Aplicou o ajuste de outubro no cronograma: ${P.novos.length} marcações e ${P.velhosF.length} desconsideradas (guardadas)`);toast('Ajuste de outubro aplicado',4000);fechar();render()}
+ catch(e){toast('Parou no meio. Abra de novo e clique em Aplicar: ele continua de onde parou.',6000);b.disabled=false;b.textContent='Aplicar ajuste'}}
+/* "não teve no dia": não houve lançamento, baixa ou conciliação naquele dia (conta como resolvido) */
+const semMovDe=(rid,dia,sis)=>(D.semmov||[]).find(m=>m.rot===rid&&m.dia===dia&&!m.desfeito&&(!sis||!m.sis||m.sis===sis));
+async function naoTeve(rid,dia,on){const r=D.cronograma.find(x=>x.id===rid);if(!r)return;const sis=multiSis(r)?sisAtual():((r.sis||[])[0]||''),id=`${dia}_${rid}${multiSis(r)?'_'+sis:''}`;
+ if(on){await salvar('semmov',id,{rot:rid,dia,sis,por:S.perfil,nome:euNome(),em:new Date().toISOString(),desfeito:false},'Marcado: não teve no dia',`Marcou que não teve "${r.t}" em ${fmt(dia)}`)}
+ else{const m=semMovDe(rid,dia,sis);if(m)await patch('semmov',m.id,{desfeito:true,desfeitoPor:euNome()},'Desfeito',`Desfez o "não teve" de "${r.t}" em ${fmt(dia)}`)}}
 const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'};
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
@@ -1615,6 +1696,8 @@ const ordProc=r=>{const w=(r.sis||[]).length===1&&r.sis[0]==='WAE'?FLUXO_WAE.ind
 const ordR=(a,b)=>ordProc(a)-ordProc(b)||(a.hora||'99').localeCompare(b.hora||'99')||(a.t||'').localeCompare(b.t||'');
 /* situação de uma rotina num dia */
 function stOc(r,dia){const x=exDe(r.id,dia);
+ if(x?.s!=='feita'&&semMovDe(r.id,dia))return ['ok','Não teve no dia'];
+ if(x?.s!=='feita'){const ex=ausRot(r,dia);if(ex)return ['ok',`${ex.tipo}: não conta`]}
  if(x?.s==='feita')return x.concl>dia?['wa','Concluída com atraso']:['ok','Concluída'];
  // Dia anterior sem marcação não vira alerta: nem todo dia tem tudo isso para fazer.
  if(dia<HJ)return x?.s==='andamento'?['ac','Ficou em andamento']:['ne','Não marcada'];
@@ -1625,7 +1708,7 @@ function stOc(r,dia){const x=exDe(r.id,dia);
 /* o que ficou para trás (últimos 30 dias, incluindo hoje depois do horário) */
 function atrasosCron(filtro){const L=[];for(const dia of diasDe(addDia(HJ,-30),HJ))for(const r of D.cronograma){if((filtro&&!filtro(r))||!ocorre(r,dia))continue;if(stOc(r,dia)[0]==='bad')L.push({r,dia})}return L}
 function contaDia(dia,filtro){const c={tot:0,ok:0,and:0,atr:0,fazer:0};
- D.cronograma.filter(r=>ocorre(r,dia)&&(!filtro||filtro(r))).forEach(r=>{c.tot++;const x=exDe(r.id,dia),s=stOc(r,dia)[0];if(x?.s==='feita')c.ok++;else if(s==='bad')c.atr++;else if(x?.s==='andamento')c.and++;else c.fazer++});return c}
+ D.cronograma.filter(r=>ocorre(r,dia)&&(!filtro||filtro(r))).forEach(r=>{c.tot++;const x=exDe(r.id,dia),s=stOc(r,dia)[0];if(x?.s==='feita'||(x?.s!=='feita'&&(ausRot(r,dia)||semMovDe(r.id,dia))))c.ok++;else if(s==='bad')c.atr++;else if(x?.s==='andamento')c.and++;else c.fazer++});return c}
 /* prazos cumpridos num período: conta cada dia em que a rotina era prevista */
 function resumoCron(filtro,ini,fim){const o={prev:0,ok:0,atr:0,pend:0,pct:null},ate=fim<HJ?fim:HJ;if(ini>ate)return o;
  for(const dia of diasDe(ini,ate))for(const r of D.cronograma){if(!filtro(r)||!ocorre(r,dia))continue;const x=exDe(r.id,dia);
@@ -1701,11 +1784,12 @@ function ocFeita(rid,dia){return euFiz(rid,dia)}
 function linOc(r,dia,comDia,semSis){const x=exDe(r.id,dia),es=multiSis(r)?estadoSis(r,dia,sisAtual()):null,st=es?(es.fe?['ok','Concluída']:es.bad?['bad','Atrasada']:es.an?['ac','Em andamento']:['ne','A fazer']):stOc(r,dia),done=es?es.fe:x?.s==='feita',pm=podeMarcar(r)&&dia<=HJ,FT=es?es.fs:feitosDe(r.id,dia),meu=meuF(r.id,dia),ms=stF(meu);
  const info=[semSis?'':(r.sis||[]).map(sisTxt).join(' · '),nomesRs(r),r.apoio?'apoio: '+r.apoio:''].filter(Boolean).map(esc).join(' · ');
  const ind=done?'<span class="stdot ok" title="Finalizada">✓</span>':FT.some(f=>stF(f)==='andamento')?'<span class="stdot ac" title="Em andamento">●</span>':st[0]==='bad'?'<span class="stdot bad" title="Atrasada">!</span>':'';
- const acoes=pm?botoesMarca(r.id,dia,ms):'';
+ const nt=!done&&semMovDe(r.id,dia,semSis?sisAtual():undefined);
+ const acoes=pm?(nt?`<button class="btn ghost sm" onclick="naoTeve('${r.id}','${dia}',false)">Desfazer "não teve"</button>`:done||ms?botoesMarca(r.id,dia,ms):botoesMarca(r.id,dia,ms)+`<button class="btn ghost sm" onclick="naoTeve('${r.id}','${dia}',true)" title="Não houve isso neste dia">Não teve</button>`):'';
  return `<div class="row oc ${done?'done':st[0]==='bad'?'late':''}">${ind}
  <span class="meta oc-h">${comDia?fmt(dia):esc(r.hora||'')}</span><div class="t"><b>${esc(r.t)}</b><span>${comDia&&r.etapa?esc(r.etapa)+' · ':''}${info}</span>
  ${FT.map(f=>`<span class="${stF(f)==='feita'?'pos':'emand'}">${stF(f)==='feita'?'✓':'●'} ${esc(txtPessoa(f))}${podeHora(f)?` <button class="lnk hr" onclick="editHora('${esc(f.id)}')" aria-label="Alterar horário de ${esc(f.nome||'')}">alterar horário</button>`:''}</span>`).join('')}
- ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}${r.freq!=='unica'||itensDe(r.id,dia).length?linItens(r,dia):''}</div>${r.chamado?`<span class="tag ac" title="Veio do chamado">${esc(r.chamado)}</span>`:''}${r.fim&&r.freq!=='unica'?`<span class="tag ne">só até ${fmt(r.fim)}</span>`:''}${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${st[0]==='bad'&&!done?`<span class="tag bad">${st[1]}</span>`:''}
+ ${r.obs&&!done?`<span>${esc(r.obs)}</span>`:''}${r.freq!=='unica'||itensDe(r.id,dia).length?linItens(r,dia):''}</div>${r.chamado?`<span class="tag ac" title="Veio do chamado">${esc(r.chamado)}</span>`:''}${r.fim&&r.freq!=='unica'?`<span class="tag ne">só até ${fmt(r.fim)}</span>`:''}${r.prio==='atencao'?'<span class="tag wa">Atenção</span>':''}${st[0]==='bad'&&!done?`<span class="tag bad">${st[1]}</span>`:''}${nt?`<span class="tag ne">Não teve no dia · ${esc(nt.nome||'')}</span>`:''}
  <div class="oc-acoes">${acoes}</div>${podeEditRot()?`<button class="btn ghost sm" onclick="editRot('${r.id}')" aria-label="Editar ${esc(r.t)}">Editar</button>`:''}</div>`}
 const filtroCron=()=>r=>(!S.cQuem||rsDe(r).includes(S.cQuem))&&(!S.cSis||(r.sis||[]).includes(S.cSis));
 const pessoasCron=()=>[...new Set(D.cronograma.flatMap(rsDe))].filter(pessoa).sort((a,b)=>nomeDe(a).localeCompare(nomeDe(b)));
@@ -1719,20 +1803,20 @@ function mvDia(k,n){let d=S[k]||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S[k]=d;ren
 const multiSis=r=>(r.sis||[]).length>1;
 const sisDoF=(f,r)=>f.sis||((r.sis||[])[0]||'');
 const feitosSis=(r,dia,x)=>feitosDe(r.id,dia).filter(f=>!multiSis(r)||sisDoF(f,r)===x);
-function estadoSis(r,dia,x){const fs=feitosSis(r,dia,x),fe=fs.some(f=>stF(f)==='feita'),an=!fe&&fs.some(f=>stF(f)==='andamento');
+function estadoSis(r,dia,x){const fs=feitosSis(r,dia,x),nt=!fs.some(f=>stF(f)==='feita')&&!!semMovDe(r.id,dia,x),fe=nt||fs.some(f=>stF(f)==='feita'),an=!fe&&fs.some(f=>stF(f)==='andamento');
  const atrasoDia=!fe&&(dia<HJ||(dia===HJ&&r.hora&&agoraHM()>r.hora));
  const tarde=fe&&fs.filter(f=>stF(f)==='feita').every(f=>(f.feitoEm||dia)>dia);
- return {fs,fe,an,bad:atrasoDia,tarde}}
+ return {fs,fe,an,bad:atrasoDia,tarde,nt}}
 function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:'',x=sisAtual(),L=D.cronograma.filter(r=>ocorre(r,dia)&&(r.sis||[]).includes(x));
  const nav=semNav?'':`<div class="cronbar"><div class="seg"><button onclick="mvDia('${k}',-1)" aria-label="Dia útil anterior">‹</button><span>${dia===HJ?'Hoje, ':''}${diaTxt(dia)}</span><button onclick="mvDia('${k}',1)" aria-label="Próximo dia útil">›</button></div>${irData(dia,k)}${dia!==HJ?`<button class="btn" onclick="S.${k}='';render()">Hoje</button>`:''}</div>`;
  const sw=`<div class="seg sis-seg" role="tablist" aria-label="Sistema">${sists().map((y,i)=>`<button role="tab" aria-selected="${y===x}" class="${y===x?'on':''}" onclick="S.cSis=sists()[${i}];render();salvarEstado()">${esc(y)}${emTeste(y)?' <small>em teste</small>':''}</button>`).join('')}</div>`;
- const topo=`<div class="ph"><h2>Andamento do departamento</h2>${sw}</div>${nav}`;
+ const fora=ausHoje(dia),topo=`<div class="ph"><h2>Andamento do departamento</h2>${sw}</div>${nav}${fora.length?`<p class="meta" style="margin:0 0 6px">${fora.map(a=>`${esc(nomeDe(a.pid))}: ${esc(a.tipo.toLowerCase())}`).join(' · ')}</p>`:''}`;
  if(!L.length){const px=proxComRotina(dia,r=>(r.sis||[]).includes(x));return `<div class="panel and">${topo}<p class="meta" style="margin:0 0 8px">Nenhuma rotina do ${esc(x)} prevista neste dia.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
  const E=[...etapasDoSis(x,L),...(L.some(r=>!grp(r))?['']:[])];
  const cel=g=>{const l=L.filter(r=>grp(r)===g);if(!l.length)return '<td><span class="andn">—</span></td>';
   const xs=l.map(r=>({r,...estadoSis(r,dia,x)})),ok=xs.filter(o=>o.fe),an=xs.filter(o=>o.an),bad=xs.filter(o=>o.bad);
   const cls=ok.length===l.length?(ok.some(o=>o.tarde)?'wa':'ok'):bad.length?'bad':an.length||ok.length?'ac':'ne';
-  const lab=ok.length===l.length?(cls==='wa'?'Concluído com atraso':'Concluído'):bad.length?'Atrasado':ok.length?`${ok.length} de ${l.length} concluídas`:an.length?'Em andamento':'A fazer';
+  const lab=ok.length===l.length?(xs.every(o=>o.nt)?'Não teve no dia':cls==='wa'?'Concluído com atraso':'Concluído'):bad.length?'Atrasado':ok.length?`${ok.length} de ${l.length} concluídas`:an.length?'Em andamento':'A fazer';
   const todosF=xs.flatMap(o=>o.fs),feitoPor=[...new Map(todosF.filter(f=>stF(f)==='feita').map(f=>[`${f.pid||f.nome}|${f.hora||''}`,`<span class="quemf">${avP(f.pid,f.nome,'avs')}${esc(f.nome||'—')}${f.hora?' · '+esc(f.hora):''}</span>`])).values()],emAnd=[...new Set(todosF.filter(f=>stF(f)==='andamento').map(f=>`● ${f.nome||'—'} iniciou ${hmDe(f.ini)}`))];
   const resp=[]; // o andamento mostra só o que foi feito e por quem; sem os nomes de quem ainda vai fazer
   const tit=xs.map(o=>`${o.r.t}: ${o.fe?'concluída':o.an?'em andamento':o.bad?'atrasada':'a fazer'}`).join('\n');
@@ -2122,8 +2206,8 @@ function chegadaPainel(enxuto){if(!(dir()||pode('painel_chamados')))return '';co
  ${padraoBloco(L)}${extra}${tabela}<p class="meta" style="margin:4px 0 0">Automático: chegou em dia o e-mail que traz a data pedida com pelo menos ${chegTxt()} de antecedência (D-${CHEG_MIN()}). Sem data, ou com menos tempo, chegou atrasado. A equipe pode corrigir no detalhe do chamado.</p></div>`}
 
 /* ---------- painel do diretor: cada um organiza a ordem dos blocos ---------- */
-const BLOCOS_NOVOS=['trimestre','registro','dash','dashGraf','dashAtr'];
-const BLOCOS_PAINEL=[['trimestre','Equipe no trimestre'],['registro','Realizado no cronograma · 7 dias'],['dash','Painel dos chamados do mês'],['dashGraf','Pedidos por categoria e por setor'],['dashAtr','Atrasos dos chamados'],['numeros','Números principais'],['chegada','Pedidos dos departamentos · em dia ou atrasados'],['andamento','Andamento do dia no cronograma'],['atencao','Precisa da sua atenção'],['prazos','Próximos prazos'],['destaques','Destaques do mês'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas por departamento'],['atrasosDep','Atrasos de departamentos'],['estrutura','Estruturação do departamento']];
+const BLOCOS_NOVOS=['trimestre','registro','aniver','ausencias','dash','dashGraf','dashAtr'];
+const BLOCOS_PAINEL=[['trimestre','Equipe no trimestre'],['registro','Realizado no cronograma · 7 dias'],['aniver','Aniversários e tempo de casa'],['ausencias','Férias e ausências'],['dash','Painel dos chamados do mês'],['dashGraf','Pedidos por categoria e por setor'],['dashAtr','Atrasos dos chamados'],['numeros','Números principais'],['chegada','Pedidos dos departamentos · em dia ou atrasados'],['andamento','Andamento do dia no cronograma'],['atencao','Precisa da sua atenção'],['prazos','Próximos prazos'],['destaques','Destaques do mês'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas por departamento'],['atrasosDep','Atrasos de departamentos'],['estrutura','Estruturação do departamento']];
 const BLOCO_LARGO=['registro','trimestre','dash','dashGraf','dashAtr','numeros','chegada','andamento','cron','metas','fech','dem'];
 function prefPainel(){const p=S.prefs||{};let l={};try{l=JSON.parse(localStorage.getItem('painel_'+(ME.uid||S.perfil))||'{}')}catch(e){}return {ordem:p.painel||l.ordem||[],oculto:p.painelOculto||l.oculto||[]}}
 function painelOrdem(){let o=prefPainel().ordem.filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k));if(!(S.prefs||{}).painelV3)o=[...BLOCOS_NOVOS,...o.filter(k=>!BLOCOS_NOVOS.includes(k))];if(!(S.prefs||{}).painelV2&&o[0]!=='numeros'){const i=o.indexOf('numeros');if(i>0)o.splice(i,1);o.unshift('numeros')}return [...new Set([...o,...BLOCOS_PAINEL.map(b=>b[0])])]}
@@ -2827,6 +2911,7 @@ painel(){
   return head(hojeTxt(),`${avP(S.perfil,p?.n,'avg')}${saud()}, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+chegadaPainel()+comecarBtn()+andamento(S.pDia||HJ,'pDia')+`<div class="panel"><div class="ph"><h2>Outras atividades de hoje</h2><span>clique no que fez</span></div>${outrasOpcoes(HJ)}</div>`+
   `<div class="stats"><div class="stat"><p>Meu dia</p><strong>${cm.ok}/${cm.tot}</strong><small>${cm.atr+meusAtr.length?`<span class="neg">${cm.atr+meusAtr.length} em atraso</span>`:'rotinas concluídas'}</small></div><div class="stat"><p>Metas do trimestre</p><strong>${p?.m??0}%</strong></div><div class="stat"><p>Minhas demandas em aberto</p><strong>${D.chamados.filter(c=>c.resp===S.perfil&&c.st!=='Concluído').length}</strong></div><div class="stat"><p>Realizado no trimestre</p><strong>${r.total}</strong><small>${r.pct===null?'chamados no prazo: —':`chamados no prazo: ${r.pct}%`}</small></div></div>
   ${trimBloco()}
+  ${anivBloco()}${ausBloco()}
   ${meusAtr.length?`<div class="panel late-p"><div class="ph"><h2>Ficaram para trás</h2><span>${meusAtr.length}</span></div>${meusAtr.map(o=>linOc(o.r,o.dia,true)).join('')}</div>`:''}
   ${(()=>{const pp=proxPrazos(5,true);return `<div class="panel"><div class="ph"><h2>Próximos prazos</h2>${novo('evento','Novo prazo')}</div>${pp.length?pp.map(linPrazo).join(''):vazio('Sem prazos próximos','')}</div>`})()}
   <div class="panel"><div class="ph"><h2>Meu dia</h2><span>${cm.ok} de ${cm.tot} concluídas</span></div>${meus.length?meus.map(r=>linOc(r,HJ)).join(''):vazio('Nenhuma rotina sua hoje','')}</div>
@@ -2838,9 +2923,10 @@ painel(){
  const alertaTop=ea.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${ic('alertas').replace('aria-hidden','style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden')}Em atraso: ${Object.entries(porDep).map(([n,q])=>`${esc(n)} (${q})`).join(', ')}</span><button class="btn" onclick="ir('alertas')">Ver alertas</button></div>`:'';
  const B={andamento:()=>comecarBtn()+andamento(S.pDia||HJ,'pDia'),
  trimestre:()=>trimBloco(),
- registro:()=>{const L=registrosCron(addDia(HJ,-6),HJ),R=regResumo(L);return `<div class="panel dashp"><div class="ph"><h2>Realizado no cronograma · últimos 7 dias</h2><button class="btn ghost" onclick="ir('calendario')">Calendário</button></div>
-  <div class="kgrid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px"><div class="glass kcard"><span>Realizado</span><b>${R.tot}</b><small>${Object.entries(R.porS).map(([k,v])=>`${esc(k)} ${v}`).join(' · ')||'—'}</small></div><div class="glass kcard"><span>Feito no próprio dia</span><b>${R.pct===null?'—':R.pct+'%'}</b><small>${R.noDia} de ${R.tot}</small></div><div class="glass kcard"><span>Feito depois do dia</span><b>${R.dep}</b><small>${R.refs.length?'de '+R.refs.slice(0,4).join(', '):'nenhum'}</small></div></div>
-  <div class="glass bloco">${regTabela(L,10,'tbx')}</div></div>`},
+ registro:()=>{const L=registrosCron(addDia(HJ,-6),HJ),R=regResumo(L);return `<div class="panel dashp"><div class="ph"><h2>Realizado no cronograma · últimos 7 dias</h2><button class="btn" onclick="realizadoSheet(7)">Ver o que foi realizado</button></div>
+  <div class="kgrid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="glass kcard"><span>Realizado</span><b>${R.tot}</b><small>${Object.entries(R.porS).map(([k,v])=>`${esc(k)} ${v}`).join(' · ')||'nada marcado'}</small></div><div class="glass kcard"><span>Feito no próprio dia</span><b>${R.pct===null?'—':R.pct+'%'}</b><small>${R.noDia} de ${R.tot}</small></div><div class="glass kcard"><span>Feito depois do dia</span><b>${R.dep}</b><small>${R.refs.length?'de '+R.refs.slice(0,4).join(', '):'nenhum'}</small></div></div>
+  ${podeAdmin()&&!CFG.ajusteOut26?`<p class="meta" style="margin:10px 0 0">Outubro ainda tem as marcações antigas. <button class="lnk" onclick="ajusteOutSheet()">Aplicar o ajuste de outubro</button></p>`:''}</div>`},
+ aniver:()=>anivBloco(),ausencias:()=>ausBloco(),
  dash:()=>pode('chamados')||dir()?`<div class="panel dashp"><div class="ph"><h2>Painel dos chamados · ${esc(mesNome(MES_ATUAL))}</h2><button class="btn ghost" onclick="ir('chamados')">Abrir chamados</button></div>${kpisX(dashCh(MES_ATUAL+'-01',HJ))}</div>`:'',
  dashGraf:()=>{if(!(pode('chamados')||dir()))return '';const K=dashCh(MES_ATUAL+'-01',HJ);return `<div class="dashp"><div class="g2">${barrasX(K.cats,'Pedidos por categoria no mês')}${barrasX(K.deps,'Pedidos por setor no mês')}</div></div>`},
  dashAtr:()=>{if(!(pode('chamados')||dir()))return '';const K=dashCh(MES_ATUAL+'-01',HJ);return `<div class="dashp"><div class="g32">${atrasosX(K,8)}${remsX(K)}</div></div>`},
@@ -2897,16 +2983,16 @@ calendario(){
  const refDia={};RR.forEach(o=>{const m=refDia[o.ref]=refDia[o.ref]||{};(m[letraS(o.g,o.sis)]=m[letraS(o.g,o.sis)]||new Set()).add(fmt(o.done))});
  let c='';['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>c+=`<div class="dn">${d}</div>`);
  for(let i=0;i<pri;i++)c+='<div></div>';
- for(let d=1;d<=nd;d++){const iso=`${S.cal}-${pad(d)}`;const gx={};(porDia[iso]||[]).forEach(o=>{const k=`${o.sis}|${o.g}|${o.ref}|${o.par?1:0}`;(gx[k]=gx[k]||{...o,n:[]}).n.push(`${o.t}${o.nome?' · '+o.nome:''}${o.hora?' · '+o.hora:''}`)});
+ for(let d=1;d<=nd;d++){const iso=`${S.cal}-${pad(d)}`;const gx={};(porDia[iso]||[]).forEach(o=>{const k=`${o.sis}|${o.g}|${o.ref}|${o.par?1:0}`;(gx[k+(o.nt?'|nt':'')]=gx[k+(o.nt?'|nt':'')]||{...o,n:[]}).n.push(`${o.t}${o.nome?' · '+o.nome:''}${o.hora?' · '+o.hora:''}`)});
   const fx=Object.values(gx).sort((a,b)=>(a.sis==='Protheus')-(b.sis==='Protheus')||ordL(a.g)-ordL(b.g)),rf=refDia[iso];
-  c+=`<div class="day ${iso===HJ?'today':''}${fx.length||rf?' clic':''}" ${fx.length||rf?`onclick="diaFeitosSheet('${iso}')" title="Ver o que foi feito"`:''}>${d}${fx.length?`<span class="lets">${fx.map(o=>`<span class="let ${o.sis==='Protheus'?'pro':''} ${o.par?'par':''}" title="${esc(o.sis)} · ${esc(nomeEtS(o.g,o.sis))}${o.ref!==iso?' · referente a '+fmt(o.ref):''}${o.par?' · em parte':''}: ${esc(o.n.join('; '))}"><b>${esc(letraS(o.g,o.sis))}</b>${o.ref!==iso?`<small>ref. ${fmt(o.ref)}</small>`:''}</span>`).join('')}</span>`:''}${rf?`<span class="meta" style="font-size:10.5px;line-height:1.3">${Object.entries(rf).map(([l,ds])=>`${esc(l)} feito em ${[...ds].join(', ')}`).join(' · ')}</span>`:''}${(ev[d]||[]).slice(0,3).map(e=>`<span class="ev ${e[1]}" title="${esc(e[0])}">${esc(e[0])}</span>`).join('')}${(ev[d]||[]).length>3?`<span class="meta">+${ev[d].length-3}</span>`:''}</div>`}
+  c+=`<div class="day ${iso===HJ?'today':''}${fx.length||rf?' clic':''}" ${fx.length||rf?`onclick="diaFeitosSheet('${iso}')" title="Ver o que foi feito"`:''}>${d}${fx.length?`<span class="lets">${fx.map(o=>`<span class="let ${o.sis==='Protheus'?'pro':''} ${o.par?'par':''} ${o.nt?'nt':''}" title="${esc(o.sis)} · ${esc(nomeEtS(o.g,o.sis))}${o.ref!==iso?' · referente a '+fmt(o.ref):''}${o.par?' · em parte':''}${o.nt?' · não teve no dia':''}: ${esc(o.n.join('; '))}"><b>${esc(letraS(o.g,o.sis))}</b>${o.ref!==iso?`<small>ref. ${fmt(o.ref)}</small>`:''}</span>`).join('')}</span>`:''}${rf?`<span class="meta" style="font-size:10.5px;line-height:1.3">${Object.entries(rf).map(([l,ds])=>`${esc(l)} feito em ${[...ds].join(', ')}`).join(' · ')}</span>`:''}${(ev[d]||[]).slice(0,3).map(e=>`<span class="ev ${e[1]}" title="${esc(e[0])}">${esc(e[0])}</span>`).join('')}${(ev[d]||[]).length>3?`<span class="meta">+${ev[d].length-3}</span>`:''}</div>`}
  return head('Agenda do departamento','Calendário','O que foi feito em cada dia, reuniões e obrigações.',mesNav('cal')+novo('evento','Novo prazo'))+
- `<div class="panel"><div class="cal">${c}</div></div><div class="legend"><span><b class="let">L</b> Lançamento / Lançar</span><span><b class="let">B</b> Baixa</span><span><b class="let">P</b> Pagamento / Pagar</span><span><b class="let">Cc</b> Conciliação / Conciliar</span><span><b class="let">L</b> WAE</span><span><b class="let pro">L</b> Protheus</span><span><b class="let par">L</b> feito em parte</span><span class="meta">Outras letras: I Identificação · C Conferência · Cp Comprovantes · Ct Controladoria · Ic Impressão de caixas</span></div><div class="legend"><span><i style="background:var(--accent)"></i>Reunião</span><span><i style="background:var(--warn)"></i>Obrigação</span><span><i style="background:var(--bad)"></i>Fechamento ou atrasada</span><span><i style="background:var(--ok)"></i>Concluída</span></div><p class="meta" style="margin:0">A letra aparece no dia em que foi feito; "ref." mostra a que dia se refere. Clique no dia para ver o que foi feito, por quem e a que horas.</p>`+
+ `<div class="panel"><div class="cal">${c}</div></div><div class="legend"><span><b class="let">L</b> Lançamento / Lançar</span><span><b class="let">B</b> Baixa</span><span><b class="let">P</b> Pagamento / Pagar</span><span><b class="let">Cc</b> Conciliação / Conciliar</span><span><b class="let">L</b> WAE</span><span><b class="let pro">L</b> Protheus</span><span><b class="let par">L</b> feito em parte</span><span><b class="let nt">L</b> não teve no dia</span><span class="meta">Outras letras: I Identificação · C Conferência · Cp Comprovantes · Ct Controladoria · Ic Impressão de caixas</span></div><div class="legend"><span><i style="background:var(--accent)"></i>Reunião</span><span><i style="background:var(--warn)"></i>Obrigação</span><span><i style="background:var(--bad)"></i>Fechamento ou atrasada</span><span><i style="background:var(--ok)"></i>Concluída</span></div><p class="meta" style="margin:0">A letra aparece no dia em que foi feito; "ref." mostra a que dia se refere. Clique no dia para ver o que foi feito, por quem e a que horas.</p>`+
  (()=>{const L=evs.filter(e=>(e.rep||'unica')!=='unica'?(!e.fim||e.fim>=S.cal+'-01')&&(!e.data||e.data<=fimM):(e.data||'').slice(0,7)===S.cal).sort((a,b)=>((a.rep||'unica')==='unica')-((b.rep||'unica')==='unica')||(a.data||'').localeCompare(b.data||''));
   return `<div class="panel"><div class="ph"><h2>Prazos e compromissos de ${mesNome(S.cal)}</h2><span>${L.length}</span></div>${L.length?L.map(e=>`<div class="row"><div class="t"><b>${esc(e.t)}</b><span>${esc(evTxt(e))} · ${esc(quemEv(e))}${e.obs?' · '+esc(e.obs):''}</span></div><span class="tag ${corEv(e)}">${esc(e.tipo||'Outro')}</span>${podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')">Editar</button>`:''}</div>`).join(''):vazio('Nada neste mês','','evento','Novo prazo')}</div>`})()},
 
 equipe(){const l=pode('feedbacks')?colabs():D.equipe.filter(e=>e.id===S.perfil);const ft={Realizado:'ok',Agendado:'wa',Pendente:'bad'};
- return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Equipe e feedbacks','Metas, feedback e o que cada pessoa realizou no trimestre.',triNav()+(pode('cadastros')?novo('pessoa','Cadastrar colaborador'):''))+
+ return head(`${S.tri.q}º trimestre de ${S.tri.ano}`,'Equipe e feedbacks','Metas, feedback e o que cada pessoa realizou no trimestre.',triNav()+`<button class="btn" onclick="ausSheet()">Férias e ausências</button>`+(pode('cadastros')?novo('pessoa','Cadastrar colaborador'):''))+
  (pode('feedbacks')&&l.length>1?`<div class="panel"><div class="ph"><h2>Realizado pela equipe no trimestre</h2><span>${mesesTri(S.tri).map(mesCurto).join(' · ')}</span></div>${tabelaTri(l)}</div>`:'')+
  (l.length?`<div class="cards">${l.map(e=>{const r=realizadoTri(e.id,S.tri);return `<div class="panel"><div style="display:flex;align-items:center;gap:12px">${avP(e.id,e.n)}<div style="flex:1;min-width:0"><b style="font-weight:500">${esc(e.n)}</b><div style="font-size:12px;color:var(--ink-3)">${esc(e.c)}</div></div>${fbPode()?(()=>{const s=seloMes(e.id,addMes(MES_ATUAL,-1));return `<span class="tag ${s[0]}" title="Feedback mensal do mês anterior">${s[0]==='ok'?'Feedback enviado':s[0]==='wa'?'Feedback registrado':s[0]==='nd'?'Sem feedback previsto':'Feedback pendente'}</span>`})():''}</div>
   <div style="margin-top:16px"><p style="margin:0 0 6px;display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-2)">Metas do trimestre<span style="font-variant-numeric:tabular-nums">${+e.m||0}%</span></p><div class="bar"><i style="width:${Math.min(100,+e.m||0)}%"></i></div></div>
@@ -3405,7 +3491,7 @@ window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
 /* rascunhos: o que foi digitado num formulário volta quando você reabre */
 const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
 (function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
-const SEM_RASC=new Set(['_teams','_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+const SEM_RASC=new Set(['_nt','_aus','_real','_ajout','_teams','_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
 function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
 function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
 const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);
@@ -3489,7 +3575,7 @@ render();
  DB=vigiarDB(db);S.online=true;
  let t;const later=()=>{clearTimeout(t);t=setTimeout(()=>render({snap:true}),40)};
  document.getElementById('main').addEventListener('focusout',()=>setTimeout(()=>{if(S.pend&&S.tela!=='fbedit'&&!document.getElementById('main').contains(document.activeElement))render()},200));
- COLS.forEach(c=>db.collection(c).onSnapshot(s=>{D[c]=s.docs.map(d=>({id:d.id,...d.data()}));if(c==='acessos')S.acOk=true;later()},()=>{if(c==='acessos'){S.acOk=true;later()}}));
+ COLS.forEach(c=>db.collection(c).onSnapshot(s=>{D[c]=s.docs.map(d=>({id:d.id,...d.data()}));if(c==='feitos'||c==='execucoes'){D[c+'Anul']=D[c].filter(x=>x.anulado);D[c]=D[c].filter(x=>!x.anulado)}if(c==='acessos')S.acOk=true;later()},()=>{if(c==='acessos'){S.acOk=true;later()}}));
  db.doc('config/estrutura').onSnapshot(s=>{CFG=s.exists?s.data():{};later()},()=>{});
  db.doc('sync/estado').onSnapshot(s=>{SYNC=s.exists?s.data():{};later()},()=>{});
  db.collection('backups').onSnapshot(s=>{D.backups=s.docs.map(d=>({id:d.id,...d.data()}));S.bkCarregado=true;later()},()=>{S.bkCarregado=true});
