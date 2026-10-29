@@ -221,7 +221,7 @@ async function excluir(){
   if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
   try{const c=F[FORM.tipo].col,x=D[c].find(y=>y.id===FORM.id);await DB.collection(c).doc(FORM.id).delete();log(`Excluiu ${NOMES[c]}: ${x?tituloDe(x):''}`);toast('Registro excluído');fechar()}catch(e){toast('Não foi possível excluir.')}}
 
-function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('show'),2200)}
+function toast(t,ms){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('show'),ms||2200)}
 function ir(t,semHist){if(!sairEditorOk(()=>ir(t,semHist)))return;S.scroll[S.tela]=window.scrollY;const mudou=t!==S.tela;S.tela=t;S.fbForce=true;S.limpar=false;S.bell=false;render();
  if(!semHist&&mudou)try{history.pushState({tela:S.tela},'','#'+S.tela)}catch(e){}
  window.scrollTo({top:S.scroll[S.tela]||0});salvarEstado()}
@@ -3046,14 +3046,25 @@ async function salvaCfg(){const v=+document.getElementById('f_dm').value,cm=+doc
  if(!DB)return toast('O armazenamento não está disponível nesta visualização.');
  try{await DB.doc('config/estrutura').set({...CFG,diasMin:v,chegadaMin:cm,chegadaUteis:cu});log(`Alterou a regra de prazo de chamados para ${v} dias úteis e a antecedência dos e-mails para D-${cm} ${cu?'dias úteis':'dias corridos'}`);toast('Regra atualizada');fechar()}catch(e){toast('Não foi possível salvar.')}}
 /* ---------- conectar o e-mail da Microsoft ---------- */
+/* caixa dos chamados conectada com outra conta (volta da Microsoft com ?ms=ok ou ?ms=erro) */
+(function(){try{const q=new URLSearchParams(location.search),m=q.get('ms');if(!m)return;
+ const em=q.get('email')||'',mo=q.get('motivo')||'';history.replaceState(history.state,'',location.pathname+location.hash);
+ try{sessionStorage.removeItem('ms_token_eq')}catch(e){}
+ setTimeout(()=>{if(m==='ok'){toast(`Caixa dos chamados conectada${em?' com '+em:''}. Os e-mails vão carregar em instantes.`);window.dispatchEvent(new Event('prumo-ms-equipe'));try{log(`Conectou a caixa dos chamados${em?' com '+em:''}`)}catch(e){}}
+  else toast('Não foi possível conectar a caixa dos chamados: '+mo,8000)},2500)}catch(e){}})();
+async function conectarCaixa(){const b=document.getElementById('cx_btn');if(b){b.disabled=true;b.textContent='Abrindo a Microsoft…'}
+ const ok=window.portalConectarCaixa?await window.portalConectarCaixa():false;
+ if(!ok){if(b){b.disabled=false;b.textContent='Conectar caixa dos chamados'}const e=window.portalMsErro;toast(e?.erro==='sem_permissao'?'Só diretor, admin ou quem tem a permissão E-mails recebidos pode conectar a caixa.':e?.status===401||e?.status===404?'A função ms-token precisa ser publicada de novo e com "Verify JWT" desligado no Supabase.':'Não foi possível abrir a conexão agora.',8000)}}
 async function conectarEmail(){FORM={tipo:'_conectar'};const sh=document.getElementById('sheet');
  sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar e-mail</h2></div><p class="meta">Verificando…</p>`;document.getElementById('ov').hidden=false;
  const ativo=window.portalMicrosoftAtivo?await window.portalMicrosoftAtivo():null;if(FORM?.tipo!=='_conectar')return;
  const cb=(window.PORTAL_CONFIG||{}).supabaseUrl?(window.PORTAL_CONFIG.supabaseUrl.replace(/\/+$/,'')+'/auth/v1/callback'):'https://SEU-PROJETO.supabase.co/auth/v1/callback';
  if(ativo){sh.innerHTML=`<div><p class="eyebrow">E-mails recebidos</p><h2 id="sheet-title">Conectar o e-mail da empresa</h2><p class="sub" style="font-size:13px">A conta que você conectar vira a <b>conexão da equipe</b>: o Prumo busca os e-mails sozinho para todos, e a conexão se renova sozinha. Ele nunca vê a sua senha.${S.msEq?.equipe?` Hoje a equipe está conectada por <b>${esc(S.msEq.equipe.email||'—')}</b>.`:''}</p></div>
-  <ol class="passos"><li>Clique em <b>Ir para a Microsoft</b>.</li><li>Entre com o e-mail da empresa${ME.email?` (o mesmo do Prumo: <b>${esc(ME.email)}</b>)`:''}.</li><li>Clique em <b>Aceitar</b>.</li><li>Se aparecer <b>Precisa de aprovação do administrador</b>, escreva o motivo e clique em <b>Solicitar aprovação</b>. O pedido vai para a TI. Depois que a TI aprovar, volte aqui e clique em Conectar e-mail de novo.</li></ol>
-  ${note('A conexão dura cerca de 1 hora por vez. Quando vencer, o portal avisa e você clica em Conectar e-mail de novo, normalmente sem digitar senha.')}
-  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="window.portalReconectarMicrosoft()">Ir para a Microsoft</button></div></div>`;return}
+  <div class="panel" style="margin:0"><div class="ph"><h2>Caixa dos chamados</h2></div><p class="meta" style="margin:0 0 10px">Conecte a conta de onde chegam os pedidos, por exemplo o <b>contas a pagar</b>. Você continua no Prumo com a sua conta${ME.email?` (${esc(ME.email)})`:''}; só a leitura dos e-mails usa a outra conta.</p>
+  <ol class="passos"><li>Clique em <b>Conectar caixa dos chamados</b>.</li><li>Na tela da Microsoft, escolha <b>Usar outra conta</b> e entre com o e-mail do contas a pagar.</li><li>Clique em <b>Aceitar</b>. Você volta para o Prumo e os e-mails carregam.</li></ol>
+  <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn pri" id="cx_btn" onclick="conectarCaixa()">Conectar caixa dos chamados</button></div></div>
+  <details class="dmais" style="margin-top:12px"><summary>Entrar de novo com a minha conta (para enviar e-mails em meu nome)</summary><p class="meta">Use só se o Prumo pedir para reconectar a sua conta. Isso entra no Prumo com a conta que você escolher.</p><button class="btn" onclick="window.portalReconectarMicrosoft()">Entrar com a minha conta</button></details>
+  <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;return}
  const pedido=`Preciso registrar o sistema Prumo no Microsoft Entra ID para ele ler e enviar e-mails pelo Outlook com a conta de cada usuário.
 
 1. App registrations > New registration: nome Prumo, somente esta organização. Redirect URI (Web): ${cb}

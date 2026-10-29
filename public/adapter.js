@@ -114,6 +114,12 @@
     sb.auth.signInWithOAuth({ provider: 'azure', options: { scopes: MS_SCOPES, redirectTo: location.origin } });
   }
   window.portalReconectarMicrosoft = () => entrarMicrosoft(true);
+  // Conecta a caixa dos chamados com outra conta da Microsoft, sem trocar o login no Prumo.
+  window.portalConectarCaixa = async () => {
+    const j = await msFuncao({ acao: 'iniciar_equipe', origem: location.origin });
+    if (j?.url) { location.href = j.url; return true; }
+    return false;
+  };
 
   // Descobre sozinho se a conexão com a Microsoft já foi ligada no Supabase.
   let msAtivo = !!CFG.microsoft, msChecado = null;
