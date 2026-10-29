@@ -348,42 +348,66 @@ const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 /* categorias automáticas dos chamados: pedidos parecidos viram uma aba de assunto.
    Só preenche chamados sem assunto; nunca troca o que alguém escolheu e não apaga nada. */
 const CATS_SUG=[
+ ['Indicadores e premiação',['indicador','indicadores','premiacao','premio','bonus','bonificacao','comissao','comissoes','meta batida','metas']],
+ ['Palestrantes e eventos',['palestrante','palestrantes','palestra','palestras','evento','eventos','honorario','honorarios','cache','congresso','seminario','workshop']],
+ ['Benefícios (Swile, VR, VA)',['swile','recarga','vale refeicao','vale alimentacao','vr','va','flash','alelo','ticket','sodexo']],
  ['Reembolso',['reembolso','reembolsos','reembolsar','ressarcimento','ressarcir']],
  ['Adiantamento',['adiantamento','adiantamentos']],
  ['Diárias e viagens',['diaria','diarias','viagem','viagens','hospedagem','passagem','passagens','quilometragem','km rodado','combustivel']],
- ['Prestação de contas',['prestacao de contas','prestar contas']],
- ['Folha e RH',['folha','folha de pagamento','rescisao','rescisoes','ferias','13 salario','decimo terceiro','salario','salarios','pensao','vale transporte','vale alimentacao','beneficio','beneficios']],
+ ['Prestação de contas',['prestacao de contas','prestar contas','relatorio de despesas','despesas']],
+ ['Folha e RH',['folha','folha de pagamento','rescisao','rescisoes','ferias','13 salario','decimo terceiro','salario','salarios','pensao','vale transporte']],
  ['Impostos e guias',['imposto','impostos','guia','guias','darf','gps','fgts','inss','iss','irrf','pis','cofins','csll','tributo','tributos','das simples']],
  ['Repasse de polos',['polo','polos','repasse','repasses']],
  ['Nota fiscal',['nota fiscal','notas fiscais','nf','nfe','nf-e','nfse','nfs-e','danfe','xml']],
  ['Estorno e devolução',['estorno','estornos','devolucao','devolver','cancelamento']],
  ['Cadastro e dados bancários',['cadastro de fornecedor','cadastrar fornecedor','dados bancarios','conta bancaria','alteracao bancaria']],
+ ['Convênio e plano de saúde',['convenio','convenios','plano de saude','convenio saude','convenio medico','unimed','odonto','odontologico','coparticipacao']],
  ['Contratos',['contrato','contratos','aditivo']],
  ['Cartão corporativo',['cartao corporativo','fatura do cartao']],
  ['Compras e orçamentos',['pedido de compra','orcamento','orcamentos','cotacao']],
  ['Pagamento a fornecedor',['boleto','boletos','fornecedor','fornecedores','fatura','faturas','pix','pagamento','pagamentos']]];
 const temPal=(nt,k)=>new RegExp('(^|[^a-z0-9])'+reEsc(norm(k))+'([^a-z0-9]|$)').test(nt);
-function catSugerida(t){const nt=norm(t);let best=null,bs=0;
- for(const [n,ks] of CATS_SUG){let sc=0;for(const k of ks)if(temPal(nt,k))sc+=k.includes(' ')?2:1;if(sc>bs){bs=sc;best=n}}return best}
+// o assunto do e-mail pesa mais que a mensagem; categorias genéricas (nota fiscal, boleto, pagamento) só ganham se nada mais específico aparecer
+const CAT_GENERICA=new Set(['Pagamento a fornecedor','Nota fiscal']);
+function catSugerida(t,sub){const nt=norm(t),ns=norm(sub||'');let best=null,bs=0;
+ for(const [n,ks] of CATS_SUG){let sc=0;for(const k of ks){const w=k.includes(' ')?2:1;if(ns&&temPal(ns,k))sc+=w*3;else if(temPal(nt,k))sc+=w}
+  if(CAT_GENERICA.has(n))sc*=0.4;if(sc>bs){bs=sc;best=n}}return best}
 /* categoria de um e-mail da triagem: o assunto cadastrado, senão a sugestão automática */
-const emCat=e=>{const a=assDe(e.sug?.assunto);if(a)return a.n;const t=`${e.assunto||''} ${e.trecho||''}`,id=assPorTexto(t);return assDe(id)?.n||catSugerida(t)||''};
+const emCatFixa=e=>{const a=assDe(e.sug?.assunto);if(a&&!a.auto)return a.n;const t=`${e.assunto||''} ${e.trecho||''}`,id=assPorTexto(t,true);return assDe(id)?.n||catSugerida(e.trecho||'',e.assunto||'')||''};
+// quando nem o assunto nem o começo do e-mail dizem a categoria: o que a mensagem inteira diz, senão o próprio assunto vira a aba
+const emCat=e=>emCatFixa(e)||e.catMsg||catDoAssunto(e.assunto);
+const MES_W=new Set(['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro','jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']);
+const PAL_VAZIA=new Set(['de','da','do','das','dos','e','a','o','as','os','para','pra','com','em','no','na','ref','referente','solicitacao','pedido','envio','segue','urgente','favor','por','mes','ano','sem','assunto','anexo','anexos','arquivo','arquivos','oi','ola','bom','dia','boa','tarde','obrigado','obrigada']);
+function catDoAssunto(a){let t=String(a||'').replace(/^\s*((re|res|enc|fw|fwd|tr|rv)\s*:\s*)+/i,'').replace(/[\[\](){}"'“”:;,.!?\/\|_–—-]+/g,' ');
+ const ws=t.split(/\s+/).filter(w=>{const n=norm(w);return n&&!/\d/.test(n)&&!MES_W.has(n)&&n.length>1});
+ const sig=ws.filter(w=>!PAL_VAZIA.has(norm(w)));if(!sig.length)return '';
+ const out=[];for(const w of ws){if(out.length>=4)break;if(!out.length&&PAL_VAZIA.has(norm(w)))continue;out.push(w)}
+ while(out.length&&PAL_VAZIA.has(norm(out[out.length-1])))out.pop();
+ const r=out.join(' ').toLowerCase();return r?r[0].toUpperCase()+r.slice(1):''}
+// lê a mensagem inteira (só dos e-mails sem categoria) e guarda só o nome da categoria encontrada, nunca o texto
+async function categoriasPelaMensagem(){if(S._cpm||!real()||S.sim||!DB||!MCP||!(pode('email')||podeAdmin()))return;
+ const L=emPend().filter(e=>!emCatFixa(e)&&!e.corpoLido&&e.msgId).slice(0,8);if(!L.length)return;S._cpm=true;
+ try{for(const e of L){const full=await lerCompleto(e.msgId);if(!full)continue;const corpo=String(full.body||'').slice(0,6000),anx=(full.attachments||[]).map(a=>a?.name||'').join(' ');
+   const c=catSugerida(`${corpo} ${anx}`,e.assunto||'')||'';await patch('emails',e.id,{catMsg:c,corpoLido:true},null,false)}}
+ catch(x){}finally{S._cpm=false}}
+const assIdPorNome=n=>n?(D.assuntos.find(a=>norm(a.n)===norm(n))?.id||''):'';
 const slugCat=n=>'auto_'+norm(n).replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
 async function autoCategorias(){if(S._acat||!real()||S.sim||!DB||!(pode('chamados')||pode('cadastros')))return;
  const tent=S._acTent=S._acTent||new Set();
- const L=D.chamados.filter(c=>!assDe(c.cat)&&!c.catManual&&!tent.has(c.id)).slice(0,150);if(!L.length)return;
+ const L=D.chamados.filter(c=>(!assDe(c.cat)||assDe(c.cat)?.auto)&&!c.catManual&&!tent.has(c.id)).slice(0,150);if(!L.length)return;
  S._acat=true;let n=0;const novas=[];
  try{for(const c of L){tent.add(c.id);const txt=`${c.assunto||''} ${c.desc||''} ${c.subcat||''} ${c.tipo&&c.tipo!=='Outros'?c.tipo:''}`;
-   let id=assPorTexto(txt);
-   if(!assDe(id)){const nome=catSugerida(txt);if(!nome)continue;
+   let id=assPorTexto(txt,true);
+   if(!assDe(id)){const nome=catSugerida(`${c.desc||''} ${c.subcat||''}`,c.assunto||'');if(!nome)continue;
     const ex=D.assuntos.find(a=>norm(a.n)===norm(nome));id=ex?.id||slugCat(nome);
     if(!ex&&!assDe(id)){const ks=CATS_SUG.find(x=>x[0]===nome)[1];if(!await salvar('assuntos',id,{n:nome,palavras:ks.join(', '),dias:3,subs:[],auto:true,criado:HJ,criadoPor:S.perfil},null,false))continue;novas.push(nome)}}
-   const at=D.chamados.find(x=>x.id===c.id);if(!at||assDe(at.cat))continue;
+   const at=D.chamados.find(x=>x.id===c.id);if(!at||at.catManual||at.cat===id||(assDe(at.cat)&&!assDe(at.cat)?.auto))continue;
    if(await patch('chamados',c.id,{cat:id,catAuto:true},null,false))n++}
   if(n)log(`Separou ${n} ${n===1?'chamado':'chamados'} em abas de assunto automaticamente${novas.length?` (abas novas: ${novas.join(', ')})`:''}`);
   if(novas.length)toast(`Abas novas em Chamados: ${novas.join(', ')}`)}
  catch(e){}finally{S._acat=false}}
-function assPorTexto(t){const nt=norm(t);let best='',bs=0;
- for(const a of D.assuntos){const ks=[a.n,...String(a.palavras||'').split(/[,;]+/),...(a.subs||[])].map(x=>norm(x).trim()).filter(x=>x.length>1);let s=0;
+function assPorTexto(t,semAuto){const nt=norm(t);let best='',bs=0;
+ for(const a of D.assuntos){if(semAuto&&a.auto)continue;const ks=[a.n,...String(a.palavras||'').split(/[,;]+/),...(a.subs||[])].map(x=>norm(x).trim()).filter(x=>x.length>1);let s=0;
   for(const k of ks)if(new RegExp('(^|[^a-z0-9])'+reEsc(k)).test(nt))s++;
   if(s>bs){bs=s;best=a.id}}
  return best}
@@ -469,8 +493,8 @@ function subCh(id,v){const c=D.chamados.find(x=>x.id===id);if(!c)return;patch('c
 
 /* aceitar demanda: assunto, prazo de entrega e responsável */
 function aceitarSheet(ref){const em=ref.email?D.emails.find(x=>x.id===ref.email):null,c=ref.ch?D.chamados.find(x=>x.id===ref.ch):null;if(!em&&!c)return;
- const s=em?.sug||{},cat=c?(c.cat||''):(s.assunto&&assDe(s.assunto)?s.assunto:''),tipo=c?.tipo||s.tipo||'Outros',resp=c?.resp||respsDe(cat)[0]||(dir()?'':S.perfil),prazo=c?.prazo||prazoPadrao(cat),ja=!!c?.aceitoEm;
- FORM={tipo:'_aceitar',ref:em?'e:'+em.id:'c:'+c.id,email:em?.id||'',ch:c?.id||'',prazoMexido:!!c?.prazo};
+ const s=em?.sug||{},cat=c?(c.cat||''):(assIdPorNome(emCat(em))||(s.assunto&&assDe(s.assunto)&&!assDe(s.assunto).auto?s.assunto:'')),tipo=c?.tipo||s.tipo||'Outros',resp=c?.resp||respsDe(cat)[0]||(dir()?'':S.perfil),prazo=c?.prazo||prazoPadrao(cat),ja=!!c?.aceitoEm;
+ FORM={tipo:'_aceitar',ref:em?'e:'+em.id:'c:'+c.id,email:em?.id||'',ch:c?.id||'',prazoMexido:!!c?.prazo,cat0:cat,catMan0:!!c?.catManual};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${em?'E-mail de '+esc(depNome(em.dep)):esc(c.proto)+' · '+esc(depNome(c.dep))}</p><h2 id="sheet-title">${ja?'Prazo, assunto e responsável':'Aceitar demanda'}</h2><p class="sub" style="font-size:13px">${ja?'Ajuste o que mudou. Fica registrado quem alterou.':'A demanda entra no painel de chamados com prazo e responsável. O atraso passa a contar a partir do prazo que você definir.'}</p></div>
  ${em?`<div class="trecho"><b style="font-weight:500">${esc(em.assunto)}</b><br>${esc(em.deNome||em.de)} · recebido ${fmtHora(em.recebido)}${em.trecho?'<br>'+esc(em.trecho):''}${em.msgId&&pode('ler_email')?`<br><button class="lnk" type="button" onclick="lerEmail('e:${esc(em.id)}')">Ler o e-mail completo</button>`:''}</div>`:''}
  <div class="fgrid">
@@ -492,7 +516,7 @@ async function salvaAceite(){const tit=val('ac_tit'),prazo=val('ac_prazo'),resp=
  if(!prazo){errEl('ace_prazo','Defina o prazo de entrega.');ok=false}
  if(!resp){errEl('ace_resp','Escolha o responsável.');ok=false}
  if(!ok||S.triando)return;
- const campos={assunto:tit.slice(0,200),cat:val('ac_cat'),catManual:true,subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
+ const campos={assunto:tit.slice(0,200),cat:val('ac_cat'),catManual:FORM.catMan0||val('ac_cat')!==FORM.cat0,subcat:val('ac_sub'),tipo:val('ac_tipo'),prazo,resp,...(FORM.email?{dep:val('ac_dep')}:{})};
  const aceite={aceito:HJ,aceitoEm:new Date().toISOString(),aceitoPor:S.perfil,aceitoUid:ME.uid||null,aceitoNome:euNome()};
  const desc=`prazo ${fmt(prazo)} · ${respNome(resp)}${campos.cat?' · '+catTxt(campos):''}`;
  if(FORM.email){const em=D.emails.find(x=>x.id===FORM.email);if(!em)return;S.triando=true;
@@ -839,7 +863,7 @@ async function processar(m){
  const d=depDe(rem?.dep)||depPorEmail(de);
  const txt=(m.subject||'')+' '+limparTxt(m.summary);
  let c;if(d)c=classificar(m,d);else{const t=tipoPorTexto(txt);c=t?{acao:'chamado',tipo:t,conf:'media'}:{acao:'nenhuma',conf:'baixa'}}
- c.assunto=rem?.cat&&assDe(rem.cat)?rem.cat:assPorTexto(txt);
+ c.assunto=rem?.cat&&assDe(rem.cat)?rem.cat:assPorTexto(txt,true);
  const pag=c.acao==='chamado'&&PAGTO(c.tipo),full=pag?await lerCompleto(m.id):null;
  const pz=await prazoDoEmail(m,full?.body);
  const em={dep:d?.id||'',de,deNome:limparTxt(m.senderName).slice(0,80),assunto:limparTxt(m.subject||'(sem assunto)').slice(0,200),trecho:limparTxt(m.summary).slice(0,220),chegada:pz.st,prazoEnv:pz.data||'',prazoTrecho:limparTxt(pz.trecho||'').slice(0,80),recebido:m.receivedDateTime||'',anexos:!!m.hasAttachments,link:/^https:\/\//.test(m.webLink||'')?m.webLink:'',sug:c,criado:new Date().toISOString(),por:ME.uid||null,msgId:m.id||'',caixa:CFG.caixa||'',rem:rid,...(full?padraoDe(m.subject,full):{})};
@@ -2476,10 +2500,13 @@ usuarios(){const ped=D.pedidos.filter(p=>!acessoDe(p.id)).sort((a,b)=>a.em<b.em?
  <div class="panel"><div class="ph"><h2>O que cada perfil pode fazer</h2><span>a equipe pode ter permissões ajustadas pessoa a pessoa</span></div>${matriz()}</div>`+
  note('Quem entra pela primeira vez aparece em Pedidos de acesso. Diretores e administradores liberam, ajustam permissões ou bloqueiam. Bloquear não apaga o histórico.')},
 triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="row"><span class="t" style="white-space:normal">${oc} ${oc>1?'e-mails vieram':'e-mail veio'} de outra caixa, não do ${esc(CFG.caixa)}. Eles não aparecem mais na revisão. Quer apagar essas cópias do Prumo? Os chamados já criados não mudam.</span><button class="btn ${S.confOC?'danger':''}" onclick="removerOutraCaixa()">${S.confOC?'Confirmar: remover':'Remover do Prumo'}</button></div>`:'';const limpa=(pode('email')||podeAdmin())&&D.emails.some(e=>!virouChamado(e));const pend=emPend(),hist=D.emails.filter(e=>daCaixa(e)&&(e.st==='aplicado'||(e.st==='ignorado'&&!e.auto))).sort((a,b)=>a.recebido<b.recebido?1:-1).slice(0,30);
- const cats={};pend.forEach(e=>{const n=emCat(e)||'';cats[n]=(cats[n]||0)+1});
- if(S.fCatT&&!(S.fCatT in cats))S.fCatT='';
+ // abas organizadas: categorias conhecidas sempre; um assunto solto só vira aba quando se repete; o resto fica em Outros
+ const fixas=new Set([...CATS_SUG.map(x=>norm(x[0])),...D.assuntos.map(a=>norm(a.n))]),bruto={};pend.forEach(e=>{const n=emCat(e)||'';bruto[n]=(bruto[n]||0)+1});
+ const catDe=e=>{const n=emCat(e)||'';return n&&(fixas.has(norm(n))||bruto[n]>1)?n:''};
+ const cats={};pend.forEach(e=>{const n=catDe(e);cats[n]=(cats[n]||0)+1});
+ if(S.fCatT&&S.fCatT!=='_sem'&&!(S.fCatT in cats))S.fCatT='';
  const abasT=Object.keys(cats).filter(Boolean).sort((a,b)=>cats[b]-cats[a]||a.localeCompare(b));
- const pendV=S.fCatT?pend.filter(e=>(emCat(e)||'')===(S.fCatT==='_sem'?'':S.fCatT)):pend;
+ const pendV=S.fCatT?pend.filter(e=>catDe(e)===(S.fCatT==='_sem'?'':S.fCatT)):pend;
  const g={};pendV.forEach(e=>{const k=remDoEmail(e);(g[k]=g[k]||[]).push(e)});
  const q=norm(S.fRemT||'');
  const G=Object.entries(g).map(([k,l])=>{const r=D.remetentes.find(x=>x.id===k);return {k,r,nome:r?.nome||l[0].deNome||l[0].de,email:r?.email||l[0].de,dep:r?r.dep:l[0].dep,l:l.sort((a,b)=>a.recebido<b.recebido?1:-1)}}).filter(x=>!q||norm(x.nome+' '+x.email+' '+depNome(x.dep)).includes(q)).sort((a,b)=>a.l[0].recebido<b.l[0].recebido?1:-1);
@@ -2489,7 +2516,7 @@ triagem(){const oc=CFG.caixa?deOutraCaixa().length:0,ocBan=oc?`<div class="row">
  chAbas('em')+chEmail()+(pode('email')?`<details class="dmais" style="margin-top:18px" ${S.limpaAb?'open':''} ontoggle="S.limpaAb=this.open"><summary>Mais opções de e-mail</summary><div class="row"><div class="t" style="white-space:normal"><b>Buscar os e-mails de novo</b><span>Lê de novo a caixa desde ${CFG.emailDesde?fmt(CFG.emailDesde):'30 dias atrás'} e traz de volta para a revisão o que saiu do Prumo. Não apaga nada e não repete os que já estão aqui.</span></div><button class="btn" onclick="relerEmails()">${S.sync?'Buscando…':'Buscar de novo'}</button></div>${ocBan}</details>`:'')+
  (sem.length?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado: ${sem.map(d=>esc(d.n)).join(', ')}. E-mails desses departamentos não são reconhecidos.</span>${pode('cadastros')?`<button class="btn" onclick="${modOn('entregas')?"ir('entregas')":'gerirDeps()'}">Cadastrar</button>`:''}</div>`:'')+
  `<div class="panel"><div class="ph"><h2>Aguardando triagem</h2><span>${pendV.length} ${pendV.length===1?'e-mail':'e-mails'} de ${Object.keys(g).length} ${Object.keys(g).length===1?'remetente':'remetentes'}</span></div>
- ${abasT.length?`<div class="tabs" role="tablist" aria-label="Categorias dos e-mails" style="flex-wrap:wrap"><button role="tab" aria-selected="${!S.fCatT}" class="${S.fCatT?'':'on'}" onclick="S.fCatT='';render()">Todos <span class="meta">${pend.length}</span></button>${abasT.map(n=>`<button role="tab" aria-selected="${S.fCatT===n}" class="${S.fCatT===n?'on':''}" onclick="S.fCatT=this.dataset.c;render()" data-c="${esc(n)}">${esc(n)} <span class="meta">${cats[n]}</span></button>`).join('')}${cats['']?`<button role="tab" aria-selected="${S.fCatT==='_sem'}" class="${S.fCatT==='_sem'?'on':''}" onclick="S.fCatT='_sem';render()">Sem categoria <span class="meta">${cats['']}</span></button>`:''}</div>`:''}
+ ${abasT.length?`<div class="tabs" role="tablist" aria-label="Categorias dos e-mails" style="flex-wrap:wrap"><button role="tab" aria-selected="${!S.fCatT}" class="${S.fCatT?'':'on'}" onclick="S.fCatT='';render()">Todos <span class="meta">${pend.length}</span></button>${abasT.map(n=>`<button role="tab" aria-selected="${S.fCatT===n}" class="${S.fCatT===n?'on':''}" onclick="S.fCatT=this.dataset.c;render()" data-c="${esc(n)}">${esc(n)} <span class="meta">${cats[n]}</span></button>`).join('')}${cats['']?`<button role="tab" aria-selected="${S.fCatT==='_sem'}" class="${S.fCatT==='_sem'?'on':''}" onclick="S.fCatT='_sem';render()">Outros <span class="meta">${cats['']}</span></button>`:''}</div>`:''}
  ${Object.keys(g).length>3?`<input class="inp" id="fremt" data-nodraft="1" placeholder="Buscar remetente ou setor" value="${esc(S.fRemT||'')}" oninput="S.fRemT=this.value;render()">`:''}
  <div class="tscroll" id="tscroll">${G.length?G.map(x=>`<div class="remg"><div class="remh"><span class="av">${esc((x.nome||'?')[0].toUpperCase())}</span><div class="t"><b>${esc(x.nome)}</b><span>${esc(x.email)} · ${x.l.length} ${x.l.length===1?'e-mail':'e-mails'}</span></div>
   <select class="inp" style="width:auto;max-width:100%" aria-label="Setor de ${esc(x.nome)}" onchange="setRem('${esc(x.k)}',{dep:this.value})"><option value="">Setor: não definido</option>${D.departamentos.map(d=>`<option value="${esc(d.id)}" ${d.id===x.dep?'selected':''}>Setor: ${esc(d.n)}</option>`).join('')}</select><button class="btn ghost" onclick="editRem('${esc(x.k)}')">Mais opções</button></div>
@@ -3014,5 +3041,5 @@ render();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
  setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);
  setTimeout(limparHorasModelo,6000);setInterval(limparHorasModelo,3e4);
- setTimeout(autoOrganizar,9000);setInterval(autoOrganizar,3e4);setTimeout(autoCategorias,12000);setInterval(autoCategorias,6e4);
+ setTimeout(autoOrganizar,9000);setInterval(autoOrganizar,3e4);setTimeout(autoCategorias,12000);setInterval(autoCategorias,6e4);setTimeout(categoriasPelaMensagem,15000);setInterval(categoriasPelaMensagem,45e3);
 })();
