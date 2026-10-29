@@ -568,14 +568,14 @@ function notifs(){
  return L.slice(0,30)}
 function lido(){if(S.prefs?.lido&&!S.sim)return S.prefs.lido;try{return localStorage.getItem('lido_'+(ME.uid||'')+S.perfil)||''}catch(e){return S['lido_'+S.perfil]||''}}
 function marcarLido(){const v=new Date().toISOString();try{localStorage.setItem('lido_'+(ME.uid||'')+S.perfil,v)}catch(e){S['lido_'+S.perfil]=v}if(DB&&ME.uid&&!S.sim){S.prefs={...(S.prefs||{}),lido:v};DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs).catch(()=>{})}}
-function bell(){const A=alertas().filter(a=>a.c==='bad'),N=notifs(),lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5,!dir()),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph;
+function bell(){const A=alertas().filter(a=>a.c==='bad'),N=[],lv=lido(),P=solic()||S.perfil==='pendente'?[]:proxPrazos(5,!dir()),ph=P.filter(x=>x.d===HJ).length,novos=N.filter(n=>n.em>lv).length+A.length+ph;
  return `<div class="tb"><span class="meta">${esc(quemSou())}</span>${temaBox()}<div style="position:relative"><button class="btn bell" id="bellbtn" onclick="tgBell()" aria-label="Notificações" aria-expanded="${!!S.bell}">${ic('alertas').replace('aria-hidden','style="width:18px;height:18px" aria-hidden')}${novos?`<span class="dot">${novos}</span>`:''}</button>
  ${S.bell?`<div class="pop" role="dialog" aria-label="Notificações"><div class="ph" style="padding:12px 14px 4px"><h2>Notificações</h2><button class="btn ghost" onclick="ir('alertas')">Ver tudo</button></div>
  ${avPodePedir()?`<div style="padding:4px 14px 8px"><button class="btn pri" style="width:100%" onclick="ativarAvisos()">Ativar avisos no canto da tela</button></div>`:''}
  ${A.map(a=>`<button class="pi" onclick="ir('${a.ir}')"><span class="tag bad" style="flex:none">Alerta</span><span><b>${esc(a.t)}</b><small>${esc(a.s)}</small></span></button>`).join('')}
- ${P.length?`<p class="eyebrow" style="margin:8px 14px 2px">Próximos prazos</p>${P.map(x=>`<button class="pi ${x.d===HJ?'new':''}" onclick="ir('calendario')"><span class="meta" style="flex:none;width:72px">${x.d===HJ?'Hoje':fmt(x.d)}${x.h?' '+x.h:''}</span><span><b style="font-weight:400">${esc(x.t)}</b><small>${esc(x.g)}${x.fixo?' · fixo':''}${x.quem&&x.quem!=='Todos'?' · '+esc(x.quem):''}</small></span></button>`).join('')}<p class="eyebrow" style="margin:8px 14px 2px">Atividades</p>`:''}
+ ${P.length?`<p class="eyebrow" style="margin:8px 14px 2px">Próximos prazos</p>${P.map(x=>`<button class="pi ${x.d===HJ?'new':''}" onclick="ir('calendario')"><span class="meta" style="flex:none;width:72px">${x.d===HJ?'Hoje':fmt(x.d)}${x.h?' '+x.h:''}</span><span><b style="font-weight:400">${esc(x.t)}</b><small>${esc(x.g)}${x.fixo?' · fixo':''}${x.quem&&x.quem!=='Todos'?' · '+esc(x.quem):''}</small></span></button>`).join('')}`:''}
  ${N.map(n=>`<button class="pi ${n.em>lv?'new':''}" onclick="${/CH-\d+/.test(n.acao)?`abrirLogCh('${(n.acao.match(/CH-\d+/)||[''])[0]}')`:`ir('${pode('logs')?'logs':'alertas'}')`}"><span class="meta" style="flex:none;width:72px">${fmtHora(n.em)}</span><span><b style="font-weight:400">${esc(n.acao)}</b><small>${esc(quemLog(n))}</small></span></button>`).join('')}
- ${!A.length&&!N.length&&!P.length?'<p class="empty">Nenhuma notificação nos últimos 7 dias.</p>':''}</div>`:''}</div></div>`}
+ ${!A.length&&!P.length?'<p class="empty">Nenhum alerta nem prazo próximo.</p>':''}${pode('logs')?`<div style="padding:6px 14px 12px"><button class="btn ghost" style="width:100%" onclick="S.bell=false;ir('logs')">Ver o registro de atividades</button></div>`:''}</div>`:''}</div></div>`}
 function tgBell(){S.bell=!S.bell;if(S.bell)setTimeout(marcarLido,1500);render()}
 function abrirLogCh(p){const c=D.chamados.find(x=>x.proto===p);S.bell=false;render();if(c)detalheCh(c.id)}
 document.addEventListener('click',e=>{if(S.bell&&!e.target.closest('.pop')&&!e.target.closest('#bellbtn')){S.bell=false;render()}});
@@ -3233,7 +3233,6 @@ render();
  let first=true;
  db.collection('logs').orderBy('em','desc').limit(300).onSnapshot(s=>{
   D.logs=s.docs.map(d=>({id:d.id,...d.data()}));
-  if(!first&&!s.metadata.hasPendingWrites){const n=s.docChanges().filter(c=>c.type==='added').map(c=>c.doc.data()).find(l=>!(ME.uid&&l.uid===ME.uid)&&notifs().some(x=>x.em===l.em));if(n)toast(`${quemLog(n)}: ${n.acao}`)}
   first=false;later()},()=>{});
  iniciarAutoSync();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
