@@ -416,14 +416,22 @@ p.meta{white-space:normal}
 .phtg{width:100%;background:none;border:0;color:inherit;font:inherit;cursor:pointer;text-align:left;margin:0}
 .phtg:hover span{color:var(--ink)}
 
-.tops{margin-top:6px}
-.tops ul{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:4px}
-.tops li{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
-.tops li label{display:flex;align-items:flex-start;gap:6px;flex:1;min-width:0;cursor:pointer}
-.tops li label span{overflow-wrap:anywhere}
-.tops li.ok label span{text-decoration:line-through;color:var(--ink-3)}
-.tops li small{font-size:11px;color:var(--ink-3);white-space:nowrap}
-.tops .xs{padding:0 8px;min-height:24px;font-size:14px}
-.topadd{display:flex;gap:6px;max-width:560px}
-.topadd .inp{flex:1;min-width:0;padding:6px 10px;font-size:13px}
-@media (max-width:600px){.tops li{flex-wrap:wrap}}
+.sheet.sheet-reu{width:min(640px,100%)}
+.reugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:12px}
+.reugrid .panel{margin:0}
+.reucard{display:flex;flex-direction:column;gap:8px}
+.reucard .ph{flex-wrap:wrap;gap:6px}
+.reunum{margin:0;font-size:13px;color:var(--ink-2)}.reunum b{font-weight:600;color:var(--ink)}
+.reuprev{margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);display:grid;gap:2px}
+.reuprev li{overflow-wrap:anywhere}.reuprev li.ok{text-decoration:line-through;color:var(--ink-3)}
+.reunovo{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg,transparent)}
+.reuas{border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:6px}
+.reuas.feito{opacity:.75}
+.reuhd{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.reuhd b{font-weight:600;overflow-wrap:anywhere}
+.reuobs{margin:0;font-size:13px;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere}
+.reuresp{display:grid;gap:6px;border-left:2px solid var(--line);padding-left:10px;margin-top:2px}
+.resp p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.lnk{background:none;border:0;padding:0;color:var(--ink-3);text-decoration:underline;cursor:pointer;font:inherit}
+.reuacts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.topadd{display:flex;gap:6px;align-items:flex-start}
+.topadd .inp{flex:1;min-width:0;padding:6px 10px;font-size:13px;resize:vertical}
