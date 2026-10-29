@@ -1662,6 +1662,7 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
   const resp=[]; // o andamento mostra só o que foi feito e por quem; sem os nomes de quem ainda vai fazer
   const tit=xs.map(o=>`${o.r.t}: ${o.fe?'concluída':o.an?'em andamento':o.bad?'atrasada':'a fazer'}`).join('\n');
   const its=l.flatMap(r=>itensDe(r.id,dia)),itTxt=its.length?[`${its.filter(i=>i.feito).length} de ${its.length} itens feitos`]:[];
+  if(cls==='ne'&&!itTxt.length)return '<td><span class="andn">—</span></td>'; // nada feito ainda: só um traço, sem "A fazer"
   return `<td><button class="andb ${cls}" title="${esc(tit)}" onclick="S.cTab='dia';S.cDia='${dia}';S.cQuem='';ir('rotinas')"><b>${lab}</b>${feitoPor.join('')}${[...emAnd,...resp,...itTxt].map(t=>`<span>${esc(t)}</span>`).join('')}</button></td>`};
  const geral=E.map(g=>{const l=L.filter(r=>grp(r)===g);if(!l.length)return null;const es=l.map(r=>estadoSis(r,dia,x));return {g:g||'Outras atividades',done:es.every(e=>e.fe),parc:es.some(e=>e.fe||e.an)}}).filter(Boolean);
  const lista=a=>a.length>1?a.slice(0,-1).join(', ')+' e '+a[a.length-1]:a[0]||'';

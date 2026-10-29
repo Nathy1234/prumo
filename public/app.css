@@ -532,7 +532,7 @@ aside,.panel,.stats,.sheet{backdrop-filter:blur(18px) saturate(1.5);-webkit-back
 
 /* andamento do departamento organizado como tabela */
 table.andt{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:760px}
-table.andt th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.andt th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:normal;line-height:1.3;vertical-align:bottom}
 table.andt td{vertical-align:top;padding:10px 8px;border-right:1px solid var(--line-soft)}table.andt td:last-child{border-right:0}
 table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);border-bottom:1px solid var(--line-soft)}
 .andb{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:5px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel);cursor:pointer;min-height:58px;color:var(--ink)}
