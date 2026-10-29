@@ -243,7 +243,7 @@ function cardDest(d){return `<div class="hcard"><div style="display:flex;justify
 function realizadoTri(pid,t){const ms=mesesTri(t),ini=ms[0]+'-01',fim=fimTri(t),den=d=>d&&d>=ini&&d<=fim;
  const ch=D.chamados.filter(c=>c.st==='Concluído'&&(pid==null||quemFez(c)===pid)&&den((c.concl||'').slice(0,10))),cp=ch.filter(c=>c.prazo),cok=cp.filter(c=>!(c.concl>c.prazo)).length;
  const vistos=new Set(),et={};let rot=0;
- const conta=(rid,dia,quem)=>{const k=`${dia}_${rid}_${quem}`;if(vistos.has(k))return;vistos.add(k);const r=D.cronograma.find(x=>x.id===rid);const g=(r?.etapa)||'Outras atividades';et[g]=(et[g]||0)+1;rot++};
+ const conta=(rid,dia,quem)=>{const k=`${dia}_${rid}_${quem}`;if(vistos.has(k))return;vistos.add(k);const r=D.cronograma.find(x=>x.id===rid);const g=(r?.etapa)||'Outras atividades';if(!noFluxo(r))return;et[g]=(et[g]||0)+1;rot++};
  (D.feitos||[]).filter(f=>f.st==='feita'&&den(f.dia)&&(pid==null||f.pid===pid)).forEach(f=>conta(f.rot,f.dia,f.pid||f.nome));
  (D.execucoes||[]).filter(x=>x.s==='feita'&&den(x.dia)&&(pid==null||x.por===pid)).forEach(x=>conta(x.rot,x.dia,x.por));
  const etapas=Object.entries(et).sort((a,b)=>b[1]-a[1]);
@@ -641,7 +641,7 @@ function feitosDoMes(mes){const M={},vistos=new Set();
  return M}
 /* cada marcação do cronograma vira um registro com o dia em que foi feita e o dia a que se refere */
 function registrosCron(de,ate){const out=[],den=d=>d&&(!de||d>=de)&&(!ate||d<=ate),vistos=new Set();
- const push=o=>{const k=`${o.done}|${o.rid}|${o.ref}|${o.quem}|${o.par?1:0}`;if(vistos.has(k))return;vistos.add(k);if(den(o.done))out.push(o)};
+ const push=o=>{if(!(ETAPAS_SIS[o.sis]||procs()).includes(o.g))return;const k=`${o.done}|${o.rid}|${o.ref}|${o.quem}|${o.par?1:0}`;if(vistos.has(k))return;vistos.add(k);if(den(o.done))out.push(o)};
  for(const f of (D.feitos||[])){const r=D.cronograma.find(x=>x.id===f.rot);if(!r)continue;const sis=f.sis||((r.sis||[])[0]||''),g=r.etapa||'Outras atividades',quem=f.pid||f.nome||'',base={rid:r.id,t:r.t,g,sis,ref:f.dia,quem,pid:f.pid,nome:f.nome||nomeDe(f.pid)};
   const ini=(f.ini||'').slice(0,10);
   if(f.st==='feita'){const done=f.feitoEm||(f.fim||'').slice(0,10)||f.dia;if(ini&&ini<done)push({...base,done:ini,par:true,hora:hmDe(f.ini)});push({...base,done,par:false,hora:f.hora||''})}
@@ -685,7 +685,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=101;
+const PRUMO_ATUALIZACOES=102;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -693,6 +693,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-29','Link público do painel, ao vivo e sem login'],
+ ['2026-10-29','Só as etapas do fluxo (L, B, C e Pagar) contam no realizado'],
  ['2026-10-29','Calendário mais limpo: L, B e C uma vez por dia'],
  ['2026-10-29','Relatório, slides e Emitir só para admin e diretor, com liberação pelo admin'],
  ['2026-10-29','Equipe no trimestre compara o tempo percorrido com o L, B e C do calendário'],
@@ -793,6 +795,8 @@ async function naoTeve(rid,dia,on){const r=D.cronograma.find(x=>x.id===rid);if(!
 /* relatório e slides das reuniões: só admin e diretor, até o admin liberar para a equipe */
 const podeReuExp=()=>podeAdmin()||dir()||CFG.reuExpTodos===true;
 async function libReuExp(){if(!podeAdmin()||!DB)return;const v=!CFG.reuExpTodos;try{await DB.doc('config/estrutura').set({...CFG,reuExpTodos:v});CFG.reuExpTodos=v;log(v?'Liberou o relatório e os slides das reuniões para a equipe':'Deixou o relatório e os slides das reuniões só para admin e diretor');toast(v?'Liberado para a equipe':'Agora só admin e diretor',3500);render()}catch(e){toast('Só administradores podem mudar.')}}
+// só conta o que faz parte do fluxo de cada sistema (WAE: L, B, C · Protheus: L, P, C); etapas antigas ficam fora
+const noFluxo=r=>!!r&&(r.sis||[]).some(x=>(ETAPAS_SIS[x]||procs()).includes(r.etapa));
 const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'};
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
@@ -2959,7 +2963,7 @@ painel(){
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>`,
  estrutura:()=>`<div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
    <div class="prog">${[['Processos mapeados',+CFG.mapeados||0,+CFG.meta||25],['Procedimentos documentados',D.procedimentos.length,+CFG.meta||25],['Melhorias implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length,Math.max(D.sugestoes.length,1)],['Rotinas do cronograma com responsável',D.cronograma.filter(r=>rsDe(r).length).length,Math.max(D.cronograma.length,1)]].map(b=>`<div><p>${b[0]}<span>${b[1]}/${b[2]}</span></p><div class="bar"><i style="width:${Math.min(100,b[1]/b[2]*100)}%"></i></div></div>`).join('')}</div></div>`};
- return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>${podeReuExp()?`<button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button>`:''}`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button><button class="btn ghost" onclick="teamsSheet()" title="Resumo da semana no Teams do diretor">Resumo no Teams</button>`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}"><button class="pbx" onclick="painelVer('${k}',false)" title="Tirar este bloco do painel" aria-label="Tirar ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])} do painel">×</button>${h}</section>`:''}).join('')}</div>`+
+ return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>${podeReuExp()?`<button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button>`:''}`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button><button class="btn ghost" onclick="teamsSheet()" title="Resumo da semana no Teams do diretor">Resumo no Teams</button>${podeReuExp()?`<button class="btn ghost" onclick="linkSheet()" title="Painel ao vivo para quem tiver o link, sem login">Link público${CFG.linkPublico?.ativo?' · ligado':''}</button>`:''}`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}"><button class="pbx" onclick="painelVer('${k}',false)" title="Tirar este bloco do painel" aria-label="Tirar ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])} do painel">×</button>${h}</section>`:''}).join('')}</div>`+
  (painelOculto().filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k)).length?`<div class="pocult"><span class="meta">Fora do painel, clique para voltar:</span>${painelOculto().filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k)).map(k=>`<button class="chip" onclick="painelVer('${k}',true)">+ ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])}</button>`).join('')}</div>`:'')},
 
 destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
@@ -3142,7 +3146,7 @@ function envolvidos(){return [{pid:'dir',n:nomeDiretor(),c:'Diretor'},...colabs(
 // realizado no período por pessoa (chamados concluídos + marcações do cronograma)
 function realizadoPer(pid,de,ate){const den=d=>d&&d>=de&&d<=ate;
  const ch=D.chamados.filter(c=>c.st==='Concluído'&&(pid==null||quemFez(c)===pid)&&den((c.concl||'').slice(0,10))),cp=ch.filter(c=>c.prazo),cok=cp.filter(c=>!(c.concl>c.prazo)).length;
- const vistos=new Set(),et={};let rot=0;const conta=(rid,dia,q)=>{const k=`${dia}_${rid}_${q}`;if(vistos.has(k))return;vistos.add(k);const r=D.cronograma.find(x=>x.id===rid);const g=(r?.etapa)||'Outras atividades';et[g]=(et[g]||0)+1;rot++};
+ const vistos=new Set(),et={};let rot=0;const conta=(rid,dia,q)=>{const k=`${dia}_${rid}_${q}`;if(vistos.has(k))return;vistos.add(k);const r=D.cronograma.find(x=>x.id===rid);const g=(r?.etapa)||'Outras atividades';if(!noFluxo(r))return;et[g]=(et[g]||0)+1;rot++};
  (D.feitos||[]).filter(f=>f.st==='feita'&&den(f.dia)&&(pid==null||f.pid===pid)).forEach(f=>conta(f.rot,f.dia,f.pid||f.nome));
  (D.execucoes||[]).filter(x=>x.s==='feita'&&den(x.dia)&&(pid==null||x.por===pid)).forEach(x=>conta(x.rot,x.dia,x.por));
  return {ch:ch.length,chPrazo:cp.length,chOk:cok,pct:cp.length?Math.round(cok/cp.length*100):null,rot,etapas:Object.entries(et).sort((a,b)=>b[1]-a[1]),total:ch.length+rot}}
@@ -3314,6 +3318,19 @@ async function teamsTeste(){const sb=window.portalSupabase,b=document.getElement
    o.textContent=M[j?.erro]||(String(error.message||'').includes('Failed to send')||error.name==='FunctionsFetchError'?'A função teams-resumo ainda não foi publicada no Supabase.':'Não foi possível enviar agora.');o.style.color='var(--bad)';return}
   o.textContent=`Enviado. ${data?.atrasados??0} chamados atrasados e ${data?.feitas??0} marcações do cronograma na semana. Confira no Teams.`;o.style.color='var(--ok)';log('Enviou o resumo da semana para o Teams (teste)')}
  catch(e){o.textContent='Não foi possível enviar agora.'}finally{b.disabled=false;b.textContent='Enviar teste agora'}}
+/* link público: painel ao vivo sem login (só números e nomes da equipe); só admin e diretor criam, trocam ou desligam */
+const linkUrl=()=>CFG.linkPublico?.ativo&&CFG.linkPublico?.token?`${location.origin}/painel?t=${CFG.linkPublico.token}`:'';
+function linkSheet(){if(!podeReuExp()){toast('O link público é liberado só para o admin e o diretor.');return}FORM={tipo:'_link'};const u=linkUrl();
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Compartilhar</p><h2 id="sheet-title">Link público do painel</h2><p class="sub" style="font-size:13px">Quem tiver o link vê o painel do departamento ao vivo, sem login e sem baixar nada: chamados do mês, atrasos, o que a equipe fez no trimestre e o L, B e C do dia. Não aparece assunto de e-mail, valor, conta ou dado de fornecedor.</p></div>
+ ${u?`<div><label class="lbl" for="lk_u">Link</label><div style="display:flex;gap:8px"><input class="inp" id="lk_u" readonly value="${esc(u)}"><button class="btn pri" onclick="copiar(null,'${esc(u)}')">Copiar</button></div><p class="meta" style="margin:6px 0 0">Ligado desde ${esc(fmtHora(CFG.linkPublico.criado||''))}. <a href="${esc(u)}" target="_blank" rel="noopener">Abrir para conferir ↗</a></p></div>
+ <div class="foot"><button class="btn danger" onclick="linkSalvar(false)">Desligar o link</button><div style="display:flex;gap:8px"><button class="btn" onclick="linkSalvar(true)">Gerar um link novo</button><button class="btn" onclick="fechar()">Fechar</button></div></div>
+ <p class="meta" style="margin:0">Gerar um link novo faz o anterior parar na hora. Use se o link foi para alguém que não deveria ter.</p>`
+ :`<div class="foot"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="linkSalvar(true)">Criar o link</button></div>`}`;
+ document.getElementById('ov').hidden=false}
+async function linkSalvar(on){if(!podeReuExp()||!DB)return;const tok=on?Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join(''):'';
+ const lp=on?{ativo:true,token:tok,criado:new Date().toISOString(),por:euNome()}:{ativo:false,token:'',desligado:new Date().toISOString(),por:euNome()};
+ try{await DB.doc('config/estrutura').set({...CFG,linkPublico:lp});CFG.linkPublico=lp;log(on?'Criou um link público do painel (o anterior parou de funcionar)':'Desligou o link público do painel');toast(on?'Link criado':'Link desligado',3000);linkSheet()}
+ catch(e){toast('Não foi possível salvar. Só administradores podem mudar a configuração.',5000)}}
 function emitirSheet(){if(!podeReuExp()){toast('Emitir relatório e slides está liberado só para o admin e o diretor.');return}FORM={tipo:'_emit'};const R=proxReunioes(1),k=R[0]?`${R[0].d}|${R[0].h}`:'';
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Para a reunião ou para o diretor</p><h2 id="sheet-title">Emitir relatório ou slides</h2><p class="sub" style="font-size:13px">Painel dos chamados, atrasos, o que a equipe realizou e, se quiser, a pauta da próxima reunião. Com o fundo, o logo e as fotos da equipe.</p></div>
  <div class="fgrid"><div class="full"><label class="lbl" for="em_per">Período</label><select class="inp" id="em_per"><option value="sem">Últimos 7 dias</option><option value="mes">Este mês até hoje</option><option value="ant">Mês passado</option><option value="tri">Trimestre</option></select></div>
@@ -3501,7 +3518,7 @@ window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
 /* rascunhos: o que foi digitado num formulário volta quando você reabre */
 const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
 (function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
-const SEM_RASC=new Set(['_nt','_aus','_real','_ajout','_teams','_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+const SEM_RASC=new Set(['_link','_nt','_aus','_real','_ajout','_teams','_criador','_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
 function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
 function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
 const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);

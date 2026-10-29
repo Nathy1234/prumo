@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Prumo · painel do departamento</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Painel público: o mesmo visual de vidro do Prumo, só leitura, atualiza sozinho */
+:root{--bg:#F1F1EE;--panel:rgba(255,255,255,.66);--solid:#fff;--line:rgba(20,20,20,.09);--line2:rgba(20,20,20,.05);--ink:#1E1E1E;--ink2:#4F4F4F;--ink3:#6B6B6B;--acc:#C24E1C;--acc2:#E4602B;--soft:rgba(228,96,43,.14);--accInk:#A9420F;--ok:#2F7D4A;--okBg:#E3F1E7;--bad:#B4382C;--badBg:#F8E5E3;--warn:#8A5A0B;--warnBg:#F7EDDA;--borda:rgba(255,255,255,.85);--sombra:rgba(0,0,0,.07);
+ --fundo:radial-gradient(45% 55% at 90% 6%,rgba(228,96,43,.26),transparent 70%),radial-gradient(50% 60% at 10% 92%,rgba(160,160,155,.3),transparent 70%);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#181818;--panel:rgba(38,38,38,.62);--solid:#222;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.06);--ink:#F4F4F2;--ink2:#C8C8C4;--ink3:#9C9C98;--acc:#E4602B;--acc2:#E4602B;--soft:rgba(228,96,43,.22);--accInk:#F4A27E;--ok:#8FCB98;--okBg:#1A2B1D;--bad:#EE9C96;--badBg:#331A18;--warn:#E3B868;--warnBg:#2E2412;--borda:rgba(255,255,255,.12);--sombra:rgba(0,0,0,.35);--fundo:radial-gradient(45% 55% at 90% 6%,rgba(228,96,43,.32),transparent 70%),radial-gradient(50% 60% at 10% 92%,rgba(90,90,90,.4),transparent 70%);color-scheme:dark}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--fundo),var(--bg);background-attachment:fixed;color:var(--ink);font:14px/1.5 Onest,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh;padding-top:env(safe-area-inset-top,0px)}
+body::after{content:"";position:fixed;right:-80px;bottom:-100px;width:min(50vw,480px);aspect-ratio:1;background:url("logo.svg") center/contain no-repeat;opacity:.06;pointer-events:none;z-index:-1}
+main{max-width:1180px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+.g{background:var(--panel);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border:1px solid var(--borda);border-radius:18px;box-shadow:0 8px 24px var(--sombra)}
+.cab{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px}.marca{display:flex;align-items:center;gap:12px}.marca img{width:40px;height:40px}.marca b{display:block;font-size:17px}.marca span{display:block;font-size:12.5px;color:var(--ink3)}
+.vivo{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2)}.vivo i{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px var(--okBg)}
+h2{margin:0 0 12px;font-size:15px}.box{padding:16px 18px}
+.kp{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.kp div{padding:14px 16px}.kp span{display:block;font-size:12px;color:var(--ink3)}.kp b{display:block;font-size:28px;letter-spacing:-.02em}.kp small{display:block;font-size:11.5px;color:var(--ink2)}.kp .al b{color:var(--bad)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.g3{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px}
+.tq{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:20px;align-items:center}.big span{display:block;font-size:12.5px;color:var(--ink3)}.big b{display:block;font-size:44px;color:var(--acc);line-height:1.05;letter-spacing:-.03em}.big small{color:var(--ink2)}
+.br p{margin:0 0 4px;display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink2)}.br b{color:var(--ink)}.trk{height:8px;border-radius:999px;background:var(--line2);overflow:hidden}.trk i{display:block;height:100%;background:var(--acc2);border-radius:999px}.br small{display:block;font-size:11.5px;color:var(--ink3);margin-top:3px}
+.ft{width:30px;height:30px;border-radius:50%;object-fit:cover;flex:none;display:inline-grid;place-items:center;background:var(--soft);color:var(--accInk);font-weight:700;font-size:12px;border:2px solid var(--solid)}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-weight:600;padding:0 8px 8px;border-bottom:1px solid var(--line)}td{padding:9px 8px;border-bottom:1px solid var(--line2);vertical-align:middle}tr:last-child td{border-bottom:0}.n{text-align:right;font-variant-numeric:tabular-nums}.pq{display:inline-flex;align-items:center;gap:8px}
+.pill{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}.pill.at{background:var(--badBg);color:var(--bad)}.chips{display:flex;flex-wrap:wrap;gap:5px}.chips span{font-size:11px;padding:2px 9px;border-radius:999px;background:var(--soft);color:var(--accInk)}
+.hb{display:grid;gap:8px}.hb .l{display:grid;grid-template-columns:34% 1fr 28px;gap:10px;align-items:center;font-size:12.5px}.hb .l span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hb .t2{display:flex;height:12px;border-radius:999px;background:var(--line2);overflow:hidden}.hb .t2 i{display:block;height:100%}.ok{background:var(--acc2)}.at2{background:#3D3D3D}.hb b{text-align:right}
+.sis{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.et{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line2)}.et:last-child{border-bottom:0}
+.st{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px}.st.feito{background:var(--okBg);color:var(--ok)}.st.andamento{background:var(--soft);color:var(--accInk)}.st.afazer{background:var(--line2);color:var(--ink3)}.st.naoteve{background:var(--line2);color:var(--ink3)}
+.vazio{color:var(--ink3);margin:0}.msg{padding:40px 20px;text-align:center}
+footer{text-align:center;font-size:12px;color:var(--ink3)}
+@media (max-width:900px){.kp{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.g3,.tq{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main id="app"><div class="g msg">Carregando o painel…</div></main>
+<script src="config.js"></script>
+<script>
+(function(){
+var C=window.PORTAL_CONFIG||{},T=new URLSearchParams(location.search).get('t')||'',el=document.getElementById('app');
+var esc=function(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var fmt=function(i){return i?i.slice(8,10)+'/'+i.slice(5,7):''};
+var MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+var ini=function(n){return String(n||'?').trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||''}).join('').toUpperCase()};
+var foto=function(f,n){return f?'<img class="ft" src="'+f+'" alt="">':'<span class="ft">'+esc(ini(n))+'</span>'};
+var barra=function(r,p,s){return '<div class="br"><p><span>'+r+'</span><b>'+(p==null?'—':p+'%')+'</b></p><div class="trk"><i style="width:'+(p||0)+'%"></i></div><small>'+s+'</small></div>'};
+var bars=function(L){var mx=Math.max.apply(null,[1].concat(L.map(function(x){return x.t})));return L.length?'<div class="hb">'+L.map(function(x){return '<div class="l"><span>'+esc(x.n)+'</span><span class="t2"><i class="ok" style="width:'+((x.t-x.a)/mx*100)+'%"></i><i class="at2" style="width:'+(x.a/mx*100)+'%"></i></span><b>'+x.t+'</b></div>'}).join('')+'</div>':'<p class="vazio">Sem pedidos no mês.</p>'};
+var ST={feito:'Feito',andamento:'Em andamento',afazer:'A fazer',naoteve:'Não teve',sem:'—'};
+function desenha(d){var k=d.kpis,t=d.trimestre,E=t.equipe;
+ el.innerHTML='<div class="g cab"><div class="marca"><img src="favicon.svg" alt=""><div><b>'+esc(d.depto)+'</b><span>Painel do departamento · Prumo</span></div></div><span class="vivo"><i></i>Ao vivo · atualizado às '+new Date(d.atualizado).toTimeString().slice(0,5)+'</span></div>'
+ +'<div class="kp">'+[['Recebidos no mês',k.recebidos,''],['Concluídos no mês',k.concluidos,k.pctPrazo==null?'':k.pctPrazo+'% no prazo'],['Em aberto',k.abertos,''],['Atrasados',k.atrasados,k.atrasados?'precisam de atenção':'nenhum',k.atrasados],['Chegaram atrasados',k.pctChegAtr==null?'—':k.pctChegAtr+'%','pedidos do mês',k.pctChegAtr>=30],['Trimestre',Math.round(t.pas/t.tot*100)+'%','faltam '+t.falta+' dias']].map(function(x){return '<div class="g'+(x[3]?' al':'')+'"><span>'+x[0]+'</span><b>'+x[1]+'</b>'+(x[2]?'<small>'+x[2]+'</small>':'')+'</div>'}).join('')+'</div>'
+ +'<div class="g box"><h2>Equipe no '+t.q+'º trimestre de '+t.ano+'</h2><div class="tq"><div class="big"><span>A equipe realizou até agora</span><b>'+E.total+'</b><small>'+E.ch+' chamados concluídos · '+E.rot+' rotinas do cronograma</small></div><div style="display:grid;gap:12px">'+barra('Trimestre percorrido',Math.round(t.pas/t.tot*100),t.pas+' de '+t.tot+' dias')+barra('Chamados no prazo',E.pct,'concluídos até o prazo combinado')+'</div></div>'
+ +'<table style="margin-top:14px"><thead><tr><th>Pessoa</th><th class="n">Realizadas</th><th class="n">Chamados</th><th class="n">Rotinas</th><th class="n">No prazo</th><th>O que realizou</th></tr></thead><tbody>'+t.pessoas.map(function(p){return '<tr><td><span class="pq">'+foto(p.foto,p.n)+'<span><b>'+esc(p.n)+'</b></span></span></td><td class="n"><b>'+p.total+'</b></td><td class="n">'+p.ch+'</td><td class="n">'+p.rot+'</td><td class="n">'+(p.pct==null?'—':p.pct+'%')+'</td><td><span class="chips">'+p.etapas.slice(0,5).map(function(e){return '<span>'+esc(e[0])+' '+e[1]+'</span>'}).join('')+'</span></td></tr>'}).join('')+'</tbody></table></div>'
+ +'<div class="g box"><h2>Hoje no cronograma</h2>'+(d.fora.length?'<p class="vazio" style="margin:-6px 0 10px">'+d.fora.map(function(a){return esc(a.n)+': '+esc(a.tipo.toLowerCase())}).join(' · ')+'</p>':'')+'<div class="sis">'+d.hojeSis.map(function(s){return '<div><b style="font-size:13px">'+esc(s.sis)+'</b>'+s.etapas.map(function(e){return '<div class="et"><span>'+esc(e.g)+(e.quem.length?' <small style="color:var(--ink3)">· '+esc(e.quem.join(', '))+'</small>':'')+'</span><span class="st '+e.st+'">'+ST[e.st]+'</span></div>'}).join('')+'</div>'}).join('')+'</div></div>'
+ +'<div class="g3"><div class="g box"><h2>Chamados atrasados</h2>'+(d.atrasos.length?'<table><thead><tr><th>Chamado</th><th>Responsável</th><th>Setor</th><th>Prazo</th><th>Atraso</th></tr></thead><tbody>'+d.atrasos.map(function(a){return '<tr><td><b>'+esc(a.proto)+'</b><br><small style="color:var(--ink3)">'+esc(a.cat)+'</small></td><td><span class="pq">'+foto(a.foto,a.resp)+esc(a.resp)+'</span></td><td>'+esc(a.setor)+'</td><td>'+fmt(a.prazo)+'</td><td><span class="pill at">'+a.dias+(a.dias===1?' dia':' dias')+'</span></td></tr>'}).join('')+'</tbody></table>':'<p class="vazio">Nenhum chamado atrasado.</p>')+'</div>'
+ +'<div class="g box"><h2>Pedidos por setor em '+MES[+d.mes.slice(5)-1]+'</h2>'+bars(d.porSetor)+'<h2 style="margin-top:16px">Por categoria</h2>'+bars(d.porCat)+'</div></div>'
+ +'<footer>Painel atualizado automaticamente a cada minuto · Prumo</footer>'}
+function carrega(){if(!T||!C.supabaseUrl){el.innerHTML='<div class="g msg">Link inválido. Peça um link novo para quem administra o Prumo.</div>';return}
+ fetch(C.supabaseUrl.replace(/\/+$/,'')+'/functions/v1/painel-publico?t='+encodeURIComponent(T),{headers:{apikey:C.supabaseAnonKey||''},cache:'no-store'}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){
+  if(!x.ok){el.innerHTML='<div class="g msg">'+(x.j&&x.j.erro==='link_invalido'?'Este link não está mais ativo. Peça um link novo para quem administra o Prumo.':'O painel não está disponível agora. Tente de novo em instantes.')+'</div>';return}
+  desenha(x.j)}).catch(function(){if(!el.querySelector('.cab'))el.innerHTML='<div class="g msg">O painel não está disponível agora. Tente de novo em instantes.</div>'})}
+carrega();setInterval(carrega,60000);
+})();
+</script>
+</body>
+</html>
