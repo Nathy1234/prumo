@@ -101,7 +101,7 @@ create or replace function public.pode_escrever(p_col text, p_id text, p_data js
 language sql stable security definer set search_path = public as $$
   select case
     when auth.uid() is null then false
-    when p_col = 'logs' then false                       -- registro de atividades é imutável
+    when p_col in ('logs','logs_arq') then false         -- registro de atividades (e o arquivo dele) é imutável
     when public.col_restrita(p_col) then public.is_admin()
     when p_col = 'pedidos' then p_id = auth.uid()::text or public.is_admin()
     when p_col = 'data/users/' || auth.uid()::text then true
@@ -245,7 +245,7 @@ begin
   -- Inclui também qualquer área nova que o sistema ganhar depois (menos backups e o registro de atividades).
   select array(select distinct x from unnest(v_cols || array(
     select distinct col from public.docs
-     where col not like '%/%' and col not in ('backups','logs','config','sync'))) as x) into v_cols;
+     where col not like '%/%' and col not in ('backups','logs','logs_arq','config','sync'))) as x) into v_cols;
 
   select jsonb_build_object(
     'sistema', 'Prumo',
@@ -296,6 +296,43 @@ create extension if not exists pg_cron with schema pg_catalog;
 select cron.unschedule('portal-backup-diario')
   where exists (select 1 from cron.job where jobname = 'portal-backup-diario');
 select cron.schedule('portal-backup-diario', '0 9 * * *', $$select public.backup_diario()$$);
+
+-- Registro de atividades: o que tem mais de 60 dias sai da lista e vai para o
+-- arquivo, um registro por mês (logs_arq/AAAA-MM). Nada é perdido.
+create or replace function public.arquivar_logs() returns int
+language plpgsql security definer set search_path = public as $$
+declare
+  v_dias int;
+  v_n int := 0;
+  r record;
+begin
+  select greatest(7, coalesce((data->>'logDias')::int, 60)) into v_dias
+    from public.docs where col = 'config' and id = 'estrutura';
+  v_dias := coalesce(v_dias, 60);
+  for r in
+    select to_char((data->>'em')::timestamptz at time zone 'America/Sao_Paulo', 'YYYY-MM') as mes,
+           jsonb_agg(data || jsonb_build_object('id', id) order by data->>'em') as itens,
+           array_agg(path) as paths
+      from public.docs
+     where col = 'logs' and coalesce((data->>'em')::timestamptz, criado_em) < now() - make_interval(days => v_dias)
+     group by 1
+  loop
+    insert into public.docs (path, col, id, data)
+    values ('logs_arq/' || r.mes, 'logs_arq', r.mes,
+            jsonb_build_object('mes', r.mes, 'n', jsonb_array_length(r.itens), 'itens', r.itens))
+    on conflict (path) do update
+      set data = jsonb_build_object('mes', r.mes,
+                   'n', jsonb_array_length(coalesce(public.docs.data->'itens', '[]'::jsonb) || r.itens),
+                   'itens', coalesce(public.docs.data->'itens', '[]'::jsonb) || r.itens);
+    delete from public.docs where path = any(r.paths);
+    v_n := v_n + coalesce(array_length(r.paths, 1), 0);
+  end loop;
+  return v_n;
+end $$;
+revoke all on function public.arquivar_logs() from public, anon, authenticated;
+select cron.unschedule('portal-arquivar-logs')
+  where exists (select 1 from cron.job where jobname = 'portal-arquivar-logs');
+select cron.schedule('portal-arquivar-logs', '30 9 * * *', $$select public.arquivar_logs()$$);
 
 -- ---------------------------------------------------------------------
 -- 6. Atualização em tempo real (todos veem as mudanças na hora)

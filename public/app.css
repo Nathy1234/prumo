@@ -435,3 +435,6 @@ p.meta{white-space:normal}
 .reuacts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .topadd{display:flex;gap:6px;align-items:flex-start}
 .topadd .inp{flex:1;min-width:0;padding:6px 10px;font-size:13px;resize:vertical}
+
+.logbox{max-height:min(60vh,560px);overflow-y:auto;overscroll-behavior:contain}
+.logarq{display:flex;align-items:center;gap:8px;margin-bottom:8px}.logarq .inp{max-width:240px}
