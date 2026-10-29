@@ -438,3 +438,14 @@ p.meta{white-space:normal}
 
 .logbox{max-height:min(60vh,560px);overflow-y:auto;overscroll-behavior:contain}
 .logarq{display:flex;align-items:center;gap:8px;margin-bottom:8px}.logarq .inp{max-width:240px}
+
+.catbar{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.catbar button{border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:32px}
+.catbar button span{color:var(--ink-3);margin-left:4px;font-variant-numeric:tabular-nums}
+.catbar button:hover{border-color:var(--accent)}
+.catbar button.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}.catbar button.on span{color:inherit;opacity:.8}
+.catsec{border-top:1px solid var(--line-soft);padding:6px 0}
+.catsec>summary{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;padding:8px 2px;list-style:none}
+.catsec>summary::-webkit-details-marker{display:none}
+.catsec>summary b{font-weight:600}.catsec>summary::before{content:'▸';color:var(--ink-3);margin-right:6px}.catsec[open]>summary::before{content:'▾'}
+.catsec>summary{justify-content:flex-start}.catsec>summary .meta{margin-left:auto}
