@@ -638,6 +638,25 @@ function feitosDoMes(mes){const M={},vistos=new Set();
  (D.feitos||[]).filter(f=>f.st==='feita').forEach(f=>add(f.rot,f.dia,f.pid||f.nome,f.nome));
  (D.execucoes||[]).filter(x=>x.s==='feita').forEach(x=>add(x.rot,x.dia,x.por,x.porNome||nomeDe(x.por)));
  return M}
+/* cada marcação do cronograma vira um registro com o dia em que foi feita e o dia a que se refere */
+function registrosCron(de,ate){const out=[],den=d=>d&&(!de||d>=de)&&(!ate||d<=ate),vistos=new Set();
+ const push=o=>{const k=`${o.done}|${o.rid}|${o.ref}|${o.quem}|${o.par?1:0}`;if(vistos.has(k))return;vistos.add(k);if(den(o.done))out.push(o)};
+ for(const f of (D.feitos||[])){const r=D.cronograma.find(x=>x.id===f.rot);if(!r)continue;const sis=f.sis||((r.sis||[])[0]||''),g=r.etapa||'Outras atividades',quem=f.pid||f.nome||'',base={rid:r.id,t:r.t,g,sis,ref:f.dia,quem,pid:f.pid,nome:f.nome||nomeDe(f.pid)};
+  const ini=(f.ini||'').slice(0,10);
+  if(f.st==='feita'){const done=f.feitoEm||(f.fim||'').slice(0,10)||f.dia;if(ini&&ini<done)push({...base,done:ini,par:true,hora:hmDe(f.ini)});push({...base,done,par:false,hora:f.hora||''})}
+  else if(f.st==='andamento'&&ini)push({...base,done:ini,par:true,hora:hmDe(f.ini)})}
+ for(const x of (D.execucoes||[]).filter(x=>x.s==='feita')){const r=D.cronograma.find(y=>y.id===x.rot);if(!r)continue;push({rid:r.id,t:r.t,g:r.etapa||'Outras atividades',sis:(r.sis||[])[0]||'',ref:x.dia,done:x.concl||x.dia,quem:x.por||'',pid:x.por,nome:x.porNome||nomeDe(x.por),par:false,hora:x.hora||''})}
+ return out.sort((a,b)=>b.done.localeCompare(a.done)||(b.hora||'').localeCompare(a.hora||''))}
+const letraS=(g,sis)=>sis==='Protheus'&&g==='Pagamento'?'P':letraDe(g);
+function diaFeitosSheet(iso){const L=registrosCron(iso,iso),R=registrosCron('','').filter(o=>o.ref===iso&&o.done!==iso);FORM={tipo:'_diaf'};
+ const tab=l=>`<div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Sistema</th><th style="text-align:left">Etapa</th><th>Referente a</th><th style="text-align:left">Quem</th><th>Hora</th><th>Situação</th></tr></thead><tbody>${l.map(o=>`<tr><td style="text-align:left">${esc(o.sis)}</td><td style="text-align:left">${esc(nomeEtS(o.g,o.sis))}<br><span class="meta">${esc(o.t)}</span></td><td>${fmt(o.ref)}</td><td style="text-align:left"><span class="quemf">${avP(o.pid,o.nome,'avs')}${esc(o.nome||'—')}</span></td><td>${esc(o.hora||'')}</td><td><span class="tag ${o.par?'wa':'ok'}">${o.par?'Em parte':'Finalizado'}</span></td></tr>`).join('')}</tbody></table></div>`;
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Calendário</p><h2 id="sheet-title">${esc(diaTxt(iso))}</h2></div>
+ <div><h3 style="font-size:14px;margin:0 0 8px">Feito neste dia</h3>${L.length?tab(L):'<p class="meta">Nada marcado como feito neste dia.</p>'}</div>
+ ${R.length?`<div><h3 style="font-size:14px;margin:12px 0 8px">Do dia ${fmt(iso)}, feito em outros dias</h3>${tab(R.map(o=>({...o,ref:o.done})))}<p class="meta" style="margin:6px 0 0">Nesta tabela, "Referente a" mostra o dia em que foi feito.</p></div>`:''}
+ <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;document.getElementById('ov').hidden=false}
+function regTabela(L,max,cls){const l=L.slice(0,max);return l.length?`<table class="${cls||''}"><thead><tr><th>Feito em</th><th>Referente a</th><th>Sistema</th><th>Etapa</th><th>Quem</th><th>Situação</th></tr></thead><tbody>${l.map(o=>{const dd=o.par?0:Math.round((new Date(o.done+'T12:00')-new Date(o.ref+'T12:00'))/864e5);return `<tr><td>${fmt(o.done)}</td><td>${fmt(o.ref)}</td><td>${esc(o.sis)}</td><td>${esc(nomeEtS(o.g,o.sis))}</td><td><span class="pq">${fotoX(o.pid,o.nome,26)}${esc(o.nome||'—')}</span></td><td><span class="pill ${o.par?'at':'okp'}">${o.par?'Em parte':dd>0?`Finalizado · ${dd} ${dd===1?'dia':'dias'} depois`:'Finalizado'}</span></td></tr>`}).join('')}</tbody></table>${L.length>max?`<p class="vazio" style="margin-top:8px">e mais ${L.length-max}</p>`:''}`:'<p class="vazio">Nada marcado no cronograma no período.</p>'}
+function regResumo(L){const fin=L.filter(o=>!o.par),noDia=fin.filter(o=>o.done===o.ref).length,dep=fin.filter(o=>o.done>o.ref),porS={};fin.forEach(o=>porS[o.sis]=(porS[o.sis]||0)+1);
+ return {tot:fin.length,noDia,pct:fin.length?Math.round(noDia/fin.length*100):null,dep:dep.length,refs:[...new Set(dep.map(o=>fmt(o.ref)))],porS}}
 const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'};
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
@@ -1493,7 +1512,14 @@ const SIS_PAD=['WAE','Protheus'];
 const emTeste=x=>(Array.isArray(CFG.cronTeste)?CFG.cronTeste:['Protheus']).includes(x);
 const sisTxt=x=>x+(emTeste(x)?' (em teste)':'');
 const procs=()=>{const b=Array.isArray(CFG.cronEtapas)&&CFG.cronEtapas.length?CFG.cronEtapas:PROC_PAD;return [...b,...['Comprovantes','Controladoria','Impressão de caixas'].filter(x=>!b.includes(x))]};
-const sists=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_PAD;
+const sistsTodos=()=>Array.isArray(CFG.cronSis)&&CFG.cronSis.length?CFG.cronSis:SIS_PAD;
+// sistema oculto pelo admin some do cronograma, andamento e painel; o que já foi marcado continua guardado
+const sists=()=>{const b=sistsTodos(),h=Array.isArray(CFG.sisOcultos)?CFG.sisOcultos:[],v=b.filter(x=>!h.includes(x));return v.length?v:b};
+const ETAPAS_SIS={WAE:['Lançamento','Baixa','Conciliação'],Protheus:['Lançamento','Pagamento','Conciliação']};
+const NOME_ET_SIS={Protheus:{'Lançamento':'Lançar','Pagamento':'Pagar','Conciliação':'Conciliar'}};
+const nomeEtS=(g,x)=>(NOME_ET_SIS[x]||{})[g]||g;
+// etapas do sistema, mais qualquer outra que tenha rotina naquele dia (nada some sem querer)
+const etapasDoSis=(x,L)=>{const b=ETAPAS_SIS[x]||procs(),ex=[...new Set((L||[]).filter(r=>(r.sis||[]).includes(x)&&r.etapa&&procs().includes(r.etapa)&&!b.includes(r.etapa)).map(r=>r.etapa))];return [...b,...ex]};
 /* módulos guardados para depois: ficam fora do menu até o administrador ligar */
 const MODS=[['fechamento','Fechamento D+N','Etapas do fechamento do mês com prazo em dias úteis'],['entregas','Entregas dos departamentos','O que outras áreas precisam enviar e até quando'],['email','E-mails do Outlook','Alertas de e-mails para revisar e de problemas na leitura da caixa'],['outros','Outros alertas','Chamados, WhatsApp, troca de dados bancários, pedidos de acesso e backup. Desligado, os alertas vêm só do cronograma']];
 const modOn=k=>!!(CFG.modulos||{})[k];
@@ -1653,7 +1679,7 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
  const sw=`<div class="seg sis-seg" role="tablist" aria-label="Sistema">${sists().map((y,i)=>`<button role="tab" aria-selected="${y===x}" class="${y===x?'on':''}" onclick="S.cSis=sists()[${i}];render();salvarEstado()">${esc(y)}${emTeste(y)?' <small>em teste</small>':''}</button>`).join('')}</div>`;
  const topo=`<div class="ph"><h2>Andamento do departamento</h2>${sw}</div>${nav}`;
  if(!L.length){const px=proxComRotina(dia,r=>(r.sis||[]).includes(x));return `<div class="panel and">${topo}<p class="meta" style="margin:0 0 8px">Nenhuma rotina do ${esc(x)} prevista neste dia.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
- const E=[...procs(),...(L.some(r=>!grp(r))?['']:[])];
+ const E=[...etapasDoSis(x,L),...(L.some(r=>!grp(r))?['']:[])];
  const cel=g=>{const l=L.filter(r=>grp(r)===g);if(!l.length)return '<td><span class="andn">—</span></td>';
   const xs=l.map(r=>({r,...estadoSis(r,dia,x)})),ok=xs.filter(o=>o.fe),an=xs.filter(o=>o.an),bad=xs.filter(o=>o.bad);
   const cls=ok.length===l.length?(ok.some(o=>o.tarde)?'wa':'ok'):bad.length?'bad':an.length||ok.length?'ac':'ne';
@@ -1669,7 +1695,7 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
  const fe=geral.filter(o=>o.done).map(o=>o.g),pa=geral.filter(o=>!o.done&&o.parc).map(o=>o.g),fa=geral.filter(o=>!o.done&&!o.parc).map(o=>o.g);
  const frase=`${fe.length?`<b class="pos">Concluído:</b> ${esc(lista(fe))}. `:'<b>Nada concluído ainda.</b> '}${pa.length?`<b style="color:var(--accent)">Em andamento:</b> ${esc(lista(pa))}. `:''}${fa.length?`<b>Falta:</b> ${esc(lista(fa))}.`:pa.length?'':'<b class="pos">Tudo concluído no dia.</b>'}`;
  return `<div class="panel and">${topo}<p class="andf"><b>${esc(x)}${emTeste(x)?' (em teste)':''}</b> · ${frase}</p>
- <div class="tbl-wrap"><table class="andt"><thead><tr>${E.map(g=>`<th>${g?`${procs().indexOf(g)+1}. ${esc(g)}`:'Outras'}</th>`).join('')}</tr></thead><tbody><tr>${E.map(g=>cel(g)).join('')}</tr></tbody></table></div>
+ <div class="tbl-wrap"><table class="andt"><thead><tr>${E.map(g=>`<th>${g?`${E.indexOf(g)+1}. ${esc(nomeEtS(g,x))}`:'Outras'}</th>`).join('')}</tr></thead><tbody><tr>${E.map(g=>cel(g)).join('')}</tr></tbody></table></div>
  ${quemFezDia(dia,L,E,x)}
  <p class="meta" style="margin:8px 0 0">Clique numa etapa para ver as rotinas e marcar. Cada pessoa marca o que ela fez.</p></div>`}
 function quemFezDia(dia,L,E,x){const grp=r=>procs().includes(r.etapa)?r.etapa:'',P=new Map();
@@ -1714,14 +1740,15 @@ async function comecarHoje(){const L=paraComecar();if(!L.length)return;
 const comecarBtn=()=>paraComecar().length&&podeEditRot()?`<div class="banner"><span>As rotinas do WAE que valem sempre estão programadas para começar só em ${fmt(paraComecar()[0].ini)}. Comece hoje para registrar o que já fazem no dia a dia.</span><button class="btn pri" onclick="comecarHoje()">${S.confCom?'Confirmar: começar hoje':'Começar hoje'}</button></div>`:'';
 const sisAtual=()=>sists().includes(S.cSis)?S.cSis:sists()[0];
 function quadroDia(dia,f){const grp=r=>procs().includes(r.etapa)?r.etapa:'',SS=[sisAtual()],L=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(!S.cQuem||rsDe(r).includes(S.cQuem)||feitosDe(r.id,dia).some(x=>x.pid===S.cQuem)));
- const G=[...procs(),''];
+ const G=[...etapasDoSis(SS[0],L),''];
  const comeca=x=>{const l=D.cronograma.filter(r=>(r.sis||[]).includes(x)&&r.freq!=='avulsa'&&r.freq!=='unica'&&r.ativo!==false&&r.ini&&r.ini>dia).map(iniEf).filter(d=>d>dia).sort();return l[0]||''};
  const cab=SS.map(x=>{const l=L.filter(r=>(r.sis||[]).includes(x)),k=l.filter(r=>exDe(r.id,dia)?.s==='feita').length,c=comeca(x);return `<div class="qd-h"><b>${esc(x)}</b>${emTeste(x)?'<small class="tag wa">em teste</small>':''}<span class="meta">${l.length?`${k} de ${l.length} feitas`:c?`começa em ${fmt(c)}`:'nada previsto'}</span>${!l.length&&c&&dia===HJ&&x==='WAE'&&paraComecar().length&&podeEditRot()?`<button class="btn pri qd-start" onclick="comecarHoje()">${S.confCom?'Confirmar: começar hoje':'Começar hoje'}</button>`:''}</div>`}).join('');
  const sw=`<div class="sisw" role="tablist" aria-label="Sistema">${sists().map((x,i)=>{const l=D.cronograma.filter(r=>r.freq!=='avulsa'&&ocorre(r,dia)&&(r.sis||[]).includes(x)),k=l.filter(r=>estadoSis(r,dia,x).fe).length,c=comeca(x);return `<button role="tab" aria-selected="${x===SS[0]}" class="${x===SS[0]?'on':''}" onclick="S.cSis=sists()[${i}];render();salvarEstado()"><b>${esc(x)}</b>${emTeste(x)?'<small class="tag wa">em teste</small>':''}<span>${l.length?`${k} de ${l.length} finalizadas`:c?`começa em ${fmt(c)}`:'nada previsto'}</span></button>`}).join('')}</div>`;
- return `${sw}<div class="qd" style="--n:1">${G.map(g=>{const i=procs().indexOf(g);
+ const refAviso=dia<HJ?`<div class="banner"><span>Você está marcando o que se refere a <b>${fmt(dia)}</b>. Fica registrado que foi feito hoje, ${fmt(HJ)}. Para marcar só uma parte, use <b>Em andamento</b>; quando terminar, <b>Finalizado</b>.</span></div>`:'';
+ return `${sw}${refAviso}<div class="qd" style="--n:1">${G.map(g=>{const i=G.indexOf(g);
   const temCols=L.some(r=>grp(r)===g);
   const nfx=g?fluxoAtivos(SS[0]).filter(f=>f.etapa===g).length:0;
-  return `<div class="qd-row ${g?'':'outras'}"><h3>${i>=0?`<span class="meta">${i+1}.</span> `:''}${esc(g||'Outras atividades')}${g?'':'<small>Clique no que fez</small>'}${nfx?`<small class="fx-n">${nfx} ${nfx>1?'e-mails':'e-mail'} nesta etapa</small>`:''}</h3>${g||temCols?SS.map(x=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x)).sort(ordR);
+  return `<div class="qd-row ${g?'':'outras'}"><h3>${g?`<span class="meta">${i+1}.</span> `:''}${esc(g?nomeEtS(g,SS[0]):'Outras atividades')}${g?'':'<small>Clique no que fez</small>'}${nfx?`<small class="fx-n">${nfx} ${nfx>1?'e-mails':'e-mail'} nesta etapa</small>`:''}</h3>${g||temCols?SS.map(x=>{const l=L.filter(r=>grp(r)===g&&(r.sis||[]).includes(x)).sort(ordR);
    return `<div class="qd-col"><p class="qd-sis">${esc(x)}</p>${l.length?l.map(r=>linOc(r,dia,false,true)).join(''):'<p class="meta qd-vazio">—</p>'}</div>`}).join(''):''}${g?'':outrasOpcoes(dia)}</div>`}).join('')}</div>`}
 function cDia(n){let d=S.cDia||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S.cDia=d;render()}
 function cronDia(){const dia=S.cDia||HJ,f0=filtroCron(),f=r=>f0(r)&&(r.sis||[]).includes(sisAtual()),L=D.cronograma.filter(r=>ocorre(r,dia)&&f(r)).sort(ordR),c=contaDia(dia,f);
@@ -1837,11 +1864,13 @@ function gerirDeps(){FORM={tipo:'_deps'};
    "chave" identifica cada rotina; "alias" são as chaves e títulos das versões anteriores, para atualizar no lugar */
 /* Análise com IA: desligada (a chave da IA é paga). Para ligar, CFG.iaLigada=true. */
 const iaOn=()=>CFG.iaLigada===true;
-const MODELO_VER=5;
+const MODELO_VER=6;
 /* fluxo do WAE, nesta ordem (padrão do contas a pagar) */
 const FLUXO_WAE=['Pagamento','Comprovantes','Controladoria','Lançamento','Baixa','Conciliação','Impressão de caixas'];
 /* rotinas que saíram do modelo: ficam pausadas (nada é apagado; dá para reativar em Editar) */
-const PAUSAR_MODELO=['ident-wae','confer-wae','pagnov-wae','pagd1-wae','impnov-wae','pagnov-pro','impnov-pro'];
+const PAUSAR_MODELO=['ident-wae','confer-wae','pagnov-wae','pagd1-wae','impnov-wae','pagnov-pro','impnov-pro',
+ // por enquanto: WAE só Lançamento, Baixa e Conciliação; Protheus só Lançar, Pagar e Conciliar (pausadas, nada é apagado)
+ 'pag1430-wae','comprov-wae','controla-wae','caixas-wae','polos-wae','folha-wae','imp-wae','repasse-polos','ident-pro','confer-pro','baixa-pro'];
 function modeloCron(){const EV='Evandro (Protheus)',N0='2026-11-01',L=[];
  // responsáveis não ficam no modelo: cada rotina mantém quem já estava nela e a equipe define o resto
  const r=(chave,etapa,t,sis,x,alias)=>L.push({chave,etapa,t,sis:[sis],rs:[],apoio:'',freq:'diaria',dias:[],n:1,antes:0,data:'',hora:'',prio:'normal',obs:'',ini:N0,fim:'',ativo:true,mv:MODELO_VER,...(x||{}),_alias:alias||[]});
@@ -1869,7 +1898,7 @@ function modeloCron(){const EV='Evandro (Protheus)',N0='2026-11-01',L=[];
  r('imp-pro','Pagamento','Impostos do dia 20 (D-5)',P,{prio:'atencao',freq:'mensal_dia',n:20,antes:5,obs:'Atenção: confira as guias. '+D5},['impd1-pro']);
  r('concil-pro','Conciliação','Conciliação bancária',P,{});
  r('acomp','','Acompanhamento diário do Protheus',P,{apoio:'Evandro',obs:'Evandro acompanha todos os dias a implantação do Protheus.'},['Acompanhamento diário do Protheus']);
- return L}
+ return L.filter(r=>!PAUSAR_MODELO.includes(r.chave))}
 const ANTIGOS=new Set(['Identificar as contas a pagar (D-5)','Identificar as contas que vencem em 5 dias úteis (D-5)','Identificar as contas que vencem no próximo dia útil','Conferir documentos, valores, vencimentos e centro de custo','Lançamento no WAE','Lançamento no Protheus','Baixa no WAE','Baixa no Protheus','Pagamento · todas as contas','Pagamento · todas as contas (D-2 em novembro)','Pagamento · todas as contas (D-1)','Pagamento · WAE','Pagamento dos polos','Folha de pagamento','Impostos (vencimento dia 20)','Impostos do dia 20 (D-2 em novembro)','Impostos do dia 20 (D-1)','Conciliação bancária','Acompanhamento diário do Protheus'].map(norm));
 const orgPendente=()=>podeCron()&&D.cronograma.some(r=>r.freq!=='unica'&&(r.mv||0)<MODELO_VER&&(r.chave||ANTIGOS.has(norm(r.t))));
 async function pessoasModelo(faltam){
@@ -2044,9 +2073,9 @@ function chegadaPainel(enxuto){if(!(dir()||pode('painel_chamados')))return '';co
  ${padraoBloco(L)}${extra}${tabela}<p class="meta" style="margin:4px 0 0">Automático: chegou em dia o e-mail que traz a data pedida com pelo menos ${chegTxt()} de antecedência (D-${CHEG_MIN()}). Sem data, ou com menos tempo, chegou atrasado. A equipe pode corrigir no detalhe do chamado.</p></div>`}
 
 /* ---------- painel do diretor: cada um organiza a ordem dos blocos ---------- */
-const BLOCOS_NOVOS=['trimestre','dash','dashGraf','dashAtr'];
-const BLOCOS_PAINEL=[['trimestre','Equipe no trimestre'],['dash','Painel dos chamados do mês'],['dashGraf','Pedidos por categoria e por setor'],['dashAtr','Atrasos dos chamados'],['numeros','Números principais'],['chegada','Pedidos dos departamentos · em dia ou atrasados'],['andamento','Andamento do dia no cronograma'],['atencao','Precisa da sua atenção'],['prazos','Próximos prazos'],['destaques','Destaques do mês'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas por departamento'],['atrasosDep','Atrasos de departamentos'],['estrutura','Estruturação do departamento']];
-const BLOCO_LARGO=['trimestre','dash','dashGraf','dashAtr','numeros','chegada','andamento','cron','metas','fech','dem'];
+const BLOCOS_NOVOS=['trimestre','registro','dash','dashGraf','dashAtr'];
+const BLOCOS_PAINEL=[['trimestre','Equipe no trimestre'],['registro','Realizado no cronograma · 7 dias'],['dash','Painel dos chamados do mês'],['dashGraf','Pedidos por categoria e por setor'],['dashAtr','Atrasos dos chamados'],['numeros','Números principais'],['chegada','Pedidos dos departamentos · em dia ou atrasados'],['andamento','Andamento do dia no cronograma'],['atencao','Precisa da sua atenção'],['prazos','Próximos prazos'],['destaques','Destaques do mês'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas por departamento'],['atrasosDep','Atrasos de departamentos'],['estrutura','Estruturação do departamento']];
+const BLOCO_LARGO=['registro','trimestre','dash','dashGraf','dashAtr','numeros','chegada','andamento','cron','metas','fech','dem'];
 function prefPainel(){const p=S.prefs||{};let l={};try{l=JSON.parse(localStorage.getItem('painel_'+(ME.uid||S.perfil))||'{}')}catch(e){}return {ordem:p.painel||l.ordem||[],oculto:p.painelOculto||l.oculto||[]}}
 function painelOrdem(){let o=prefPainel().ordem.filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k));if(!(S.prefs||{}).painelV3)o=[...BLOCOS_NOVOS,...o.filter(k=>!BLOCOS_NOVOS.includes(k))];if(!(S.prefs||{}).painelV2&&o[0]!=='numeros'){const i=o.indexOf('numeros');if(i>0)o.splice(i,1);o.unshift('numeros')}return [...new Set([...o,...BLOCOS_PAINEL.map(b=>b[0])])]}
 const painelOculto=()=>prefPainel().oculto;
@@ -2760,6 +2789,9 @@ painel(){
  const alertaTop=ea.length?`<div class="banner" style="background:var(--bad-bg);color:var(--bad)"><span>${ic('alertas').replace('aria-hidden','style="width:16px;height:16px;vertical-align:-3px;margin-right:6px" aria-hidden')}Em atraso: ${Object.entries(porDep).map(([n,q])=>`${esc(n)} (${q})`).join(', ')}</span><button class="btn" onclick="ir('alertas')">Ver alertas</button></div>`:'';
  const B={andamento:()=>comecarBtn()+andamento(S.pDia||HJ,'pDia'),
  trimestre:()=>trimBloco(),
+ registro:()=>{const L=registrosCron(addDia(HJ,-6),HJ),R=regResumo(L);return `<div class="panel dashp"><div class="ph"><h2>Realizado no cronograma · últimos 7 dias</h2><button class="btn ghost" onclick="ir('calendario')">Calendário</button></div>
+  <div class="kgrid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:12px"><div class="glass kcard"><span>Realizado</span><b>${R.tot}</b><small>${Object.entries(R.porS).map(([k,v])=>`${esc(k)} ${v}`).join(' · ')||'—'}</small></div><div class="glass kcard"><span>Feito no próprio dia</span><b>${R.pct===null?'—':R.pct+'%'}</b><small>${R.noDia} de ${R.tot}</small></div><div class="glass kcard"><span>Feito depois do dia</span><b>${R.dep}</b><small>${R.refs.length?'de '+R.refs.slice(0,4).join(', '):'nenhum'}</small></div></div>
+  <div class="glass bloco">${regTabela(L,10,'tbx')}</div></div>`},
  dash:()=>pode('chamados')||dir()?`<div class="panel dashp"><div class="ph"><h2>Painel dos chamados · ${esc(mesNome(MES_ATUAL))}</h2><button class="btn ghost" onclick="ir('chamados')">Abrir chamados</button></div>${kpisX(dashCh(MES_ATUAL+'-01',HJ))}</div>`:'',
  dashGraf:()=>{if(!(pode('chamados')||dir()))return '';const K=dashCh(MES_ATUAL+'-01',HJ);return `<div class="dashp"><div class="g2">${barrasX(K.cats,'Pedidos por categoria no mês')}${barrasX(K.deps,'Pedidos por setor no mês')}</div></div>`},
  dashAtr:()=>{if(!(pode('chamados')||dir()))return '';const K=dashCh(MES_ATUAL+'-01',HJ);return `<div class="dashp"><div class="g32">${atrasosX(K,8)}${remsX(K)}</div></div>`},
@@ -2811,13 +2843,16 @@ calendario(){
  const fimM=isoD(new Date(y,m,0)),evs=D.eventos.filter(vejoEv);
  evs.forEach(e=>{for(const d of diasDe(S.cal+'-01',fimM))if(evOcorre(e,d))put(d,(e.hora?e.hora+' ':'')+e.t,corEv(e))});
  minhas().forEach(t=>put(t.prazo,t.t,t.s==='feita'?'ok':atrasada(t)?'bad':'ne'));
- const FM=feitosDoMes(S.cal),ordL=g=>{const i=[...procs(),'Comprovantes','Controladoria','Impressão de caixas'].indexOf(g);return i<0?99:i};
+ const RG=registrosCron(S.cal+'-01',fimM),RR=registrosCron('','').filter(o=>o.ref.slice(0,7)===S.cal&&o.done!==o.ref&&!o.par),ordL=g=>{const i=[...procs(),'Comprovantes','Controladoria','Impressão de caixas'].indexOf(g);return i<0?99:i};
+ const porDia={};RG.forEach(o=>{(porDia[o.done]=porDia[o.done]||[]).push(o)});
+ const refDia={};RR.forEach(o=>{const m=refDia[o.ref]=refDia[o.ref]||{};(m[letraS(o.g,o.sis)]=m[letraS(o.g,o.sis)]||new Set()).add(fmt(o.done))});
  let c='';['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>c+=`<div class="dn">${d}</div>`);
  for(let i=0;i<pri;i++)c+='<div></div>';
- for(let d=1;d<=nd;d++){const iso=`${S.cal}-${pad(d)}`;const fx=FM[iso]?Object.entries(FM[iso]).sort((a,b)=>ordL(a[0])-ordL(b[0])):[];
-  c+=`<div class="day ${iso===HJ?'today':''}">${d}${fx.length?`<span class="lets">${fx.map(([g,l])=>`<span class="let" title="${esc(g)}: ${esc(l.join('; '))}">${esc(letraDe(g))}</span>`).join('')}</span>`:''}${(ev[d]||[]).slice(0,3).map(e=>`<span class="ev ${e[1]}" title="${esc(e[0])}">${esc(e[0])}</span>`).join('')}${(ev[d]||[]).length>3?`<span class="meta">+${ev[d].length-3}</span>`:''}</div>`}
+ for(let d=1;d<=nd;d++){const iso=`${S.cal}-${pad(d)}`;const gx={};(porDia[iso]||[]).forEach(o=>{const k=`${o.sis}|${o.g}|${o.ref}|${o.par?1:0}`;(gx[k]=gx[k]||{...o,n:[]}).n.push(`${o.t}${o.nome?' · '+o.nome:''}${o.hora?' · '+o.hora:''}`)});
+  const fx=Object.values(gx).sort((a,b)=>(a.sis==='Protheus')-(b.sis==='Protheus')||ordL(a.g)-ordL(b.g)),rf=refDia[iso];
+  c+=`<div class="day ${iso===HJ?'today':''}${fx.length||rf?' clic':''}" ${fx.length||rf?`onclick="diaFeitosSheet('${iso}')" title="Ver o que foi feito"`:''}>${d}${fx.length?`<span class="lets">${fx.map(o=>`<span class="let ${o.sis==='Protheus'?'pro':''} ${o.par?'par':''}" title="${esc(o.sis)} · ${esc(nomeEtS(o.g,o.sis))}${o.ref!==iso?' · referente a '+fmt(o.ref):''}${o.par?' · em parte':''}: ${esc(o.n.join('; '))}"><b>${esc(letraS(o.g,o.sis))}</b>${o.ref!==iso?`<small>ref. ${fmt(o.ref)}</small>`:''}</span>`).join('')}</span>`:''}${rf?`<span class="meta" style="font-size:10.5px;line-height:1.3">${Object.entries(rf).map(([l,ds])=>`${esc(l)} feito em ${[...ds].join(', ')}`).join(' · ')}</span>`:''}${(ev[d]||[]).slice(0,3).map(e=>`<span class="ev ${e[1]}" title="${esc(e[0])}">${esc(e[0])}</span>`).join('')}${(ev[d]||[]).length>3?`<span class="meta">+${ev[d].length-3}</span>`:''}</div>`}
  return head('Agenda do departamento','Calendário','O que foi feito em cada dia, reuniões e obrigações.',mesNav('cal')+novo('evento','Novo prazo'))+
- `<div class="panel"><div class="cal">${c}</div></div><div class="legend"><span><b class="let">I</b> Identificação</span><span><b class="let">C</b> Conferência</span><span><b class="let">L</b> Lançamento</span><span><b class="let">B</b> Baixa</span><span><b class="let">P</b> Pagamento</span><span><b class="let">Cc</b> Conciliação</span><span><b class="let">Cp</b> Comprovantes</span><span><b class="let">Ct</b> Controladoria</span><span><b class="let">Ic</b> Impressão de caixas</span></div><div class="legend"><span><i style="background:var(--accent)"></i>Reunião</span><span><i style="background:var(--warn)"></i>Obrigação</span><span><i style="background:var(--bad)"></i>Fechamento ou atrasada</span><span><i style="background:var(--ok)"></i>Concluída</span></div><p class="meta" style="margin:0">As letras mostram o que foi marcado como feito no cronograma em cada dia. Passe o mouse sobre a letra para ver o que foi feito e por quem.</p>`+
+ `<div class="panel"><div class="cal">${c}</div></div><div class="legend"><span><b class="let">L</b> Lançamento / Lançar</span><span><b class="let">B</b> Baixa</span><span><b class="let">P</b> Pagamento / Pagar</span><span><b class="let">Cc</b> Conciliação / Conciliar</span><span><b class="let">L</b> WAE</span><span><b class="let pro">L</b> Protheus</span><span><b class="let par">L</b> feito em parte</span><span class="meta">Outras letras: I Identificação · C Conferência · Cp Comprovantes · Ct Controladoria · Ic Impressão de caixas</span></div><div class="legend"><span><i style="background:var(--accent)"></i>Reunião</span><span><i style="background:var(--warn)"></i>Obrigação</span><span><i style="background:var(--bad)"></i>Fechamento ou atrasada</span><span><i style="background:var(--ok)"></i>Concluída</span></div><p class="meta" style="margin:0">A letra aparece no dia em que foi feito; "ref." mostra a que dia se refere. Clique no dia para ver o que foi feito, por quem e a que horas.</p>`+
  (()=>{const L=evs.filter(e=>(e.rep||'unica')!=='unica'?(!e.fim||e.fim>=S.cal+'-01')&&(!e.data||e.data<=fimM):(e.data||'').slice(0,7)===S.cal).sort((a,b)=>((a.rep||'unica')==='unica')-((b.rep||'unica')==='unica')||(a.data||'').localeCompare(b.data||''));
   return `<div class="panel"><div class="ph"><h2>Prazos e compromissos de ${mesNome(S.cal)}</h2><span>${L.length}</span></div>${L.length?L.map(e=>`<div class="row"><div class="t"><b>${esc(e.t)}</b><span>${esc(evTxt(e))} · ${esc(quemEv(e))}${e.obs?' · '+esc(e.obs):''}</span></div><span class="tag ${corEv(e)}">${esc(e.tipo||'Outro')}</span>${podeEditRot()?`<button class="btn ghost" onclick="editEv('${e.id}')">Editar</button>`:''}</div>`).join(''):vazio('Nada neste mês','','evento','Novo prazo')}</div>`})()},
 
@@ -2990,7 +3025,7 @@ const CSS_X=`:root{--ink:#1E1E1E;--ink2:#4F4F4F;--ink3:#6B6B6B;--acc:#C24E1C;--a
 .bt{display:flex;height:12px;border-radius:999px;background:rgba(20,20,20,.06);overflow:hidden}.bt i{display:block;height:100%}.bt .ok,.leg .ok{background:var(--acc2)}.bt .at,.leg .at{background:#3D3D3D}
 .hbar b{text-align:right;font-variant-numeric:tabular-nums}.leg{margin:10px 0 0;font-size:11px;color:var(--ink3);display:flex;gap:6px;align-items:center}.leg i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-left:6px}
 .lista{display:grid;gap:8px}.li{display:flex;align-items:center;gap:10px}.li .tx{flex:1;min-width:0}.li b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.li small{display:block;font-size:11.5px;color:var(--ink3)}
-.pill{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}.pill.at{background:rgba(180,56,44,.12);color:var(--bad)}
+.pill{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}.pill.at{background:rgba(180,56,44,.12);color:var(--bad)}.pill.okp{background:#E3F1E7;color:var(--ok)}
 .vazio{margin:0;color:var(--ink3);font-size:13px}
 .eqgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pess{display:flex;gap:14px;padding:14px 16px;align-items:flex-start}.pess .tx{min-width:0}.pess>div>b{font-size:15px}.pess small{display:block;color:var(--ink3);font-size:12px}
 .nums{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--ink2)}.nums b{color:var(--ink);font-size:15px}
@@ -3024,6 +3059,7 @@ function htmlReuRel(k,per){per=per||perReu(k);const K=dashCh(per.de,per.ate),T=r
  <h2>Atrasos</h2><div class="g2">${atrasosX(K,12)}${remsX(K)}</div>
  ${K.pgF.length?`<div class="glass bloco"><h3>Pagamentos fora do D-5 <span class="cont">${K.pgF.length}</span></h3><div class="lista">${K.pgF.slice(0,10).map(x=>`<div class="li"><div class="tx"><b>${esc(x.c.assunto||'')}</b><small>${esc(x.p.just||'sem justificativa')}</small></div><span class="pill at">pago ${fmt(x.p.pg)}</span></div>`).join('')}</div></div>`:''}
  <h2>O que a equipe realizou</h2>${equipeX(per.de,per.ate)}
+ <h2>Registro do cronograma</h2>${(()=>{const L=registrosCron(per.de,per.ate),R=regResumo(L);return `<div class="kgrid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="glass kcard"><span>Realizado no período</span><b>${R.tot}</b><small>${Object.entries(R.porS).map(([k,v])=>`${esc(k)} ${v}`).join(' · ')||'—'}</small></div><div class="glass kcard"><span>Feito no próprio dia</span><b>${R.pct===null?'—':R.pct+'%'}</b><small>${R.noDia} de ${R.tot}</small></div><div class="glass kcard"><span>Feito depois do dia</span><b>${R.dep}</b><small>${R.refs.length?'de '+R.refs.slice(0,5).join(', '):'nenhum'}</small></div></div><div class="glass bloco">${regTabela(L,40,'tbx')}</div>`})()}
  ${pe.length?`<h2>Pauta da reunião</h2>${pe.map(bloco).join('')}`:''}${fa.length?`<h2>Já falados</h2>${fa.map((x,i)=>bloco(x,pe.length+i)).join('')}`:''}
  </main></body></html>`}
 /* ---------- slides ---------- */
@@ -3086,10 +3122,12 @@ function menuSheet(){if(!podeAdmin())return;FORM={tipo:'_menu'};const oc=new Set
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Administração</p><h2 id="sheet-title">Mostrar e ocultar áreas</h2><p class="sub" style="font-size:13px">Desmarque o que não quer que apareça no menu. Vale para todos. Nada é apagado: ao marcar de novo, a área volta como estava.</p></div>
  <div class="fgrid">${MENU.filter(([k])=>!NAO_OCULTA.includes(k)).map(([k,n])=>`<label class="perm"><input type="checkbox" data-k="${k}" ${oc.has(k)?'':'checked'}><span><b>${esc(n)}</b></span></label>`).join('')}</div>
  <p class="meta" style="margin:0">Painel e Usuários e permissões ficam sempre visíveis, para dar para voltar aqui.</p>
+ <div><h3 style="font-size:14px;margin:8px 0 6px">Sistemas no cronograma</h3><div class="fgrid">${sistsTodos().map(x=>`<label class="perm"><input type="checkbox" data-s="${esc(x)}" ${(CFG.sisOcultos||[]).includes(x)?'':'checked'}><span><b>${esc(x)}</b><small>Desmarcado: some do cronograma, do andamento e do painel. O que já foi marcado continua no calendário e nos relatórios.</small></span></label>`).join('')}</div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaMenu()">Salvar</button></div></div>`;
  document.getElementById('ov').hidden=false}
 async function salvaMenu(){if(FORM?.tipo!=='_menu'||!DB)return;const oc=[...document.querySelectorAll('#sheet input[data-k]')].filter(i=>!i.checked).map(i=>i.dataset.k);
- try{await DB.doc('config/estrutura').set({...CFG,ocultos:oc});CFG.ocultos=oc;log(`Mudou as áreas do menu${oc.length?`: ocultou ${oc.map(k=>(MENU.find(m=>m[0]===k)||[,k])[1]).join(', ')}`:': todas visíveis'}`);toast('Menu atualizado');fechar();render()}
+ let so=[...document.querySelectorAll('#sheet input[data-s]')].filter(i=>!i.checked).map(i=>i.dataset.s);if(so.length>=sistsTodos().length){toast('Deixe pelo menos um sistema visível.');return}
+ try{await DB.doc('config/estrutura').set({...CFG,ocultos:oc,sisOcultos:so});CFG.ocultos=oc;CFG.sisOcultos=so;log(`Mudou as áreas do menu${oc.length?`: ocultou ${oc.map(k=>(MENU.find(m=>m[0]===k)||[,k])[1]).join(', ')}`:': todas visíveis'}`);toast('Menu atualizado');fechar();render()}
  catch(e){toast('Só administradores podem mudar o menu.')}}
 function triAgora(){const n=new Date(HJ+'T12:00');return {ano:n.getFullYear(),q:Math.floor(n.getMonth()/3)+1}}
 function trimBloco(){const t=triAgora(),ini=mesesTri(t)[0]+'-01',fim=fimTri(t),T=realizadoPer(null,ini,HJ);
@@ -3289,7 +3327,7 @@ window.addEventListener('popstate',e=>{if(S.pulaPop){S.pulaPop=false;return}
 /* rascunhos: o que foi digitado num formulário volta quando você reabre */
 const RASC_K='prumo_rasc';let RASC=LS.get(RASC_K,{});
 (function(){const lim=Date.now()-7*864e5;for(const k in RASC)if(!(RASC[k]?.em>lim))delete RASC[k]})();
-const SEM_RASC=new Set(['_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
+const SEM_RASC=new Set(['_diaf','_menu','_emit','_ajuste','_iacp','_reu','_det','_copia','_busca','_sair','_rest','_ler','_assuntos','_resumo']);
 function chaveSheet(f){f=f||FORM;if(!f||SEM_RASC.has(f.tipo))return null;return 'sh:'+f.tipo+':'+(f.id||f.uid||f.ref||'')}
 function chaveMain(){if(S.tela==='abrir')return 'tela:abrir:'+S.perfil;if(S.tela==='fbedit'&&S.fbEd)return 'tela:fbedit:'+(S.fbEd.id||'novo');return null}
 const camposDe=root=>[...root.querySelectorAll('input[id],textarea[id],select[id]')].filter(el=>!['password','file','hidden','search'].includes(el.type)&&!el.dataset.nodraft);

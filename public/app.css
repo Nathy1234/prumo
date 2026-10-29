@@ -567,3 +567,9 @@ table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;col
 
 .dashp .g32{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px}.dashp .bloco{overflow-x:auto}.dashp .tbx td,.dashp .tbx th{white-space:nowrap}.dashp .tbx td small{white-space:nowrap;max-width:26ch;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1100px){.dashp .g32{grid-template-columns:1fr}}
+
+/* calendário: dia em que foi feito × dia de referência */
+.day.clic{cursor:pointer}.day.clic:hover{border-color:var(--accent)}
+.let{gap:3px}.let small{font-size:9.5px;font-weight:500;opacity:.85}.lets .let{min-width:0}
+.let.pro{background:var(--line-soft);color:var(--ink)}.let.par{outline:1px dashed currentColor;outline-offset:-2px}
+.dashp .pill.okp{background:var(--ok-bg);color:var(--ok)}
