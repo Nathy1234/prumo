@@ -4,26 +4,26 @@ img{max-width:100%}
 [hidden]{display:none!important}
 /* Layout: barra lateral fixa à esquerda + área de trabalho arejada; formulários abrem em painel lateral; no celular o menu vira faixa rolável */
 :root{
-  --bg:#F4F4F3; --panel:#FFFFFF; --line:#E4E3E1; --line-soft:#EEEDEB;
-  --ink:#2B2B2B; --ink-2:#57534E; --ink-3:#7A746D;
-  --accent:#B4470A; --accent-soft:#FBEDE3; --accent-ink:#8A3608; --gold:#FDB913;
+  --bg:#F3F5F9; --panel:#FFFFFF; --line:#E1E5EE; --line-soft:#ECEFF5;
+  --ink:#1F2738; --ink-2:#4D5568; --ink-3:#757D8C;
+  --accent:#2E3D60; --accent-soft:#E9EEF8; --accent-ink:#2E3D60; --gold:#E3BA81; --brown:#6F5732;
   --ok:#2F6B3A; --ok-bg:#E6F1E7; --warn:#8A5A0B; --warn-bg:#F7EDDA; --bad:#9C2F2B; --bad-bg:#F8E5E3;
-  --side:#2E2E2E; --scrim:rgba(20,16,12,.32);
+  --side:#2E3D60; --scrim:rgba(20,26,40,.36);
   --f-ui:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-voice:"Newsreader",Georgia,"Times New Roman",serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#171513; --panel:#1F1C19; --line:#34302B; --line-soft:#29251F;
-  --ink:#F1EEEA; --ink-2:#BDB6AD; --ink-3:#8A847C;
-  --accent:#F08A3C; --accent-soft:#3A2716; --accent-ink:#FFC48F; --gold:#FDB913;
+  --bg:#141821; --panel:#1B2030; --line:#2C3346; --line-soft:#222839;
+  --ink:#ECEFF6; --ink-2:#B3BACB; --ink-3:#8890A3;
+  --accent:#ADC0EA; --accent-soft:#24304A; --accent-ink:#C9D3EA; --gold:#E3BA81; --brown:#C9A46E;
   --ok:#8FCB98; --ok-bg:#1A2B1D; --warn:#E3B868; --warn-bg:#2E2412; --bad:#EE9C96; --bad-bg:#331A18;
-  --side:#1A1816; --scrim:rgba(0,0,0,.55); color-scheme:dark}}
+  --side:#1B2233; --scrim:rgba(0,0,0,.55); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#171513; --panel:#1F1C19; --line:#34302B; --line-soft:#29251F;
-  --ink:#F1EEEA; --ink-2:#BDB6AD; --ink-3:#8A847C;
-  --accent:#F08A3C; --accent-soft:#3A2716; --accent-ink:#FFC48F; --gold:#FDB913;
+  --bg:#141821; --panel:#1B2030; --line:#2C3346; --line-soft:#222839;
+  --ink:#ECEFF6; --ink-2:#B3BACB; --ink-3:#8890A3;
+  --accent:#ADC0EA; --accent-soft:#24304A; --accent-ink:#C9D3EA; --gold:#E3BA81; --brown:#C9A46E;
   --ok:#8FCB98; --ok-bg:#1A2B1D; --warn:#E3B868; --warn-bg:#2E2412; --bad:#EE9C96; --bad-bg:#331A18;
-  --side:#1A1816; --scrim:rgba(0,0,0,.55); color-scheme:dark}
+  --side:#1B2233; --scrim:rgba(0,0,0,.55); color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -459,9 +459,9 @@ p.meta{white-space:normal}
 .mark{background:none!important;padding:0;width:34px;height:34px}.mark svg{width:100%;height:100%;display:block}
 
 /* barra lateral grafite (tom sóbrio): usa cores claras por dentro, no modo claro e no escuro */
-aside{--side:#2E2E2E;--panel:#3A3735;--bg:#2E2E2E;--line:#45413E;--line-soft:#3A3735;--ink:#F4F1ED;--ink-2:#CFC9C2;--ink-3:#A39C93;--accent:#C4510A;--accent-soft:#4A3324;--accent-ink:#FFC48F;--warn:#F2C26B;--warn-bg:#4A3A1C;background:#2E2E2E;color:var(--ink);border-right-color:#2E2E2E}
-aside .nav.reg,aside .nav.reg:hover{color:#FFFFFF}
-aside .nav.on{box-shadow:inset 3px 0 0 #F08A3C}
+aside{--side:#2E3D60;--panel:#3A4A70;--bg:#2E3D60;--line:#46557A;--line-soft:#3A4A70;--ink:#F2F4FA;--ink-2:#C9D3EA;--ink-3:#9AA6C2;--accent:#E3BA81;--accent-soft:#3E4D72;--accent-ink:#E3BA81;--warn:#F2C26B;--warn-bg:#4A4128;background:#2E3D60;color:var(--ink);border-right-color:#2E3D60}
+aside .nav.reg,aside .nav.reg:hover{color:#2E3D60}
+aside .nav.on{box-shadow:inset 3px 0 0 #E3BA81}
 aside .inp{border-color:#55504B}
 
 /* recolher o menu lateral */
