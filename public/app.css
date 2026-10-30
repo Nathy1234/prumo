@@ -626,3 +626,5 @@ button.tqp{font:inherit;color:inherit;cursor:pointer;text-align:left}button.tqp:
 @keyframes reuavIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.reuav{animation:none}}
 .reuav-b{display:flex;flex-wrap:wrap;gap:6px}
+
+.relcorpo{display:flex;flex-direction:column;gap:16px}.reugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}.reugrid .panel{margin:0}

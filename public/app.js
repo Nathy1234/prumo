@@ -706,7 +706,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=115;
+const PRUMO_ATUALIZACOES=116;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -714,6 +714,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Relatórios organizados em abas: Equipe, Chamados, Cronograma, Reuniões e ideias, Destaques'],
  ['2026-10-30','Botão do meio do mouse (ou Ctrl + clique) abre a área em nova aba'],
  ['2026-10-30','Relatório em HTML com o mesmo visual e as mesmas partes do link público do painel'],
  ['2026-10-30','Aviso das reuniões também 5 minutos antes'],
@@ -3119,13 +3120,28 @@ sistema(){if(!podeAdmin()&&!dir())return V.painel();
  <div class="panel"><div class="ph"><h2>Novidades recentes</h2><span>últimas mudanças no Prumo</span></div>${NOVIDADES.slice(0,15).map(([d,t])=>`<div class="row"><span class="meta" style="width:52px">${fmt(d)}</span><div class="t"><b style="font-weight:400">${esc(t)}</b></div></div>`).join('')}</div>`+
  `<div class="sb-fim"><div class="sb-logo">${document.querySelector('.brand .mark')?.innerHTML||''}</div><div><b>Prumo · Financeiro e Contábil</b><span>Criado por ${esc(CFG.criador||'Natalia Araujo')} em ${esc(PRUMO_INICIO)} · ${PRUMO_ATUALIZACOES} atualizações publicadas${vs?` · versão ${esc(vs)}`:''}</span></div>${podeAdmin()?`<button class="btn ghost" onclick="editCriador()">Editar nome</button>`:''}</div>`+
  note('Só administradores e o diretor veem esta tela. Os números são do momento em que você abre e mudam sozinhos conforme a equipe usa o Prumo.')},
-relat(){const tf=D.tarefas,f=tf.filter(x=>x.s==='feita').length,ms=mesesTri(S.tri),dq=D.destaques.filter(d=>ms.includes(d.mes));
- return head('Para as reuniões','Relatórios','Montados a partir de tudo o que foi registrado no portal.',triNav())+
- `<div class="panel"><div class="ph"><h2>Situação atual</h2><span>atualizado agora</span></div>
- ${[['Rotinas concluídas',`${f} de ${tf.length}`],['Tarefas atrasadas',tf.filter(atrasada).length],['Chamados em aberto',D.chamados.filter(c=>c.st!=='Concluído').length],['Chamados fora do prazo da política',D.chamados.filter(c=>c.fora).length],['Feedbacks mensais do mês anterior registrados',`${colabs().filter(p=>['ok','wa'].includes(seloMes(p.id,addMes(MES_ATUAL,-1))[0])).length} de ${colabs().filter(p=>seloMes(p.id,addMes(MES_ATUAL,-1))[0]!=='nd').length}`],['Mensagens aprovadas',D.mensagens.filter(m=>m.s==='aprovada').length],['Sugestões implantadas',D.sugestoes.filter(s=>s.e==='Implantada').length]].map(r=>`<div class="row"><div class="t"><b style="font-weight:400">${r[0]}</b></div><span style="font-variant-numeric:tabular-nums;font-weight:500">${r[1]}</span></div>`).join('')}</div>
- <div class="panel"><div class="ph"><h2>Entregas dos departamentos</h2><span>pontualidade e atrasos</span></div>${painelDep()}</div>
- <div class="panel"><div class="ph"><h2>Realizado no ${S.tri.q}º trimestre</h2><span>${ms.map(mesCurto).join(' · ')}</span></div>${tabelaTri(colabs())}</div>
- <div class="panel"><div class="ph"><h2>Destaques do trimestre</h2><span>${dq.length}</span></div>${dq.length?`<div class="hl">${dq.map(cardDest).join('')}</div>`:vazio('Nenhum destaque registrado no trimestre','')}</div>`}};
+relat(){const ms=mesesTri(S.tri),de=ms[0]+'-01',ft=fimTri(S.tri),ate=ft<HJ?ft:HJ,dq=D.destaques.filter(d=>ms.includes(d.mes));
+ const vazioT=de>HJ;const T=realizadoPer(null,de,ate),K=dashCh(de,ate),LB=lbcEmDia(de,ate),pLB=LB.tot?Math.round(LB.ok/LB.tot*100):null;
+ const reuK=[...new Set(D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&x.reuData&&x.reuData>=de&&x.reuData<=ft).map(reuKey))].sort().reverse(),ideias=D.sugestoes.filter(x=>sugCat(x)==='sistema');
+ const ent=modOn('entregas')&&D.entregas.length;
+ const ABAS=[['equipe','Equipe'],['chamados','Chamados'],['crono','Cronograma (L, B, C)'],['reun','Reuniões e ideias'],['dest',`Destaques${dq.length?' · '+dq.length:''}`],...(ent?[['ent','Entregas dos departamentos']]:[])];
+ if(!ABAS.some(a=>a[0]===S.relAba))S.relAba='equipe';
+ const stat=(n,v,sx,cor)=>`<div class="stat"><p>${n}</p><strong${cor?` style="color:${cor}"`:''}>${v}</strong>${sx?`<span class="meta" style="font-size:12px">${sx}</span>`:''}</div>`;
+ const corpo={
+  equipe:()=>{const ant=addMes(MES_ATUAL,-1),fbT=colabs().filter(p=>seloMes(p.id,ant)[0]!=='nd').length,fbOk=colabs().filter(p=>['ok','wa'].includes(seloMes(p.id,ant)[0])).length;
+   return `<div class="panel"><div class="ph"><h2>Realizado no ${S.tri.q}º trimestre</h2><span>${ms.map(mesCurto).join(' · ')}</span></div>${tabelaTri(colabs())}</div>${fbT?`<div class="panel"><div class="row"><div class="t"><b>Feedbacks mensais de ${esc(mesNome(ant))}</b><span>${fbOk} de ${fbT} registrados</span></div><button class="btn ghost" onclick="ir('feedbacks')">Abrir feedbacks</button></div></div>`:''}`},
+  chamados:()=>`<div class="dashp" style="display:flex;flex-direction:column;gap:16px">${kpisX(K)}<div class="g2">${barrasX(K.cats,'Pedidos por categoria')}${barrasX(K.deps,'Pedidos por setor')}</div><div class="g32">${atrasosX(K,10)}${remsX(K)}</div></div>`,
+  crono:()=>{const L=registrosCron(de,ate),R=regResumo(L);return `<div class="panel dashp"><div class="ph"><h2>Registro do cronograma no trimestre</h2><button class="btn" onclick="calFiltro()">Ver no calendário</button></div>
+   <div class="stats" style="margin-bottom:12px">${stat('L, B e C em dia',pLB==null?'—':pLB+'%',LB.tot?`${LB.ok} de ${LB.tot} marcações`:'nada marcado')}${stat('Realizado',R.tot,Object.entries(R.porS).map(([a,b])=>`${esc(a)} ${b}`).join(' · '))}${stat('Feito no próprio dia',R.pct===null?'—':R.pct+'%',`${R.noDia} de ${R.tot}`)}${stat('Feito depois do dia',R.dep,R.refs.length?'de '+R.refs.slice(0,4).join(', '):'nenhum')}</div>${regTabela(L,60,'')||vazio('Nada registrado no trimestre','')}</div>`},
+  reun:()=>`${podeReuExp()?`<div style="display:flex;justify-content:flex-end"><button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button></div>`:''}
+   <div class="panel"><div class="ph"><h2>Reuniões do trimestre</h2><span>${reuK.length}</span></div>${reuK.length?`<div class="reugrid">${reuK.map(k=>reuCard(k,D.sugestoes.filter(x=>sugCat(x)==='reuniao'))).join('')}</div>`:vazio('Nenhuma reunião com assuntos no trimestre','')}</div>
+   <div class="panel"><div class="ph"><h2>Ideias para o sistema</h2><span>${ideias.length}</span></div>${ideias.length?ideias.sort((a,b)=>(b.v||0)-(a.v||0)).map(linSug).join(''):vazio('Nenhuma ideia registrada','')}</div>`,
+  dest:()=>`<div class="panel"><div class="ph"><h2>Destaques do trimestre</h2><span>${dq.length}</span></div>${dq.length?`<div class="hl">${dq.map(cardDest).join('')}</div>`:vazio('Nenhum destaque registrado no trimestre','')}</div>`,
+  ent:()=>`<div class="panel"><div class="ph"><h2>Entregas dos departamentos</h2><span>pontualidade e atrasos</span></div>${painelDep()}</div>`};
+ return head('Para as reuniões','Relatórios','Os números do trimestre, separados por assunto.',`${triNav()}${podeReuExp()?`<button class="btn" onclick="emitirSheet()">Emitir</button>`:''}`)+
+ (vazioT?vazio('Este trimestre ainda não começou',''):`<div class="stats">${stat('Realizado pela equipe',T.total,`${T.ch} chamados · ${T.rot} rotinas`)}${stat('Chamados concluídos',K.con,`${K.rec} recebidos`)}${stat('Chamados no prazo',K.pctOk==null?'—':K.pctOk+'%','concluídos até o prazo')}${stat('L, B e C em dia',pLB==null?'—':pLB+'%','calendário')}${stat('Em aberto hoje',D.chamados.filter(c=>c.st!=='Concluído').length,K.atrE.length?`${K.atrE.length} atrasados`:'nenhum atrasado',K.atrE.length?'var(--bad)':'')}</div>
+ <div class="tabs big" role="tablist" aria-label="Assuntos do relatório">${ABAS.map(([k,n])=>`<button role="tab" aria-selected="${S.relAba===k}" class="${S.relAba===k?'on':''}" onclick="S.relAba='${k}';render()">${esc(n)}</button>`).join('')}</div>
+ <div class="relcorpo">${corpo[S.relAba]()}</div>`)}};
 
 function procList(l){return l.length?l.map(p=>`<div class="row"><div class="t"><b>${esc(p.t)}</b><span>${esc(p.a)}${p.formato?' · '+esc(p.formato):''}</span></div>${p.link&&/^https?:\/\//.test(p.link)?`<a class="btn" href="${esc(p.link)}" target="_blank" rel="noopener">Abrir</a>`:''}${editar('procedimento',p.id)}</div>`).join(''):vazio(S.busca?'Nada encontrado':'Nenhum procedimento ainda',S.busca?'Tente outra palavra.':'Documente o passo a passo das atividades.')}
 function renderList(){const b=S.busca.toLowerCase();document.getElementById('plist').innerHTML=procList(D.procedimentos.filter(p=>(p.t+' '+p.a).toLowerCase().includes(b)))}
