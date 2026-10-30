@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=131;
+const PRUMO_ATUALIZACOES=132;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
@@ -721,7 +721,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','Feedback automático: rascunho com o que a pessoa realizou, ausências e observações, para o diretor revisar'],
+  ['2026-10-30','IA do Prumo: escreve o feedback no próprio computador, lendo só os dados do sistema'],
+ ['2026-10-30','Feedback automático: rascunho com o que a pessoa realizou, ausências e observações, para o diretor revisar'],
  ['2026-10-30','Equipe › Evolução: evolução de cada colaborador pelos feedbacks e observações'],
  ['2026-10-30','Admin e diretor ajustam férias e ausências já lançadas'],
  ['2026-10-30','No andamento, cada colaborador vê só o próprio andamento (só diretor e admin veem o departamento todo)'],
@@ -1506,7 +1507,8 @@ function fbGerarSheet(pid){if(!fbPode())return;const p=pessoa(pid);if(!p)return;
  FORM={tipo:'_fbger',pid,op:OP};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(p.n)}</p><h2 id="sheet-title">Criar feedback automático</h2><p class="sub" style="font-size:13px">O Prumo escreve um rascunho com o que ${esc(p.n)} realizou no período (lançamentos, baixas, conciliações, chamados e prazos), as ausências e as suas observações. Depois você revisa e muda o que quiser. Nada é enviado sozinho.</p></div>
  <div class="sbox">${OP.map((o,i)=>{const d=dadosPer(pid,o),ps=d.obs.filter(x=>x.tipo==='pos').length,at=d.obs.filter(x=>x.tipo==='aten').length;return `<label class="perm"><input type="radio" name="fg_p" value="${i}" ${i===0?'checked':''}><span><b>${esc(o.n)}</b><small>${d.R.total} realizadas (${d.R.rot} rotinas, ${d.R.ch} chamados) · ${d.obs.length} ${d.obs.length===1?'observação':'observações'}${d.obs.length?` (${ps} positivas, ${at} de atenção)`:''}</small></span></label>`}).join('')}</div>
- <div class="foot"><button class="btn ghost" onclick="fechar();S.fbP='${esc(pid)}';fbIr('fbpessoa')">Registrar observação antes</button><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="fbGerar()">Criar rascunho</button></div></div>`;
+ <div class="foot"><button class="btn ghost" onclick="fechar();S.fbP='${esc(pid)}';fbIr('fbpessoa')">Registrar observação antes</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn" onclick="fbGerar()" title="Na hora, montado com os dados">Criar rascunho</button>${'gpu' in navigator?`<button class="btn pri" onclick="fbIA()" title="A IA roda neste computador e lê só os dados do Prumo">✦ Escrever com a IA do Prumo</button>`:''}</div></div>
+ <div id="fg_ia" class="iabox" hidden></div>`;
  document.getElementById('ov').hidden=false}
 function fbTexto(p,o,d){const R=d.R,G=d.G,RA=d.RA,L=d.obs,li=a=>a.map(x=>`- ${x}`).join('\n');
  const per=o.tipo==='Mensal'?`mensal de ${mesNome(o.mes)}`:(()=>{const t=triParse(o.tri);return `do ${t.q}º trimestre de ${t.ano}`})();
@@ -1533,7 +1535,35 @@ function fbTexto(p,o,d){const R=d.R,G=d.G,RA=d.RA,L=d.obs,li=a=>a.map(x=>`- ${x}
  const neu=L.filter(x=>x.tipo!=='pos'&&x.tipo!=='aten').map(x=>String(x.texto||'').trim());
  const tom=bem.length&&aten.length?'mix':aten.length?'mel':'pos';
  const texto=`Olá, ${tratDe(p)}!\n\nEste é o seu feedback ${per}, com base no que você realizou no período e no que acompanhamos no dia a dia.\n\n### Números do período\n${li(nums)}\n\n${bem.length?`### O que você fez bem\n${li(bem)}\n\n`:''}${aten.length?`### Pontos que ainda precisam de atenção\n${li(aten)}\n\n`:''}${neu.length?`### Outras observações\n${li(neu)}\n\n`:''}### Próximos passos\n${li(prox)}\n\n${tom==='pos'?'Parabéns pelo trabalho. Continue assim!':'Conte comigo para o que precisar.'}\n\n${DIR_NOME()}`;
- return {texto,tom}}
+ return {texto,tom,partes:{per,nums,bem,aten,neu,prox:prox.filter(x=>!x.startsWith('('))}}}
+/* IA do Prumo: roda neste computador (WebGPU), sem serviço pago e sem mandar dados para fora.
+   Lê só o que o Prumo entrega (números do período, observações e um feedback anterior como exemplo de estilo). */
+const IA_LIB='https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';let IA_ENG=null,IA_CARR=null;
+async function iaMotor(prog){if(IA_ENG)return IA_ENG;if(IA_CARR)return IA_CARR;
+ IA_CARR=(async()=>{if(!navigator.gpu)throw new Error('sem_webgpu');const ad=await navigator.gpu.requestAdapter();if(!ad)throw new Error('sem_webgpu');
+  const wl=await import(IA_LIB),mod=ad.features.has('shader-f16')?'Qwen2.5-3B-Instruct-q4f16_1-MLC':'Qwen2.5-3B-Instruct-q4f32_1-MLC';
+  IA_ENG=await wl.CreateMLCEngine(mod,{initProgressCallback:r=>{try{prog&&prog(r)}catch(e){}}});return IA_ENG})();
+ try{return await IA_CARR}catch(e){IA_CARR=null;throw e}}
+function iaExemplo(pid){const f=[...D.feedbacks].filter(x=>!x.arquivado&&String(x.texto||'').length>200).sort((a,b)=>(b.data||'').localeCompare(a.data||''));const x=f.find(y=>y.pessoa===pid)||f[0];return x?String(x.texto).replace(/\s+\n/g,'\n').slice(0,900):''}
+async function fbIA(){const f=FORM;if(f?.tipo!=='_fbger')return;const i=+(document.querySelector('#sheet input[name=fg_p]:checked')?.value??-1),o=f.op[i];if(!o){toast('Escolha o período.');return}
+ const box=document.getElementById('fg_ia');box.hidden=false;const bts=[...document.querySelectorAll('#sheet .foot button')];bts.forEach(b=>b.disabled=true);
+ const p=pessoa(f.pid),d=dadosPer(f.pid,o),{tom,partes:P}=fbTexto(p,o,d),ex=iaExemplo(f.pid);
+ box.innerHTML='<b>IA do Prumo</b><p class="meta" id="ia_st">Preparando a IA neste computador…</p><div class="iabar"><i id="ia_pg" style="width:0%"></i></div><pre id="ia_txt"></pre>';
+ const st=t=>{const e=document.getElementById('ia_st');if(e)e.textContent=t},pg=v=>{const e=document.getElementById('ia_pg');if(e)e.style.width=Math.round(v*100)+'%'};
+ try{const eng=await iaMotor(r=>{pg(r.progress||0);st(r.progress<1?`Baixando a IA (só na primeira vez, cerca de 2 GB): ${Math.round((r.progress||0)*100)}%`:'Carregando a IA…')});
+  pg(1);st('Escrevendo o feedback…');
+  const lista=(t,a)=>a.length?`${t}:\n${a.map(x=>'- '+x).join('\n')}\n`:'';
+  const fatos=`Colaborador: ${p.n} (chamar de ${tratDe(p)})\nCargo: ${p.c||'não informado'}\nFeedback: ${P.per}\nTom esperado: ${TONS[tom]}\n\n${lista('Números do período',P.nums)}${lista('Pontos positivos (observações do diretor e números)',P.bem)}${lista('Pontos de atenção (observações do diretor e números)',P.aten)}${lista('Outras observações',P.neu)}${lista('Próximos passos sugeridos',P.prox)}`;
+  const sys='Você escreve feedbacks de desempenho para colaboradores do departamento Financeiro e Contábil, em nome do diretor. Escreva em português do Brasil, em tom humano, respeitoso e direto, falando com a pessoa ("você"). Use APENAS os fatos fornecidos: não invente números, tarefas, elogios nem problemas. Não use dados de fora. Estrutura: saudação com o nome; um parágrafo de abertura; as seções "### O que você fez bem", "### Pontos que ainda precisam de atenção" (só se houver) e "### Próximos passos", com listas curtas; um fechamento de uma frase. Não assine. Até 300 palavras.';
+  const msgs=[{role:'system',content:sys},...(ex?[{role:'user',content:'Exemplo de feedback já escrito pelo diretor, só para seguir o estilo (não copie os fatos):\n\n'+ex},{role:'assistant',content:'Entendido. Vou seguir esse estilo usando só os fatos que você mandar.'}]:[]),{role:'user',content:'Escreva o feedback com estes fatos:\n\n'+fatos}];
+  let out='';const it=await eng.chat.completions.create({messages:msgs,temperature:0.5,max_tokens:900,stream:true});
+  for await(const ch of it){out+=ch.choices?.[0]?.delta?.content||'';const e=document.getElementById('ia_txt');if(e){e.textContent=out;e.scrollTop=e.scrollHeight}}
+  out=out.trim();if(!out)throw new Error('vazio');
+  const texto=`${out}\n\n${DIR_NOME()}`;
+  fechar();fbNovo({pessoa:f.pid,tipo:o.tipo,mes:o.mes,tri:o.tri,tom,texto});if(S.fbEd){S.fbEd.obsUsadas=d.obs.filter(x=>!x.usadoEm).map(x=>x.id);S.fbEd.dirty=true}
+  log(`Criou com a IA do Prumo um rascunho de feedback ${o.tipo.toLowerCase()} de ${p.n}`);toast('Rascunho escrito pela IA. Revise antes de salvar ou enviar: ela pode errar.',7000)}
+ catch(e){bts.forEach(b=>b.disabled=false);const m=String(e?.message||e);
+  st(m==='sem_webgpu'||/webgpu|adapter/i.test(m)?'Este computador ou navegador não consegue rodar a IA (precisa do Edge ou Chrome atualizado, com WebGPU). Use "Criar rascunho".':/quota|storage|space/i.test(m)?'Falta espaço no computador para guardar a IA (cerca de 2 GB). Use "Criar rascunho".':/fetch|network|Failed to/i.test(m)?'Não consegui baixar a IA agora. Confira a internet e tente de novo, ou use "Criar rascunho".':'A IA não conseguiu escrever agora. Use "Criar rascunho" ou tente de novo.')}}
 function fbGerar(){const f=FORM;if(f?.tipo!=='_fbger')return;const i=+(document.querySelector('#sheet input[name=fg_p]:checked')?.value??-1),o=f.op[i];if(!o){toast('Escolha o período.');return}
  const p=pessoa(f.pid),d=dadosPer(f.pid,o),{texto,tom}=fbTexto(p,o,d);
  fechar();fbNovo({pessoa:f.pid,tipo:o.tipo,mes:o.mes,tri:o.tri,tom,texto});if(S.fbEd){S.fbEd.obsUsadas=d.obs.filter(x=>!x.usadoEm).map(x=>x.id);S.fbEd.dirty=true}
