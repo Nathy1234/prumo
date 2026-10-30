@@ -689,39 +689,40 @@ function regResumo(L){const fin=L.filter(o=>!o.par&&!o.nt),noDia=fin.filter(o=>o
  return {tot:fin.length,noDia,pct:fin.length?Math.round(noDia/fin.length*100):null,dep:dep.length,refs:[...new Set(dep.map(o=>fmt(o.ref)))],porS}}
 /* resumo de cada área para a tela Sobre o sistema: [o que tem, número ao vivo] */
 const SOBRE={
- painel:['Visão geral do dia: números dos chamados, equipe no trimestre, atrasos, andamento e o que foi feito no cronograma. Cada pessoa escolhe os blocos.',()=>`${BLOCOS_PAINEL.length} blocos disponíveis`],
+ painel:['Visão geral do dia: números dos chamados, equipe no trimestre, destaques do mês com foto, atrasos e andamento (cada colaborador vê só o dele). Cada pessoa escolhe os blocos; avisos de reunião, e-mail novo e resumo de quando esteve fora.',()=>`${BLOCOS_PAINEL.length} blocos disponíveis`],
  alertas:['Rotinas atrasadas e pendências que precisam de atenção.',()=>{const a=alertas().length;return a?`${a} ${a===1?'alerta':'alertas'} agora`:'nenhum alerta agora'}],
  ferramentas:['Atalhos para os sistemas e sites que o departamento usa.',()=>`${D.ferramentas.length} ferramentas`],
- chamados:['Pedidos dos departamentos: leitura da caixa do contas a pagar, triagem por categoria, regra D-8, padrão do contas a pagar, D-5 com justificativa.',()=>`${D.chamados.filter(c=>c.st!=='Concluído').length} em aberto · ${emPend().length} e-mails para revisar · ${D.chamados.filter(chAtrasado).length} atrasados`],
+ chamados:['Pedidos dos departamentos: leitura da caixa do contas a pagar, triagem por categoria, regra D-8, padrão do contas a pagar, D-5 com justificativa. Quadro por etapa ou por data de entrega, com cartões compactos.',()=>`${D.chamados.filter(c=>c.st!=='Concluído').length} em aberto · ${emPend().length} e-mails para revisar · ${D.chamados.filter(chAtrasado).length} atrasados`],
  rotinas:['Cronograma por sistema (WAE: Lançamento, Baixa, Conciliação · Protheus: Lançar, Pagar, Conciliar), com quem fez, a hora e o dia de referência.',()=>`${D.cronograma.filter(r=>r.ativo!==false).length} rotinas ativas · sistemas: ${sists().join(', ')}`],
  metas:['Metas e lista do que fazer no mês, do departamento e de cada pessoa.',()=>{const i=itensMeta(MES_ATUAL,'dep').length;return `${i} itens do departamento em ${mesCurto(MES_ATUAL)}`}],
  entregas:['Entregas que os departamentos devem ao financeiro, com prazo e cobrança.',()=>`${D.entregas.filter(e=>!e.recebido).length} pendentes`],
- destaques:['Conquistas e reconhecimentos da equipe no mês.',()=>`${D.destaques.filter(d=>d.mes===MES_ATUAL).length} neste mês`],
+ destaques:['Conquistas e reconhecimentos da equipe no mês, com a foto de quem foi destaque; aparecem também no Painel.',()=>`${D.destaques.filter(d=>d.mes===MES_ATUAL).length} neste mês`],
  fechamento:['Acompanhamento do fechamento mensal (D+N).',()=>''],
- calendario:['Calendário com as letras do que foi feito em cada dia, a referência e as reuniões.',()=>`${registrosCron(MES_ATUAL+'-01',HJ).length} registros no mês · ${D.eventos.length} compromissos`],
- equipe:['Equipe e feedbacks: o que cada pessoa realizou no trimestre e o acompanhamento.',()=>`${colabs().length} pessoas`],
- feedbacks:['Feedbacks mensais e trimestrais, com modelos de texto.',()=>`${D.feedbacks.length} feedbacks registrados`],
+ calendario:['Calendário com as letras do que foi feito em cada dia, a referência, os prazos e as reuniões (inclusive só com quem você escolher, com aviso na tela no dia, 15 e 5 minutos antes).',()=>`${registrosCron(MES_ATUAL+'-01',HJ).length} registros no mês · ${D.eventos.length} compromissos`],
+ equipe:['Pessoas, Evolução pelos feedbacks, Feedbacks e Férias e ausências. Só diretor, admin e quem o admin liberar.',()=>`${colabs().length} pessoas`],
+ feedbacks:['Feedbacks mensais e trimestrais no modelo feedforward: rascunho automático com o que a pessoa realizou e as observações, ou escrito pela IA do Prumo no próprio computador, sempre revisado pelo diretor.',()=>`${D.feedbacks.length} feedbacks registrados`],
  realizadas:['Histórico das demandas concluídas.',()=>`${D.chamados.filter(c=>c.st==='Concluído').length} concluídas`],
  bancos:['Troca de dados bancários com conferência antifraude.',()=>''],
  whats:['Mensagens de WhatsApp aprovadas pelo diretor.',()=>''],
  proc:['Procedimentos: o passo a passo de cada atividade.',()=>`${D.procedimentos.length} procedimentos`],
- melhorias:['Pauta das reuniões (assuntos e respostas da equipe, relatório e slides) e ideias para o sistema.',()=>`${D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&!sugFeita(x)).length} assuntos a falar · ${D.sugestoes.filter(x=>sugCat(x)==='sistema').length} ideias`],
- relat:['Relatórios do trimestre: o que a equipe realizou, entregas e destaques.',()=>''],
+ melhorias:['Pauta das reuniões (assuntos e respostas da equipe), marcar reunião, relatório completo no visual do painel e slides, e ideias para o sistema.',()=>`${D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&!sugFeita(x)).length} assuntos a falar · ${D.sugestoes.filter(x=>sugCat(x)==='sistema').length} ideias`],
+ relat:['Números do trimestre em abas: Equipe, Chamados, Cronograma (L, B, C), Reuniões e ideias e Destaques. Emitir relatório e slides.',()=>''],
  indicadores:['Indicadores por área, com envio do resumo aos gestores.',()=>''],
  logs:['Registro de tudo o que foi feito no sistema, com arquivo dos meses anteriores.',()=>`${D.logs.length} ações recentes`],
  usuarios:['Quem acessa o Prumo, perfis e permissões. Também escolhe as áreas e sistemas que aparecem.',()=>{const p=D.pedidos.filter(x=>!acessoDe(x.id)).length;return `${D.acessos.length} acessos${p?` · ${p} pedidos esperando`:''}`}],
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=133;
-const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
+const PRUMO_ATUALIZACOES=134;
+const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra. Na gestão de pessoas, acompanha a evolução de cada colaborador pelos feedbacks e cria rascunhos de feedback no modelo feedforward, inclusive com uma IA que roda no próprio computador e lê só os dados do Prumo.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCriador()">Salvar</button></div></div>`;document.getElementById('ov').hidden=false}
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','Feedback automático no modelo feedforward: pontos fortes, resumo curto e o que fazer daqui para frente'],
+  ['2026-10-30','Sobre o sistema atualizado com as áreas novas'],
+ ['2026-10-30','Feedback automático no modelo feedforward: pontos fortes, resumo curto e o que fazer daqui para frente'],
  ['2026-10-30','IA do Prumo: escreve o feedback no próprio computador, lendo só os dados do sistema'],
  ['2026-10-30','Feedback automático: rascunho com o que a pessoa realizou, ausências e observações, para o diretor revisar'],
  ['2026-10-30','Equipe › Evolução: evolução de cada colaborador pelos feedbacks e observações'],
