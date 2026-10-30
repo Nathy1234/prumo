@@ -628,3 +628,5 @@ button.tqp{font:inherit;color:inherit;cursor:pointer;text-align:left}button.tqp:
 .reuav-b{display:flex;flex-wrap:wrap;gap:6px}
 
 .relcorpo{display:flex;flex-direction:column;gap:16px}.reugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}.reugrid .panel{margin:0}
+
+.eqc{display:flex;flex-direction:column;gap:12px}.eqinfo{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}.eqinfo>span{background:var(--line-soft);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink)}.eqinfo small{display:block;font-size:11px;color:var(--ink-3)}.eqinfo i{font-style:normal;font-size:11px}
