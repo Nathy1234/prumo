@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Planejamento 2027 · ao vivo</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Planejamento 2027 · link público: só leitura, atualiza sozinho */
+:root{--bg:#F1F1EE;--panel:rgba(255,255,255,.7);--solid:#fff;--line:rgba(20,20,20,.09);--line2:rgba(20,20,20,.05);--ink:#1E1E1E;--ink2:#4F4F4F;--ink3:#6B6B6B;--acc:#C24E1C;--acc2:#E4602B;--soft:rgba(228,96,43,.13);--ok:#2F7D4A;--okBg:#E3F1E7;--bad:#B4382C;--badBg:#F8E5E3;--warn:#8A5A0B;--warnBg:#F7EDDA;--borda:rgba(255,255,255,.85);--sombra:rgba(0,0,0,.07);--fundo:radial-gradient(45% 55% at 90% 6%,rgba(228,96,43,.24),transparent 70%),radial-gradient(50% 60% at 10% 92%,rgba(160,160,155,.3),transparent 70%);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#181818;--panel:rgba(38,38,38,.66);--solid:#222;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.06);--ink:#F4F4F2;--ink2:#C8C8C4;--ink3:#9C9C98;--acc:#E4602B;--soft:rgba(228,96,43,.22);--ok:#8FCB98;--okBg:#1A2B1D;--bad:#EE9C96;--badBg:#331A18;--warn:#E3B868;--warnBg:#2E2412;--borda:rgba(255,255,255,.12);--sombra:rgba(0,0,0,.35);--fundo:radial-gradient(45% 55% at 90% 6%,rgba(228,96,43,.3),transparent 70%),radial-gradient(50% 60% at 10% 92%,rgba(90,90,90,.4),transparent 70%);color-scheme:dark}}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--fundo),var(--bg);background-attachment:fixed;color:var(--ink);font:14px/1.5 Onest,system-ui,sans-serif;min-height:100vh}
+main{max-width:1240px;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:14px}
+.g{background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--borda);border-radius:16px;box-shadow:0 8px 24px var(--sombra)}
+.cab{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px}.marca{display:flex;align-items:center;gap:12px}.marca img{width:40px;height:40px}.marca b{display:block;font-size:17px}.marca span{display:block;font-size:12.5px;color:var(--ink3)}
+.vivo{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2)}.vivo i{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px var(--okBg)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}.tabs button{border:0;background:none;font:inherit;color:var(--ink2);padding:10px 14px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}.tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--acc2)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bar input,.bar select{font:inherit;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--solid);color:var(--ink)}
+.kp{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.kp div{padding:14px 16px}.kp span{display:block;font-size:12px;color:var(--ink3)}.kp b{display:block;font-size:26px;letter-spacing:-.02em}
+.box{padding:16px 18px}h2{margin:0 0 10px;font-size:15px}.q{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);margin:10px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th{text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-weight:600;padding:0 6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}td{padding:7px 6px;border-bottom:1px solid var(--line2);vertical-align:middle}tr:last-child td{border-bottom:0}.c{text-align:center}.wrap{overflow-x:auto}
+.plc{display:inline-grid;place-items:center;min-width:34px;height:22px;padding:0 4px;border-radius:6px;font-size:10.5px;font-weight:600;white-space:nowrap}.plc.ok{background:var(--okBg);color:var(--ok)}.plc.ac{background:var(--soft);color:var(--acc)}.plc.wa{background:var(--warnBg);color:var(--warn)}.plc.bad{background:var(--badBg);color:var(--bad)}.plc.ne{background:var(--line2);color:var(--ink2)}.plc.vz{border:1px dashed var(--line)}
+.obj h3{font-size:14.5px;margin:2px 0 4px}.obj p{margin:0 0 8px;font-size:12.5px;color:var(--ink2)}.ey{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);font-weight:600}
+.msg{padding:40px 20px;text-align:center}footer{text-align:center;font-size:12px;color:var(--ink3)}
+@media (max-width:900px){.kp{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<main id="app"><div class="g msg">Carregando o planejamento…</div></main>
+<script src="config.js"></script>
+<script src="planejamento-calc.js"></script>
+<script>
+(function(){
+var C=window.PORTAL_CONFIG||{},T=new URLSearchParams(location.search).get('t')||'',el=document.getElementById('app'),DATA=null,S={aba:'painel',bq:'',mes:null};
+var e=function(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var nm=function(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')};
+var CL={'Atingido':'ok','Parcial':'ac','Insatisfatório':'wa','Não atingido':'bad','Fora das faixas':'ne'};
+var cel=function(st,t,tt){return '<span class="plc '+(st?(CL[st]||'ne'):'vz')+'" title="'+e(tt||'')+'">'+(t==null?'':e(t))+'</span>'};
+var fmt=function(it,v){if(v==null)return '';var s=Math.abs(v)>=1000?v.toLocaleString('pt-BR',{maximumFractionDigits:2}):(+v.toFixed(2)).toLocaleString('pt-BR');return s+(/Percentual/.test(it.ind.me||'')&&Math.abs(v)<1000?'%':'')};
+function grade(L,R){return '<div class="wrap"><table><thead><tr><th>Cód.</th><th>Indicador</th><th>Meta</th>'+PLC.MN.map(function(m){return '<th class="c">'+m+'</th>'}).join('')+'<th class="c">T1</th><th class="c">T2</th><th class="c">T3</th><th class="c">T4</th><th class="c">Ano</th></tr></thead><tbody>'+L.map(function(it){return PLC.grupos(it.ind).map(function(g,gi){return '<tr><td>'+(gi?'':'<b>'+e(it.ind.c)+'</b>')+'</td><td>'+(gi?'<span style="color:var(--ink3)">'+e(g)+'</span>':e(it.ind.n)+(g?'<br><span style="color:var(--ink3)">'+e(g)+'</span>':''))+'</td><td style="color:var(--ink2);max-width:170px">'+(gi?'':e(it.ind.mt))+'</td>'
+ +PLC.MS.map(function(m){var v=PLC.val(R,it,m,g),st=PLC.stPer(R,it,[m],g);return '<td class="c">'+cel(st,v!=null?fmt(it,v):st?'✓':'',st||'')+'</td>'}).join('')
+ +PLC.TRI.concat([PLC.MS]).map(function(ms){var v=PLC.agg(R,it,ms,g),st=PLC.stPer(R,it,ms,g);return '<td class="c">'+cel(st,v!=null?fmt(it,v):st?'✓':'',st||'')+'</td>'}).join('')+'</tr>'}).join('')}).join('')+'</tbody></table></div>'}
+function desenha(){var P=DATA.def,R=DATA.res||{},L=PLC.todos(P),m=S.mes||(new Date().getFullYear()===2027?String(new Date().getMonth()+1).padStart(2,'0'):'01');
+ var ABAS=[['painel','Painel']].concat(P.secoes.map(function(s){return [s.id,s.nome]})).concat([['finq','Quadrante Financeiro']]);
+ var h='<div class="g cab"><div class="marca"><img src="favicon.svg" alt=""><div><b>'+e(P.titulo)+'</b><span>'+e(P.sub)+' · acompanhamento ao vivo</span></div></div><span class="vivo"><i></i>Ao vivo · atualizado às '+new Date(DATA.atualizado).toTimeString().slice(0,5)+'</span></div>'
+ +'<div class="bar"><input id="bq" placeholder="Buscar indicador, setor ou responsável" value="'+e(S.bq)+'" style="flex:1;min-width:220px"><select id="mes">'+PLC.MS.map(function(x,i){return '<option value="'+x+'"'+(x===m?' selected':'')+'>'+PLC.MN[i]+'/2027</option>'}).join('')+'</select></div>'
+ +'<div class="tabs">'+ABAS.map(function(a){return '<button data-a="'+a[0]+'" class="'+(S.aba===a[0]?'on':'')+'">'+e(a[1])+'</button>'}).join('')+'</div>';
+ var bq=nm(S.bq);
+ if(bq){var F=L.filter(function(it){return nm(it.ind.c+' '+it.ind.n+' '+it.secNome+' '+it.ind.rs+' '+it.ind.ap).indexOf(bq)>=0});h+='<div class="g box"><h2>Resultado da busca · '+F.length+'</h2>'+grade(F,R)+'</div>'}
+ else if(S.aba==='painel'){var c={l:0};PLC.ST.forEach(function(s){c[s]=0});L.forEach(function(it){var sts=PLC.grupos(it.ind).map(function(g){return PLC.stPer(R,it,[m],g)}).filter(Boolean);if(sts.length){c.l++;var p=PLC.ST.slice().reverse().filter(function(s){return sts.indexOf(s)>=0})[0];if(p)c[p]++}});
+  h+='<div class="kp">'+[['Indicadores',L.length],['Lançados no mês',c.l],['Atingido',c['Atingido'],'var(--ok)'],['Parcial',c['Parcial'],'var(--acc)'],['Insatisfatório',c['Insatisfatório'],'var(--warn)'],['Não atingido',c['Não atingido'],'var(--bad)']].map(function(x){return '<div class="g"><span>'+x[0]+'</span><b'+(x[2]?' style="color:'+x[2]+'"':'')+'>'+x[1]+'</b></div>'}).join('')+'</div>'
+  +'<div class="g box"><h2>Por setor · '+PLC.MN[+m-1]+'/2027</h2><table><thead><tr><th>Setor</th><th class="c">Indicadores</th><th class="c">Lançados</th><th class="c">Atingidos</th></tr></thead><tbody>'+ABAS.slice(1).map(function(a){var I2=L.filter(function(it){return it.sec===a[0]}),ln=0,at=0;I2.forEach(function(it){var s=PLC.grupos(it.ind).map(function(g){return PLC.stPer(R,it,[m],g)}).filter(Boolean);if(s.length){ln++;if(s.every(function(x){return x==='Atingido'}))at++}});return '<tr><td><b>'+e(a[1])+'</b></td><td class="c">'+I2.length+'</td><td class="c">'+ln+'</td><td class="c">'+at+'</td></tr>'}).join('')+'</tbody></table></div>'}
+ else{var objs=S.aba==='finq'?[['Financeiro',P.financeiro.obj]]:(function(){var s=P.secoes.filter(function(x){return x.id===S.aba})[0];return [['Clientes',s.quad.clientes],['Processos',s.quad.processos],['Pessoas',s.quad.pessoas]]})();
+  h+=objs.map(function(q){return (q[1]||[]).length?'<p class="q">'+q[0]+'</p>'+q[1].map(function(o){return '<div class="g box obj"><span class="ey">Objetivo '+e(o.c)+'</span><h3>'+e(o.n)+'</h3><p>Responsável: '+e(o.rs)+'</p>'+grade(L.filter(function(it){return it.obj===o}),R)+'</div>'}).join(''):''}).join('')}
+ h+='<footer>Somente leitura · status calculado pelas faixas de atingimento do documento oficial · atualiza a cada minuto</footer>';
+ el.innerHTML=h;
+ el.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){S.aba=b.getAttribute('data-a');S.bq='';desenha()}});
+ var i=document.getElementById('bq');i.oninput=function(){S.bq=i.value;desenha();var n=document.getElementById('bq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
+ document.getElementById('mes').onchange=function(ev){S.mes=ev.target.value;desenha()}}
+function carrega(){if(!T||!C.supabaseUrl){el.innerHTML='<div class="g msg">Link inválido. Peça um link novo para quem administra o Prumo.</div>';return}
+ fetch(C.supabaseUrl.replace(/\/+$/,'')+'/functions/v1/painel-publico?plan=1&t='+encodeURIComponent(T),{headers:{apikey:C.supabaseAnonKey||''},cache:'no-store'}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){
+  if(!x.ok||!x.j.def){el.innerHTML='<div class="g msg">'+(x.j&&x.j.erro==='link_invalido'?'Este link não está mais ativo. Peça um link novo para quem administra o Prumo.':'O planejamento não está disponível agora.')+'</div>';return}
+  DATA=x.j;if(!document.activeElement||document.activeElement.id!=='bq')desenha()}).catch(function(){if(!DATA)el.innerHTML='<div class="g msg">O planejamento não está disponível agora. Tente de novo em instantes.</div>'})}
+carrega();setInterval(carrega,60000);
+})();
+</script>
+</body>
+</html>

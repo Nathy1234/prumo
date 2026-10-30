@@ -21,6 +21,16 @@ Deno.serve(async (req) => {
   const adm = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
   const { data: cfgRow } = await adm.from('docs').select('data').eq('col', 'config').eq('id', 'estrutura').maybeSingle();
   const cfg = (cfgRow?.data || {}) as Doc, lp = cfg.linkPublico || {};
+  // Planejamento 2027: link próprio (CFG.planLink), só leitura: a base do planejamento e os resultados lançados.
+  if (new URL(req.url).searchParams.get('plan') === '1') {
+    const pl = cfg.planLink || {};
+    if (!pl.ativo || pl.token !== t) return resp({ erro: 'link_invalido' }, 404);
+    const { data: rows } = await adm.from('docs').select('id,data').eq('col', 'planej');
+    const def = (rows || []).find((r: Doc) => r.id === 'def');
+    const res: Record<string, unknown> = {};
+    (rows || []).forEach((r: Doc) => { if (r.id !== 'def') { const { v, man, obs, em, porNome } = r.data || {}; res[r.id] = { v, man, obs, em, porNome }; } });
+    return resp({ atualizado: new Date().toISOString(), depto: cfg.depto || 'Financeiro e Contábil', def: def?.data?.d || null, res });
+  }
   if (!lp.ativo || lp.token !== t) return resp({ erro: 'link_invalido' }, 404);
 
   const col = async (c: string) => { const { data } = await adm.from('docs').select('id,data').eq('col', c); return (data || []).map((r: Doc) => ({ id: r.id, ...r.data })); };

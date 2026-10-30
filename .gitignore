@@ -7,3 +7,4 @@ public/config.js
 node_modules/
 .vercel/
 .DS_Store
+dados/
