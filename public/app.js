@@ -700,14 +700,15 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=111;
+const PRUMO_ATUALIZACOES=112;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCriador()">Salvar</button></div></div>`;document.getElementById('ov').hidden=false}
-async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
+async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Relatório mais completo: escolha da reunião, chamados concluídos e ideias; diretor Alessandro'],
  ['2026-10-30','Aviso no canto da tela das reuniões do dia e 15 minutos antes'],
  ['2026-10-30','Cartões dos chamados mais compactos, com a etiqueta de chegada dentro do cartão'],
  ['2026-10-30','Chamados: visão Por data de entrega, com os em aberto separados por dia'],
@@ -833,8 +834,10 @@ const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa ta
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
 /* foto de quem é da equipe (pela conta ligada à pessoa); sem foto, a inicial */
-const uidDePessoa=pid=>{if(!pid)return null;const a=pid==='dir'?D.acessos.find(x=>x.perfil==='diretor'&&x.ativo!==false)?.id:D.acessos.find(x=>x.pessoa===pid)?.id;
- if(a&&PROF[a]?.avatarUrl)return a;if(real()&&ME.uid&&!S.sim&&(S.perfil===pid||(pid==='dir'&&dir()))&&PROF[ME.uid]?.avatarUrl)return ME.uid;
+const DIR_NOME=()=>CFG.diretorNome||'Alessandro';
+const ehDirNome=n=>{const a=norm(n||'').split(/\s+/)[0],b=norm(DIR_NOME()).split(/\s+/)[0];return !!a&&a===b};
+const uidDePessoa=pid=>{if(!pid)return null;const a=pid==='dir'?D.acessos.find(x=>x.perfil==='diretor'&&x.ativo!==false&&ehDirNome(PROF[x.id]?.name||x.nome||x.n))?.id:D.acessos.find(x=>x.pessoa===pid)?.id;
+ if(a&&PROF[a]?.avatarUrl)return a;if(real()&&ME.uid&&!S.sim&&((pid!=='dir'&&S.perfil===pid)||(pid==='dir'&&dir()&&ehDirNome(ME.nome)))&&PROF[ME.uid]?.avatarUrl)return ME.uid;
  const n=norm(pid==='dir'?'':(pessoa(pid)?.n||''));if(!n)return a;const p1=n.split(/\s+/)[0];
  const hit=Object.entries(PROF).find(([,p])=>p&&p.avatarUrl&&(norm(p.name||'')===n||norm(p.name||'').split(/\s+/)[0]===p1));return hit?hit[0]:a};
 const avP=(pid,nome,cls)=>{const u=uidDePessoa(pid),f=u&&PROF[u]?.avatarUrl;return fotoOk(f)?`<img class="av ${cls||''}" src="${f}" alt="">`:`<div class="av ${cls||''}">${esc((nome||'?')[0])}</div>`};
@@ -3145,7 +3148,7 @@ function linSug(s){const c=sugCat(s),cri=s.criado||(s.criadoEm||'').slice(0,10),
 /* tópicos: qualquer pessoa acrescenta o que não pode esquecer de falar no assunto */
 const topDe=s=>Array.isArray(s.topicos)?s.topicos:[];
 const reuKey=s=>s.reuData?`${s.reuData}|${s.reuHora||''}`:'';
-const reuTit=k=>{const [d,h]=k.split('|');return d?`Reunião de ${reuTxt(d,h)}`:'Assuntos sem reunião marcada'};
+const reuTit=k=>{if(k==='*')return 'Reuniões do período';const [d,h]=k.split('|');return d?`Reunião de ${reuTxt(d,h)}`:'Assuntos sem reunião marcada'};
 function reuCard(k,l){const it=l.filter(x=>reuKey(x)===k),pe=it.filter(x=>!sugFeita(x)),rs=it.reduce((a,x)=>a+topDe(x).length,0),d=k.split('|')[0],ev=d?proxReunioes(40).find(r=>`${r.d}|${r.h}`===k):null;
  const tag=!d?'':d===HJ?'<span class="tag ac">hoje</span>':d<HJ?(pe.length?'<span class="tag wa">já passou · há assuntos a falar</span>':'<span class="tag ok">realizada</span>'):'';
  return `<div class="panel reucard"><div class="ph"><h2>${esc(reuTit(k))}</h2>${tag}</div>${ev?.t&&!/^reuni[aã]o$/i.test(ev.t)?`<p class="meta" style="margin:0">${esc(ev.t)}</p>`:''}
@@ -3153,6 +3156,11 @@ function reuCard(k,l){const it=l.filter(x=>reuKey(x)===k),pe=it.filter(x=>!sugFe
  ${it.length?`<ul class="reuprev">${it.slice(0,4).map(x=>`<li class="${sugFeita(x)?'ok':''}">${esc(x.t)}${topDe(x).length?` <span class="meta">· ${topDe(x).length}</span>`:''}</li>`).join('')}${it.length>4?`<li class="meta">e mais ${it.length-4}</li>`:''}</ul>`:''}
  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" onclick="reuSheet('${esc(k)}')">${it.length?'Abrir reunião':'Abrir e criar assunto'}</button>${it.length&&podeReuExp()?`<button class="btn" onclick="baixarReu('${esc(k)}','rel')">Relatório</button><button class="btn" onclick="baixarReu('${esc(k)}','slides')">Slides</button>`:''}</div></div>`}
 /* relatório e slides da reunião (arquivos HTML que abrem no navegador; dá para imprimir ou salvar em PDF) */
+const reuItensK=(k,per)=>k==='*'?D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&x.reuData&&x.reuData>=per.de&&x.reuData<=per.ate).sort((a,b)=>reuKey(a).localeCompare(reuKey(b))):k?reuItens(k):[];
+/* reuniões que dá para escolher ao emitir: as dos últimos 60 dias e as próximas */
+function reuOpcoes(){const m=new Map();D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&x.reuData&&x.reuData>=addDia(HJ,-60)).forEach(x=>m.set(reuKey(x),1));proxReunioes(3).forEach(r=>m.set(`${r.d}|${r.h}`,1));
+ for(const e of D.eventos.filter(e=>e.tipo==='Reunião'&&vejoEv(e)&&evOcorre(e,HJ)))m.set(`${HJ}|${e.hora||''}`,1);
+ return [...m.keys()].sort().reverse()}
 const reuItens=k=>D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&reuKey(x)===k).sort((x,y)=>sugFeita(x)-sugFeita(y)||(x.criadoEm||x.criado||'').localeCompare(y.criadoEm||y.criado||''));
 const respQuando=x=>x.em?`${fmt(x.em.slice(0,10))} às ${new Date(x.em).toTimeString().slice(0,5)}`:'';
 const CSS_BASE=`:root{--ink:#16201E;--ink2:#3F4A48;--ink3:#5B6664;--acc:#C24E1C;--soft:#FDEEE6;--line:#DDE3E1;--bg:#F6F7F7}*{box-sizing:border-box}body{margin:0;font-family:Onest,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:#fff}`;
@@ -3193,7 +3201,7 @@ const CSS_DASH=`.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))
 const LOGO_X='<svg viewBox="0 0 120 120" aria-hidden="true"><rect x="8" y="8" width="88" height="104" rx="22" fill="#E4602B"/><path d="M28 36H76M28 56H68M28 76H52" stroke="#FDFFF8" stroke-width="9" stroke-linecap="round"/><circle cx="88" cy="88" r="26" fill="#161616" stroke="#FFFFFF" stroke-width="5"/><path d="M76 88l8 8l16-17" stroke="#E4602B" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const MARCA_URL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect x='8' y='8' width='88' height='104' rx='22' fill='%23E4602B'/%3E%3Cpath d='M28 36H76M28 56H68M28 76H52' stroke='%23FFFFFF' stroke-width='9' stroke-linecap='round'/%3E%3Ccircle cx='88' cy='88' r='26' fill='%233D3D3D'/%3E%3C/svg%3E";
 const deptoNome=()=>CFG.depto||'Financeiro e Contábil';
-const nomeDiretor=()=>{const u=uidDePessoa('dir');return (u&&PROF[u]?.name)||(dir()&&real()&&!S.sim&&ME.nome)||'Diretor'};
+const nomeDiretor=()=>{const u=uidDePessoa('dir'),n=u&&PROF[u]?.name;return n&&ehDirNome(n)?n:DIR_NOME()};
 // foto de quem está na equipe (ou a inicial, se a pessoa ainda não escolheu foto)
 function fotoX(pid,nome,px){px=px||36;const u=uidDePessoa(pid),f=u&&PROF[u]?.avatarUrl;
  return fotoOk(f)?`<img class="ft" style="width:${px}px;height:${px}px" src="${f}" alt="">`:`<span class="ft" style="width:${px}px;height:${px}px;font-size:${Math.round(px*.4)}px">${esc(String(nome||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?')}</span>`}
@@ -3255,7 +3263,9 @@ const CSS_X=`:root{--ink:#1E1E1E;--ink2:#4F4F4F;--ink3:#6B6B6B;--acc:#C24E1C;--a
 const LOGO_DATA='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect x="8" y="8" width="88" height="104" rx="22" fill="#E4602B"/><path d="M28 36H76M28 56H68M28 76H52" stroke="#FDFFF8" stroke-width="9" stroke-linecap="round"/><circle cx="88" cy="88" r="26" fill="#161616" stroke="#FFFFFF" stroke-width="5"/><path d="M76 88l8 8l16-17" stroke="#E4602B" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 const perReu=k=>{const d=k.split('|')[0],ate=d&&d<HJ?addDia(d,-1):HJ;return {de:addDia(ate,-6),ate,rot:'Semana'}};
 /* ---------- relatório ---------- */
-function htmlReuRel(k,per){per=per||perReu(k);const K=dashCh(per.de,per.ate),T=realizadoPer(null,per.de,per.ate),it=k?reuItens(k):[],pe=it.filter(x=>!sugFeita(x)),fa=it.filter(sugFeita);
+function htmlReuRel(k,per){per=per||perReu(k);const K=dashCh(per.de,per.ate),T=realizadoPer(null,per.de,per.ate),it=reuItensK(k,per),pe=it.filter(x=>!sugFeita(x)),fa=it.filter(sugFeita);
+ const ideias=D.sugestoes.filter(x=>sugCat(x)==='sistema'&&(x.e!=='Implantada'||((x.criado||(x.criadoEm||'').slice(0,10))>=per.de))).sort((a,b)=>(b.v||0)-(a.v||0));
+ const conc=D.chamados.filter(c=>c.st==='Concluído'&&(c.concl||'')>=per.de&&(c.concl||'')<=per.ate).sort((a,b)=>(b.concl||'').localeCompare(a.concl||''));
  const bloco=(x,i)=>{const R=topDe(x),cri=x.criado||(x.criadoEm||'').slice(0,10);
   return `<div class="glass as"><div class="hd"><span class="n">${i+1}</span><h3>${esc(x.t)}</h3><span class="st ${sugFeita(x)?'ok':''}">${sugFeita(x)?'Falado':'A falar'}</span></div>${x.obs?`<div class="tx">${htmlBlocos(blocosTxt(x.obs))}</div>`:''}<p class="meta">Sugerido por ${esc(sugAutor(x))}${cri?` em ${fmtAno(cri)}`:''}</p>
   ${R.length?`<div class="rs">${R.map(r=>`<div class="rr">${fotoX(r.por||pidDoNome(r.porNome),r.porNome||respNome(r.por),34)}<div class="tx"><b>${esc(r.porNome||respNome(r.por)||'Equipe')}</b><small>${r.em?respQuando(r):''}</small>${htmlBlocos(blocosTxt(r.txt))}</div></div>`).join('')}</div>`:''}<div class="enc"><b>Encaminhamento</b><div class="lin"></div><div class="lin"></div></div></div>`};
@@ -3277,10 +3287,12 @@ function htmlReuRel(k,per){per=per||perReu(k);const K=dashCh(per.de,per.ate),T=r
  ${K.pgF.length?`<div class="glass bloco"><h3>Pagamentos fora do D-5 <span class="cont">${K.pgF.length}</span></h3><div class="lista">${K.pgF.slice(0,10).map(x=>`<div class="li"><div class="tx"><b>${esc(x.c.assunto||'')}</b><small>${esc(x.p.just||'sem justificativa')}</small></div><span class="pill at">pago ${fmt(x.p.pg)}</span></div>`).join('')}</div></div>`:''}
  <h2>O que a equipe realizou</h2>${equipeX(per.de,per.ate)}
  <h2>Registro do cronograma</h2>${(()=>{const L=registrosCron(per.de,per.ate),R=regResumo(L);return `<div class="kgrid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="glass kcard"><span>Realizado no período</span><b>${R.tot}</b><small>${Object.entries(R.porS).map(([k,v])=>`${esc(k)} ${v}`).join(' · ')||'—'}</small></div><div class="glass kcard"><span>Feito no próprio dia</span><b>${R.pct===null?'—':R.pct+'%'}</b><small>${R.noDia} de ${R.tot}</small></div><div class="glass kcard"><span>Feito depois do dia</span><b>${R.dep}</b><small>${R.refs.length?'de '+R.refs.slice(0,5).join(', '):'nenhum'}</small></div></div><div class="glass bloco">${regTabela(L,40,'tbx')}</div>`})()}
- ${pe.length?`<h2>Pauta da reunião</h2>${pe.map(bloco).join('')}`:''}${fa.length?`<h2>Já falados</h2>${fa.map((x,i)=>bloco(x,pe.length+i)).join('')}`:''}
+ <h2>Chamados concluídos no período <span style="color:var(--ink3);letter-spacing:0">· ${conc.length}</span></h2>${conc.length?`<div class="glass bloco"><table class="tbx"><thead><tr><th>Protocolo</th><th>Demanda</th><th>Quem fez</th><th>Concluído</th><th>Prazo</th></tr></thead><tbody>${conc.slice(0,60).map(c=>{const sp=stPrazo(c);return `<tr><td>${esc(c.proto||'')}</td><td>${esc(c.assunto||'')}<br><small>${esc(c.dep?depNome(c.dep):remNomeCh(c)||'')}</small></td><td>${esc(respNome(quemFez(c))||'')}</td><td>${fmt(c.concl)}</td><td>${sp?esc(sp[1]):'—'}</td></tr>`}).join('')}</tbody></table>${conc.length>60?`<p class="meta">e mais ${conc.length-60}</p>`:''}</div>`:'<div class="glass bloco"><p class="meta" style="margin:0">Nenhum chamado concluído no período.</p></div>'}
+ ${k==='*'?(it.length?[...new Set(it.map(reuKey))].map(kk=>{const L=it.filter(x=>reuKey(x)===kk);return `<h2>${esc(reuTit(kk))}</h2>${L.map(bloco).join('')}`}).join(''):'<h2>Reuniões do período</h2><div class="glass bloco"><p class="meta" style="margin:0">Nenhum assunto de reunião no período.</p></div>'):`${pe.length?`<h2>Pauta da reunião</h2>${pe.map(bloco).join('')}`:''}${fa.length?`<h2>Já falados</h2>${fa.map((x,i)=>bloco(x,pe.length+i)).join('')}`:''}`}
+ <h2>Ideias para o sistema <span style="color:var(--ink3);letter-spacing:0">· ${ideias.length}</span></h2>${ideias.length?`<div class="glass bloco"><table class="tbx"><thead><tr><th>Ideia</th><th>Quem sugeriu</th><th>Situação</th><th>Apoios</th></tr></thead><tbody>${ideias.slice(0,40).map(x=>`<tr><td>${esc(x.t)}${x.obs?`<br><small>${esc(String(x.obs).slice(0,200))}</small>`:''}</td><td>${esc(sugAutor(x))}</td><td>${esc(x.e||'Nova')}</td><td>${x.v||0}</td></tr>`).join('')}</tbody></table></div>`:'<div class="glass bloco"><p class="meta" style="margin:0">Nenhuma ideia registrada.</p></div>'}
  </main></body></html>`}
 /* ---------- slides ---------- */
-function htmlReuSlides(k,per){per=per||perReu(k);const it=k?reuItens(k):[],[d,h]=(k||'').split('|'),K=dashCh(per.de,per.ate),T=realizadoPer(null,per.de,per.ate),tot=it.length;
+function htmlReuSlides(k,per){per=per||perReu(k);const it=reuItensK(k,per),[d,h]=(k&&k!=='*'?k:'').split('|'),K=dashCh(per.de,per.ate),T=realizadoPer(null,per.de,per.ate),tot=it.length;
  const quemR=r=>r.porNome||respNome(r.por)||'Equipe',pidR=r=>r.por||pidDoNome(r.porNome);
  const tit=t=>`<h2 class="${t.length>110?'t3':t.length>60?'t2':''}">${esc(t)}</h2>`;
  const topo=(ey)=>`<div class="sh"><div class="marca">${LOGO_X}<div><b>Prumo</b><small>${esc(deptoNome())}</small></div></div><span class="ey">${esc(ey)}</span></div>`;
@@ -3327,7 +3339,7 @@ function htmlReuSlides(k,per){per=per||perReu(k);const it=k?reuItens(k):[],[d,h]
  <script>(function(){var S=[].slice.call(document.querySelectorAll('section')),i=0,p=document.getElementById('pos');S.forEach(function(s,j){var g=s.querySelector('.pg');if(g)g.textContent=(j+1)+' / '+S.length});function ir(n){i=Math.max(0,Math.min(S.length-1,n));S.forEach(function(s,j){s.classList.toggle('on',j===i)});p.textContent=(i+1)+' / '+S.length}
  document.getElementById('ant').onclick=function(){ir(i-1)};document.getElementById('prox').onclick=function(){ir(i+1)};
  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();ir(i+1)}if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();ir(i-1)}if(e.key==='f'){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}});ir(0)})()</script></body></html>`}
-async function baixarReu(k,tipo,per){if(!podeReuExp()){toast('Relatório e slides estão liberados só para o admin e o diretor.');return}if(!DL){toast('O download não está disponível nesta visualização.');return}k=k||'';const nome=(k.split('|')[0]||(per?per.de+'-a-'+per.ate:HJ));
+async function baixarReu(k,tipo,per){if(!podeReuExp()){toast('Relatório e slides estão liberados só para o admin e o diretor.');return}if(!DL){toast('O download não está disponível nesta visualização.');return}k=k||'';const nome=(k!=='*'&&k.split('|')[0])||(per?per.de+'-a-'+per.ate:HJ);
  try{await DL.save({filename:`${tipo==='slides'?'slides':'relatorio'}-${k?'reuniao':'departamento'}-${nome}.html`,data:new Blob([tipo==='slides'?htmlReuSlides(k,per):htmlReuRel(k,per)],{type:'text/html'})});
   log(`Baixou ${tipo==='slides'?'os slides':'o relatório'} ${k?'da '+reuTit(k).toLowerCase():`do departamento (${per?fmtAno(per.de)+' a '+fmtAno(per.ate):''})`}`);toast(tipo==='slides'?'Slides baixados. Abra o arquivo e use as setas do teclado; F deixa em tela cheia.':'Relatório baixado. Abra no navegador; dá para imprimir ou salvar em PDF.',5000)}
  catch(e){toast('Não foi possível baixar.')}}
@@ -3390,13 +3402,13 @@ async function linkSalvar(on){if(!podeReuExp()||!DB)return;const tok=on?Array.fr
  const lp=on?{ativo:true,token:tok,criado:new Date().toISOString(),por:euNome()}:{ativo:false,token:'',desligado:new Date().toISOString(),por:euNome()};
  try{await DB.doc('config/estrutura').set({...CFG,linkPublico:lp});CFG.linkPublico=lp;log(on?'Criou um link público do painel (o anterior parou de funcionar)':'Desligou o link público do painel');toast(on?'Link criado':'Link desligado',3000);linkSheet()}
  catch(e){toast('Não foi possível salvar. Só administradores podem mudar a configuração.',5000)}}
-function emitirSheet(){if(!podeReuExp()){toast('Emitir relatório e slides está liberado só para o admin e o diretor.');return}FORM={tipo:'_emit'};const R=proxReunioes(1),k=R[0]?`${R[0].d}|${R[0].h}`:'';
+function emitirSheet(){if(!podeReuExp()){toast('Emitir relatório e slides está liberado só para o admin e o diretor.');return}FORM={tipo:'_emit'};const OP=reuOpcoes(),k=OP.find(x=>x.startsWith(HJ))||OP.find(x=>x.split('|')[0]<HJ)||OP[OP.length-1]||'';
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Para a reunião ou para o diretor</p><h2 id="sheet-title">Emitir relatório ou slides</h2><p class="sub" style="font-size:13px">Painel dos chamados, atrasos, o que a equipe realizou e, se quiser, a pauta da próxima reunião. Com o fundo, o logo e as fotos da equipe.</p></div>
  <div class="fgrid"><div class="full"><label class="lbl" for="em_per">Período</label><select class="inp" id="em_per"><option value="sem">Últimos 7 dias</option><option value="mes">Este mês até hoje</option><option value="ant">Mês passado</option><option value="tri">Trimestre</option></select></div>
- ${k?`<label class="perm full"><input type="checkbox" id="em_reu" checked><span><b>Incluir a pauta da ${esc(reuTit(k).toLowerCase())}</b><small>Os assuntos, quem sugeriu e as respostas da equipe.</small></span></label>`:''}</div>
- <div class="foot"><button class="btn" onclick="fechar()">Fechar</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="emitir('rel','${esc(k)}')">Baixar relatório</button><button class="btn pri" onclick="emitir('slides','${esc(k)}')">Baixar slides</button></div></div>`;
+ <div class="full"><label class="lbl" for="em_reu">Reunião</label><select class="inp" id="em_reu"><option value="*" ${k?'':'selected'}>Todas as reuniões do período</option>${OP.map(x=>`<option value="${esc(x)}" ${x===k?'selected':''}>${esc(reuTit(x))}${x.startsWith(HJ)?' (hoje)':''} · ${reuItens(x).length} ${reuItens(x).length===1?'assunto':'assuntos'}</option>`).join('')}<option value="">Sem reunião (só números)</option></select><p class="meta" style="margin:4px 0 0">Entram os assuntos, quem sugeriu e as respostas. O relatório também traz os chamados concluídos e as ideias para o sistema.</p></div></div>
+ <div class="foot"><button class="btn" onclick="fechar()">Fechar</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="emitir('rel')">Baixar relatório</button><button class="btn pri" onclick="emitir('slides')">Baixar slides</button></div></div>`;
  document.getElementById('ov').hidden=false}
-function emitir(tipo,k){const per=periodoEmit(val('em_per')),r=document.getElementById('em_reu');baixarReu(r&&r.checked?k:'',tipo,per)}
+function emitir(tipo){const per=periodoEmit(val('em_per'));baixarReu(val('em_reu')||'',tipo,per)}
 function reuSheet(k){FORM={tipo:'_reu',k};const sh=document.getElementById('sheet');sh.classList.add('sheet-reu');sh.innerHTML='';reuPaint(true);document.getElementById('ov').hidden=false;setTimeout(()=>document.getElementById('rq_t')?.focus(),50)}
 // redesenha a reunião sem perder o que está sendo digitado
 function reuPaint(novo){if(FORM?.tipo!=='_reu')return;const sh=document.getElementById('sheet'),k=FORM.k;
