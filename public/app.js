@@ -700,7 +700,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=112;
+const PRUMO_ATUALIZACOES=113;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -708,6 +708,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Aviso das reuniões também 5 minutos antes'],
  ['2026-10-30','Relatório mais completo: escolha da reunião, chamados concluídos e ideias; diretor Alessandro'],
  ['2026-10-30','Aviso no canto da tela das reuniões do dia e 15 minutos antes'],
  ['2026-10-30','Cartões dos chamados mais compactos, com a etiqueta de chegada dentro do cartão'],
@@ -2617,7 +2618,7 @@ async function fluxoTirar(id){const f=D.fluxo.find(x=>x.id===id);if(!f)return;if
 
 /* ---------- prazos e compromissos: fixos (toda semana, todo mês) ou de uma vez ---------- */
 const TIPOS_EV=['Reunião','Obrigação','Fechamento','Outro'];
-/* aviso no canto da tela: reuniões do dia (ao abrir o Prumo) e de novo 15 minutos antes */
+/* aviso no canto da tela: reuniões do dia (ao abrir o Prumo), 15 minutos antes e 5 minutos antes */
 const reuAvKey=(id,f)=>`reuAv:${id}:${HJ}:${f}`;
 const reuAvVisto=k=>{try{return localStorage.getItem(k)==='1'}catch(e){return !!(window.__reuAv||{})[k]}};
 function reuAvFecha(k){try{localStorage.setItem(k,'1')}catch(e){}(window.__reuAv=window.__reuAv||{})[k]=1;reuAviso()}
@@ -2627,7 +2628,7 @@ function reuAviso(){let box=document.getElementById('reuav');
  const ag=new Date(),min=ag.getHours()*60+ag.getMinutes(),mm=h=>{const m=/^(\d{1,2}):(\d{2})/.exec(h||'');return m?+m[1]*60+ +m[2]:null};
  const L=[];for(const e of D.eventos.filter(e=>e.tipo==='Reunião'&&vejoEv(e)&&evOcorre(e,HJ))){const h=mm(e.hora),falta=h===null?null:h-min;
   if(falta!==null&&falta<-30)continue;
-  const fase=falta!==null&&falta<=15?'antes':'dia',k=reuAvKey(e.id,fase);if(reuAvVisto(k))continue;
+  const fase=falta!==null&&falta<=5?'antes5':falta!==null&&falta<=15?'antes':'dia',k=reuAvKey(e.id,fase);if(reuAvVisto(k))continue;
   L.push({e,k,falta})}
  L.sort((a,b)=>(a.e.hora||'99')<(b.e.hora||'99')?-1:1);
  for(const {e,k,falta} of L){const kn=k+':win';if(reuAvVisto(kn))continue;
