@@ -685,7 +685,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=103;
+const PRUMO_ATUALIZACOES=104;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -693,6 +693,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','A área Melhorias passou a se chamar Reuniões e ideias'],
  ['2026-10-30','Equipe no trimestre leva ao calendário filtrado por pessoa ou etapa; L, B e C em dia conta todos os dias úteis'],
  ['2026-10-29','Link público do painel, ao vivo e sem login'],
  ['2026-10-29','Só as etapas do fluxo (L, B, C e Pagar) contam no realizado'],
@@ -2649,7 +2650,7 @@ async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FOR
  const e=D.eventos.find(x=>x.id===FORM.id);try{await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
 
 /* ---------- telas ---------- */
-const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Melhorias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['sistema','Sobre o sistema'],['usuarios','Usuários e permissões'],['backup','Backup']];
+const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe e metas'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Reuniões e ideias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['sistema','Sobre o sistema'],['usuarios','Usuários e permissões'],['backup','Backup']];
 const MENU_SOL=[['abrir','Abrir chamado'],['meus','Meus chamados'],['alertas','Notificações']];
 const MENU_PERM={realizadas:'realizadas',whats:'whats',relat:'relat',indicadores:'relat',logs:'logs',chamados:'chamados',triagem:'email',bancos:'antifraude',fechamento:'fechamento'};
 const NAO_OCULTA=['painel','usuarios','sistema'];
@@ -3037,7 +3038,7 @@ proc(){const b=S.busca.toLowerCase(),l=D.procedimentos.filter(p=>(p.t+' '+p.a).t
 
 melhorias(){const ab=S.sugAba==='sistema'?'sistema':'reuniao',l=D.sugestoes.filter(s=>sugCat(s)===ab);
  const tabs=`<div class="tabs big" role="tablist" aria-label="Tipo de sugestão">${SUG_CAT.map(([k,n])=>{const q=D.sugestoes.filter(s=>sugCat(s)===k&&!sugFeita(s)).length;return `<button role="tab" aria-selected="${ab===k}" class="${ab===k?'on':''}" onclick="S.sugAba='${k}';render()">${n} <span class="meta">${q}</span></button>`}).join('')}</div>`;
- const topo=head('Ideias da equipe','Melhorias e sugestões','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`${podeAdmin()?`<button class="btn ghost" onclick="libReuExp()" title="Quem pode baixar o relatório e os slides das reuniões">Relatório e slides: ${CFG.reuExpTodos?'liberados para a equipe':'só admin e diretor'}</button>`:''}<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
+ const topo=head('Equipe','Reuniões e ideias','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`${podeAdmin()?`<button class="btn ghost" onclick="libReuExp()" title="Quem pode baixar o relatório e os slides das reuniões">Relatório e slides: ${CFG.reuExpTodos?'liberados para a equipe':'só admin e diretor'}</button>`:''}<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
  if(!l.length)return topo+`<div class="panel">${vazio(ab==='reuniao'?'Nenhum assunto para as reuniões':'Nenhuma ideia para o sistema',ab==='reuniao'?'Anote aqui o que precisa ser falado e escolha em qual reunião.':'Toda ideia de melhoria começa aqui.')}</div>`;
  if(ab==='sistema')return topo+`<div class="panel">${[...l].sort((x,y)=>sugFeita(x)-sugFeita(y)||(y.v||0)-(x.v||0)).map(linSug).join('')}</div>`;
  const R=proxReunioes(4),ks=new Set([...R.map(r=>`${r.d}|${r.h}`),...l.map(reuKey)]);
@@ -3085,7 +3086,7 @@ function cobrar(id){const e=D.entregas.find(x=>x.id===id);if(!e)return;const dp=
 function ap(id){patch('mensagens',id,{s:'aprovada'},'Mensagem aprovada e agendada',`Aprovou mensagem de WhatsApp para ${D.mensagens.find(m=>m.id===id)?.para||''}`)}
 function fb(id){patch('equipe',id,{f:'Realizado',fd:HJ},'Feedback registrado',`Registrou feedback de ${nomeDe(id)}`)}
 /* ---------- melhorias: assuntos para as reuniões e ideias para o sistema ---------- */
-const SUG_CAT=[['reuniao','Para reuniões'],['sistema','Para o sistema']];
+const SUG_CAT=[['reuniao','Reuniões'],['sistema','Ideias para o sistema']];
 const SUG_ST={reuniao:['A falar','Falado'],sistema:['Nova','Em análise','Em teste','Implantada']};
 const sugCat=s=>s.cat==='sistema'?'sistema':'reuniao';
 const sugFeita=s=>sugCat(s)==='reuniao'?s.e==='Falado':s.e==='Implantada';
@@ -3357,7 +3358,7 @@ function reuPaint(novo){if(FORM?.tipo!=='_reu')return;const sh=document.getEleme
  const ae=document.activeElement,fid=ae&&sh.contains(ae)?ae.id:null,pos=fid&&ae.selectionStart!=null?[ae.selectionStart,ae.selectionEnd]:null,top=sh.scrollTop;
  const it=D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&reuKey(x)===k).sort((x,y)=>sugFeita(x)-sugFeita(y)||(x.criadoEm||x.criado||'').localeCompare(y.criadoEm||y.criado||''));
  const pe=it.filter(x=>!sugFeita(x)).length;
- sh.innerHTML=`<div><p class="eyebrow">Melhorias · reunião da equipe</p><h2 id="sheet-title">${esc(reuTit(k))}</h2><p class="sub" style="font-size:13px">${it.length?`${pe} ${pe===1?'assunto a falar':'assuntos a falar'} de ${it.length}. Responda em cada assunto o que não pode esquecer.`:'Nenhum assunto ainda. Crie o primeiro.'}</p>${it.length&&podeReuExp()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="baixarReu(FORM.k,'rel')">Relatório (HTML)</button><button class="btn" onclick="baixarReu(FORM.k,'slides')">Slides para apresentar</button></div>`:''}</div>
+ sh.innerHTML=`<div><p class="eyebrow">Reuniões e ideias · reunião da equipe</p><h2 id="sheet-title">${esc(reuTit(k))}</h2><p class="sub" style="font-size:13px">${it.length?`${pe} ${pe===1?'assunto a falar':'assuntos a falar'} de ${it.length}. Responda em cada assunto o que não pode esquecer.`:'Nenhum assunto ainda. Crie o primeiro.'}</p>${it.length&&podeReuExp()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="baixarReu(FORM.k,'rel')">Relatório (HTML)</button><button class="btn" onclick="baixarReu(FORM.k,'slides')">Slides para apresentar</button></div>`:''}</div>
  <div class="reunovo"><label class="lbl" for="rq_t">Novo assunto</label><input class="inp" id="rq_t" maxlength="200" placeholder="O que precisa ser falado nesta reunião" onkeydown="if(event.key==='Enter'){event.preventDefault();reuNovo()}"><textarea class="inp" id="rq_obs" rows="2" maxlength="5000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,420)+'px'" placeholder="Detalhes · opcional"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn pri" onclick="reuNovo()">Criar assunto</button></div></div>
  ${it.map(reuAssunto).join('')}
  <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;
@@ -3389,7 +3390,7 @@ function sugSheet(id,cat){document.getElementById('sheet').classList.remove('she
  const aut=s?(s.a||'dir'):(dir()?'dir':S.perfil),A=autoresSug();if(aut&&!A.some(x=>x[0]===aut))A.push([aut,respNome(aut)]);
  const cri=s?(s.criado||(s.criadoEm||'').slice(0,10)):HJ;
  const st=k=>`<select class="inp" id="sg_e_${k}">${SUG_ST[k].map(x=>`<option ${x===(s?.e)?'selected':''}>${x}</option>`).join('')}${s?.e&&sugCat(s)===k&&!SUG_ST[k].includes(s.e)?`<option selected>${esc(s.e)}</option>`:''}</select>`;
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Melhorias e sugestões</p><h2 id="sheet-title">${c==='reuniao'?(s?'Editar assunto':'Novo assunto'):(s?'Editar sugestão':'Nova sugestão')}</h2></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Reuniões e ideias</p><h2 id="sheet-title">${c==='reuniao'?(s?'Editar assunto':'Novo assunto'):(s?'Editar sugestão':'Nova sugestão')}</h2></div>
  <div class="fgrid">
   <div class="full"><label class="lbl" for="sg_t">${c==='reuniao'?'Assunto':'Sugestão'}</label><input class="inp" id="sg_t" maxlength="200" value="${esc(s?.t||'')}" placeholder="${c==='reuniao'?'Combinar a ordem das conferências na semana do fechamento':'Avisar no celular quando chegar chamado novo'}"><p class="ferr" id="sge_t"></p></div>
   <div class="full"><label class="lbl" for="sg_obs">Detalhes · opcional</label>${c==='reuniao'?'<p class="meta" style="margin:0 0 4px">Depois de salvar, qualquer pessoa da equipe pode responder neste assunto abrindo a reunião.</p>':''}<textarea class="inp" id="sg_obs" rows="3" maxlength="5000">${esc(s?.obs||'')}</textarea></div>
