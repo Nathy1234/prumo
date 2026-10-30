@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=134;
+const PRUMO_ATUALIZACOES=135;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra. Na gestão de pessoas, acompanha a evolução de cada colaborador pelos feedbacks e cria rascunhos de feedback no modelo feedforward, inclusive com uma IA que roda no próprio computador e lê só os dados do Prumo.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
@@ -721,7 +721,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','Sobre o sistema atualizado com as áreas novas'],
+  ['2026-10-30','Excluir reunião: sai do calendário e os assuntos voltam para sem reunião marcada'],
+ ['2026-10-30','Sobre o sistema atualizado com as áreas novas'],
  ['2026-10-30','Feedback automático no modelo feedforward: pontos fortes, resumo curto e o que fazer daqui para frente'],
  ['2026-10-30','IA do Prumo: escreve o feedback no próprio computador, lendo só os dados do sistema'],
  ['2026-10-30','Feedback automático: rascunho com o que a pessoa realizou, ausências e observações, para o diretor revisar'],
@@ -3381,7 +3382,7 @@ function reuCard(k,l){const it=l.filter(x=>reuKey(x)===k),pe=it.filter(x=>!sugFe
  return `<div class="panel reucard"><div class="ph"><h2>${esc(reuTit(k))}</h2>${tag}</div>${ev?.t&&!/^reuni[aã]o$/i.test(ev.t)?`<p class="meta" style="margin:0">${esc(ev.t)}</p>`:''}
  <p class="reunum">${it.length?`<b>${pe.length}</b> ${pe.length===1?'assunto a falar':'assuntos a falar'} · <b>${it.length-pe.length}</b> ${it.length-pe.length===1?'falado':'falados'} · <b>${rs}</b> ${rs===1?'resposta':'respostas'}`:'Nenhum assunto ainda.'}</p>
  ${it.length?`<ul class="reuprev">${it.slice(0,4).map(x=>`<li class="${sugFeita(x)?'ok':''}">${esc(x.t)}${topDe(x).length?` <span class="meta">· ${topDe(x).length}</span>`:''}</li>`).join('')}${it.length>4?`<li class="meta">e mais ${it.length-4}</li>`:''}</ul>`:''}
- <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" onclick="reuSheet('${esc(k)}')">${it.length?'Abrir reunião':'Abrir e criar assunto'}</button>${it.length&&podeReuExp()?`<button class="btn" onclick="baixarReu('${esc(k)}','rel')">Relatório</button><button class="btn" onclick="baixarReu('${esc(k)}','slides')">Slides</button>`:''}</div></div>`}
+ <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" onclick="reuSheet('${esc(k)}')">${it.length?'Abrir reunião':'Abrir e criar assunto'}</button>${reuPodeExcluir(k)?`<button class="btn ghost" onclick="reuSheet('${esc(k)}');setTimeout(()=>document.getElementById('breudel')?.scrollIntoView({block:'center'}),150)" title="Excluir esta reunião">Excluir</button>`:''}${it.length&&podeReuExp()?`<button class="btn" onclick="baixarReu('${esc(k)}','rel')">Relatório</button><button class="btn" onclick="baixarReu('${esc(k)}','slides')">Slides</button>`:''}</div></div>`}
 /* relatório e slides da reunião (arquivos HTML que abrem no navegador; dá para imprimir ou salvar em PDF) */
 const reuItensK=(k,per)=>k==='*'?D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&x.reuData&&x.reuData>=per.de&&x.reuData<=per.ate).sort((a,b)=>reuKey(a).localeCompare(reuKey(b))):k?reuItens(k):[];
 /* reuniões que dá para escolher ao emitir: as dos últimos 60 dias e as próximas */
@@ -3667,6 +3668,17 @@ function emitirSheet(){if(!podeReuExp()){toast('Emitir relatório e slides está
  <div class="foot"><button class="btn" onclick="fechar()">Fechar</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="emitir('rel')">Baixar relatório</button><button class="btn pri" onclick="emitir('slides')">Baixar slides</button></div></div>`;
  document.getElementById('ov').hidden=false}
 function emitir(tipo){const per=periodoEmit(val('em_per'));baixarReu(val('em_reu')||'',tipo,per)}
+/* excluir uma reunião: tira o compromisso do calendário; os assuntos não são apagados, voltam para "sem reunião marcada" */
+const reuEventos=k=>{const [d,h]=k.split('|');return D.eventos.filter(e=>e.tipo==='Reunião'&&evOcorre(e,d)&&(e.hora||'')===(h||''))};
+const reuPodeExcluir=k=>!!k&&k!=='*'&&!!k.split('|')[0]&&(podeAdmin()||dir()||reuEventos(k).some(souCriador)||(D.sugestoes.filter(x=>reuKey(x)===k).every(x=>x.criadoUid?x.criadoUid===ME.uid:x.criadoPor===S.perfil)&&!reuEventos(k).length));
+async function reuExcluir(k){if(!reuPodeExcluir(k))return;const b=document.getElementById('breudel');
+ const ev=reuEventos(k),rep=ev.filter(e=>e.rep&&e.rep!=='unica'),uni=ev.filter(e=>!e.rep||e.rep==='unica'),its=D.sugestoes.filter(x=>reuKey(x)===k);
+ if(rep.length&&!uni.length){toast('Esta reunião se repete. Abra o compromisso no Calendário para mudar ou excluir a série.',6000);fechar();editEv(rep[0].id);return}
+ if(b&&!b.dataset.ok){b.dataset.ok='1';b.textContent=its.length?`Confirmar: excluir e deixar ${its.length} ${its.length===1?'assunto':'assuntos'} sem reunião`:'Confirmar exclusão';return}
+ try{for(const e of uni)await DB.collection('eventos').doc(e.id).delete();
+  for(const x of its)await patch('sugestoes',x.id,{reuData:'',reuHora:''},null,false);
+  log(`Excluiu a ${reuTit(k).toLowerCase()}${its.length?` (${its.length} ${its.length===1?'assunto voltou':'assuntos voltaram'} para sem reunião marcada)`:''}`);toast('Reunião excluída');fechar();render()}
+ catch(e){toast('Não foi possível excluir a reunião.')}}
 function reuSheet(k){FORM={tipo:'_reu',k};const sh=document.getElementById('sheet');sh.classList.add('sheet-reu');sh.innerHTML='';reuPaint(true);document.getElementById('ov').hidden=false;setTimeout(()=>document.getElementById('rq_t')?.focus(),50)}
 // redesenha a reunião sem perder o que está sendo digitado
 function reuPaint(novo){if(FORM?.tipo!=='_reu')return;const sh=document.getElementById('sheet'),k=FORM.k;
@@ -3677,7 +3689,7 @@ function reuPaint(novo){if(FORM?.tipo!=='_reu')return;const sh=document.getEleme
  sh.innerHTML=`<div><p class="eyebrow">Reuniões e ideias · reunião da equipe</p><h2 id="sheet-title">${esc(reuTit(k))}</h2><p class="sub" style="font-size:13px">${it.length?`${pe} ${pe===1?'assunto a falar':'assuntos a falar'} de ${it.length}. Responda em cada assunto o que não pode esquecer.`:'Nenhum assunto ainda. Crie o primeiro.'}</p>${it.length&&podeReuExp()?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="baixarReu(FORM.k,'rel')">Relatório (HTML)</button><button class="btn" onclick="baixarReu(FORM.k,'slides')">Slides para apresentar</button></div>`:''}</div>
  <div class="reunovo"><label class="lbl" for="rq_t">Novo assunto</label><input class="inp" id="rq_t" maxlength="200" placeholder="O que precisa ser falado nesta reunião" onkeydown="if(event.key==='Enter'){event.preventDefault();reuNovo()}"><textarea class="inp" id="rq_obs" rows="2" maxlength="5000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,420)+'px'" placeholder="Detalhes · opcional"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn pri" onclick="reuNovo()">Criar assunto</button></div></div>
  ${it.map(reuAssunto).join('')}
- <div class="foot"><span></span><button class="btn" onclick="fechar()">Fechar</button></div>`;
+ <div class="foot">${reuPodeExcluir(k)?`<button class="btn danger" id="breudel" onclick="reuExcluir('${esc(k)}')">Excluir reunião</button>`:'<span></span>'}<button class="btn" onclick="fechar()">Fechar</button></div>`;
  for(const [id,[v,hh]] of Object.entries(vals)){const el=document.getElementById(id);if(el&&v){el.value=v;if(hh)el.style.height=hh}}
  sh.scrollTop=top;if(fid){const el=document.getElementById(fid);if(el){el.focus();try{if(pos)el.setSelectionRange(pos[0],pos[1])}catch(e){}}}}
 function reuAssunto(s){const fe=sugFeita(s),sid=esc(s.id),T=topDe(s),cri=s.criado||(s.criadoEm||'').slice(0,10);
