@@ -713,14 +713,15 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=122;
+const PRUMO_ATUALIZACOES=123;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
  <div class="foot"><span></span><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaCriador()">Salvar</button></div></div>`;document.getElementById('ov').hidden=false}
-async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
+async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Reuniões enviam convite no Outlook e Teams, com lembrete mesmo com o Prumo fechado'],
  ['2026-10-30','Reunião só com quem você escolher: aparece e avisa só para os participantes'],
  ['2026-10-30','Destaques idênticos aparecem uma vez só'],
  ['2026-10-30','Destaques do mês no Painel, com a foto grande, logo abaixo da Equipe no trimestre'],
@@ -2694,7 +2695,9 @@ function editEv(id){const e=id?D.eventos.find(x=>x.id===id):{tipo:'Reunião',rep
  <div id="evw_fim"><label class="lbl" for="ev_fim">Até · opcional</label><input class="inp" id="ev_fim" type="date" value="${esc(e.fim||'')}"><p class="meta" style="margin:4px 0 0">Vazio: continua valendo.</p></div>
  <div class="full"><span class="lbl">Quem vê</span><div class="cks"><label class="ck"><input type="radio" name="ev_quem" id="ev_q_todos" value="todos" ${e.quem!=='pessoas'?'checked':''} onchange="evVis()"> Todos</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_ps" value="pessoas" ${e.quem==='pessoas'?'checked':''} onchange="evVis()"> Só com quem eu escolher</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_eu" value="eu" ${e.quem==='eu'?'checked':''} onchange="evVis()"> Só para mim</label></div><p class="meta" style="margin:4px 0 0">Só com quem eu escolher: aparece e avisa no canto da tela só para você e para as pessoas marcadas. Só para mim: ninguém mais vê.</p></div>
  <div class="full" id="evw_ps"><span class="lbl">Com quem</span><div class="cks">${[{id:'dir',n:DIR_NOME()+' (diretor)'},...colabs()].map(p=>ck('ev_p_'+p.id,(e.ps||[]).includes(p.id),p.n)).join('')}</div><p class="ferr" id="eve_ps"></p></div>
- <div class="full"><label class="lbl" for="ev_obs">Observação · opcional</label><input class="inp" id="ev_obs" value="${esc(e.obs||'')}" placeholder="Sala 2 ou link do Teams"></div><p class="ferr full" id="eve_rep"></p></div>
+ <div class="full"><label class="lbl" for="ev_obs">Observação · opcional</label><input class="inp" id="ev_obs" value="${esc(e.obs||'')}" placeholder="Sala 2 ou link do Teams"></div>
+ ${real()&&window.portalCalendario?`<div><label class="lbl" for="ev_dur">Duração</label><select class="inp" id="ev_dur">${[[30,'30 min'],[60,'1 hora'],[90,'1h30'],[120,'2 horas']].map(([v,l])=>`<option value="${v}" ${v===(+e.dur||60)?'selected':''}>${l}</option>`).join('')}</select></div>
+ <label class="perm full"><input type="checkbox" id="ev_conv" ${e.outlookId||(!id&&e.tipo==='Reunião')?'checked':''}><span><b>Enviar convite no Outlook e Teams</b><small>Vai para o calendário de quem participa, com link do Teams e lembrete 15 minutos antes, que aparece no computador e no celular mesmo com o Prumo fechado. Precisa de horário.</small></span></label>`:''}<p class="ferr full" id="eve_rep"></p></div>
  <div class="foot"><div>${id&&podeEditRot()?`<button class="btn danger" id="bdel" onclick="delEv()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaEv()">${id?'Salvar alterações':'Registrar'}</button></div></div>`;
  document.getElementById('ov').hidden=false;evVis();setTimeout(()=>document.getElementById('ev_t')?.focus(),30)}
 function evVis(){const r=val('ev_rep'),sh=(i,on)=>{const x=document.getElementById(i);if(x)x.style.display=on?'':'none'};
@@ -2709,10 +2712,35 @@ async function salvaEv(){['eve_t','eve_ps','eve_rep'].forEach(x=>errEl(x,''));
  if(rep==='mensal'&&!(n>=1&&n<=31)){errEl('eve_rep','Use um dia de 1 a 31.');ok=false}
  if(fim&&fim<data){errEl('eve_rep','A data final é antes do início.');ok=false}
  if(quem==='pessoas'&&!ps.length){errEl('eve_ps','Escolha ao menos uma pessoa.');ok=false}
+ const conv=!!document.getElementById('ev_conv')?.checked;if(conv&&!val('ev_hora')){errEl('eve_rep','Para enviar o convite no Outlook, informe o horário.');ok=false}
  if(!ok)return;const ant=FORM.id?D.eventos.find(x=>x.id===FORM.id):null,{id:_,...b}=ant||{criado:HJ,criadoPor:S.perfil,criadoUid:ME.uid||null,criadoNome:pessoa(S.perfil)?.n||ME.nome||quemSou()};
- if(await salvar('eventos',FORM.id||null,{...b,t,tipo:val('ev_tipo'),rep,data,dias,n,hora:val('ev_hora'),fim,quem,ps:quem==='pessoas'?ps:[],obs:val('ev_obs')},ant?'Alterações salvas':'Registrado',`${ant?'Alterou':'Registrou'} o prazo "${t}" (${rep==='unica'?fmt(data):REP_EV.find(x=>x[0]===rep)[1].toLowerCase()})`))fechar()}
+ const eid=FORM.id||('ev'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)),dados={...b,t,tipo:val('ev_tipo'),rep,data,dias,n,hora:val('ev_hora'),fim,quem,ps:quem==='pessoas'?ps:[],obs:val('ev_obs'),dur:+val('ev_dur')||+b.dur||60};
+ if(conv||ant?.outlookId)setTimeout(()=>outlookEv(eid,conv,{...dados,outlookId:ant?.outlookId||''}),800);
+ if(await salvar('eventos',eid,dados,ant?'Alterações salvas':'Registrado',`${ant?'Alterou':'Registrou'} o prazo "${t}" (${rep==='unica'?fmt(data):REP_EV.find(x=>x[0]===rep)[1].toLowerCase()})`))fechar()}
+/* convite no Outlook/Teams: cria, atualiza ou cancela no calendário de quem marcou; os participantes recebem o convite */
+const emailDir=()=>CFG.diretorEmail||D.acessos.find(a=>a.perfil==='diretor'&&a.ativo!==false&&ehDirNome(PROF[a.id]?.name||a.nome||a.n))?.email||'';
+const emailDePid=pid=>pid==='dir'?emailDir():(pessoa(pid)?.email||'');
+async function outlookEv(id,enviar,dados){const e=dados?{id,...(D.eventos.find(x=>x.id===id)||{}),...dados}:D.eventos.find(x=>x.id===id);if(!e||!window.portalCalendario)return;
+ const meu=String(ME.email||'').toLowerCase();
+ if(!enviar){if(e.outlookId){try{await window.portalCalendario('DELETE','/me/events/'+encodeURIComponent(e.outlookId));await patch('eventos',id,{outlookId:''},null,false);toast('Convite cancelado no Outlook')}catch(x){}}return}
+ if(!e.hora)return;
+ const pids=e.quem==='eu'?[]:e.quem==='pessoas'?(e.ps||[]):['dir',...colabs().map(p=>p.id)];
+ const emails=[...new Set(pids.map(emailDePid).map(x=>String(x||'').trim().toLowerCase()).filter(x=>x&&x.includes('@')&&x!==meu))];
+ const sem=pids.filter(p=>!emailDePid(p)).map(p=>p==='dir'?DIR_NOME():nomeDe(p));
+ const ini=`${e.data||HJ}T${e.hora}:00`,fimD=new Date(new Date(`${e.data||HJ}T${e.hora}:00`).getTime()+(+e.dur||60)*60e3),fim=`${isoD(fimD)}T${pad(fimD.getHours())}:${pad(fimD.getMinutes())}:00`,TZ='E. South America Standard Time';
+ const DS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+ const rec=e.rep==='semanal'?{pattern:{type:'weekly',interval:1,daysOfWeek:(e.dias||[]).map(d=>DS[+d])},range:e.fim?{type:'endDate',startDate:e.data||HJ,endDate:e.fim}:{type:'noEnd',startDate:e.data||HJ}}
+  :e.rep==='mensal'?{pattern:{type:'absoluteMonthly',interval:1,dayOfMonth:+e.n||1},range:e.fim?{type:'endDate',startDate:e.data||HJ,endDate:e.fim}:{type:'noEnd',startDate:e.data||HJ}}:null;
+ const corpo={subject:e.t,body:{contentType:'text',content:`${e.obs?e.obs+'\n\n':''}Marcada no Prumo por ${e.criadoNome||euNome()}.`},start:{dateTime:ini,timeZone:TZ},end:{dateTime:fim,timeZone:TZ},
+  attendees:emails.map(a=>({emailAddress:{address:a},type:'required'})),isReminderOn:true,reminderMinutesBeforeStart:15,...(rec?{recurrence:rec}:{}),...(e.obs?{location:{displayName:e.obs.slice(0,100)}}:{})};
+ const envia=async c=>e.outlookId?window.portalCalendario('PATCH','/me/events/'+encodeURIComponent(e.outlookId),c):window.portalCalendario('POST','/me/events',c);
+ try{let r;try{r=await envia({...corpo,isOnlineMeeting:true,onlineMeetingProvider:'teamsForBusiness'})}catch(x){if(x?.code==='blocked_by_policy'||x?.code==='needs_reauth'||x?.code==='server_not_connected')throw x;r=await envia(corpo)}
+  if(r?.id&&r.id!==e.outlookId)await patch('eventos',id,{outlookId:r.id},null,false);
+  log(`${e.outlookId?'Atualizou':'Enviou'} o convite no Outlook de "${e.t}"${emails.length?' para '+emails.length+' '+(emails.length>1?'pessoas':'pessoa'):''}`);
+  toast(`Convite ${e.outlookId?'atualizado':'enviado'} no Outlook${emails.length?` para ${emails.length} ${emails.length>1?'pessoas':'pessoa'}`:''}.${sem.length?` Sem e-mail cadastrado: ${sem.join(', ')}.`:''}`,6000)}
+ catch(x){toast(x?.code==='blocked_by_policy'||x?.code==='tool_error'?'O Outlook não deixou criar o convite: falta liberar a permissão de calendário (Calendars.ReadWrite) no Azure.':x?.code==='needs_reauth'||x?.code==='server_not_connected'?'Para enviar o convite, entre de novo com a conta Microsoft (sair e entrar).':'Não foi possível enviar o convite no Outlook agora. A reunião ficou salva no Prumo.',8000)}}
 async function delEv(){const b=document.getElementById('bdel');if(!FORM.del){FORM.del=true;b.textContent='Confirmar exclusão';return}
- const e=D.eventos.find(x=>x.id===FORM.id);try{await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
+ const e=D.eventos.find(x=>x.id===FORM.id);try{if(e?.outlookId&&window.portalCalendario){try{await window.portalCalendario('DELETE','/me/events/'+encodeURIComponent(e.outlookId));toast('Convite cancelado no Outlook')}catch(x){}}await DB.collection('eventos').doc(FORM.id).delete();log(`Excluiu o prazo "${e?.t||''}"`);toast('Excluído');fechar()}catch(x){toast('Não foi possível excluir.')}}
 
 /* ---------- telas ---------- */
 const MENU=[['painel','Painel'],['alertas','Alertas'],['ferramentas','Ferramentas'],['chamados','Chamados'],['rotinas','Cronograma'],['metas','Metas e a fazer'],['entregas','Entregas dos departamentos'],['destaques','Destaques do mês'],['fechamento','Fechamento D+N'],['calendario','Calendário'],['equipe','Equipe'],['feedbacks','Feedbacks'],['realizadas','Demandas realizadas'],['bancos','Troca de dados bancários'],['whats','WhatsApp'],['proc','Procedimentos'],['melhorias','Reuniões e ideias'],['relat','Relatórios'],['indicadores','Indicadores por área'],['logs','Registro de atividades'],['sistema','Sobre o sistema'],['usuarios','Usuários e permissões'],['backup','Backup']];
@@ -3621,7 +3649,7 @@ async function conectarEmail(){FORM={tipo:'_conectar'};const sh=document.getElem
  const pedido=`Preciso registrar o sistema Prumo no Microsoft Entra ID para ele ler e enviar e-mails pelo Outlook com a conta de cada usuário.
 
 1. App registrations > New registration: nome Prumo, somente esta organização. Redirect URI (Web): ${cb}
-2. API permissions > Microsoft Graph > Delegated: openid, profile, email, offline_access, User.Read, Mail.Read, Mail.Read.Shared, Mail.Send. Depois, Grant admin consent.
+2. API permissions > Microsoft Graph > Delegated: openid, profile, email, offline_access, User.Read, Mail.Read, Mail.Read.Shared, Mail.Send, Calendars.ReadWrite. Depois, Grant admin consent.
 3. Certificates & secrets: criar um Client secret.
 4. Me passar o Application (client) ID e o Directory (tenant) ID. O valor do secret deve ser colado direto no Supabase (Authentication > Sign In / Providers > Azure), não por e-mail.`;
  FORM.pedido=pedido;

@@ -130,8 +130,9 @@ Deno.serve(async (req) => {
     return resp({ ok: true });
   }
 
-  // renovar: tipo "equipe" (ler a caixa) ou "eu" (enviar em meu nome)
-  const daEquipe = corpo.tipo === 'equipe';
+  // renovar: tipo "equipe" (ler a caixa), "eu" (enviar em meu nome) ou "cal" (convites de reunião no calendário de quem marcou).
+  // "cal" usa a mesma conexão de "eu", pedindo só a permissão de calendário; se ela ainda não foi liberada no Azure, só o convite falha.
+  const daEquipe = corpo.tipo === 'equipe', ehCal = corpo.tipo === 'cal';
   if (daEquipe && !podeEquipe) return resp({ erro: 'sem_permissao' }, 403);
   const { data: linha } = daEquipe
     ? await adm.from('ms_equipe').select('refresh_token,user_id,email').eq('id', 1).maybeSingle()
@@ -149,13 +150,13 @@ Deno.serve(async (req) => {
       client_secret: sec('AZURE_CLIENT_SECRET'),
       grant_type: 'refresh_token',
       refresh_token: linha.refresh_token,
-      scope: ESCOPOS,
+      scope: ehCal ? 'offline_access https://graph.microsoft.com/Calendars.ReadWrite' : ESCOPOS,
     }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) {
     // invalid_grant: a renovação venceu ou foi revogada; alguém precisa conectar de novo.
-    if (j.error === 'invalid_grant') {
+    if (j.error === 'invalid_grant' && !ehCal) {
       if (daEquipe) await adm.from('ms_equipe').delete().eq('id', 1);
       else await adm.from('ms_tokens').delete().eq('user_id', uid);
     }

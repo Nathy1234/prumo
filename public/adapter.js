@@ -372,7 +372,7 @@
      ------------------------------------------------------------------ */
   function criarMcp() {
     // Duas chaves: "equipe" (ler a caixa, a conta que clicou em Conectar e-mail) e "eu" (enviar em meu nome).
-    const CH = { equipe: 'ms_token_eq', eu: 'ms_token' }, renovando = {}, falhouAte = {};
+    const CH = { equipe: 'ms_token_eq', eu: 'ms_token', cal: 'ms_token_cal' }, renovando = {}, falhouAte = {};
     const lerCache = tipo => { try { const s = JSON.parse(sessionStorage.getItem(CH[tipo]) || 'null'); if (s && s.exp > Date.now()) return s.t; } catch (e) {} return null; };
     // Pede uma chave nova à função ms-token (o secret do app fica só no Supabase).
     function renovar(tipo) {
@@ -392,6 +392,10 @@
       return data?.session?.provider_token || null;
     }
     window.portalMsStatus = () => msFuncao({ acao: 'status' }).catch(() => null);
+    // Convites de reunião no Outlook de quem marcou (o lembrete é do próprio Outlook/Teams, com o Prumo fechado).
+    window.portalCalendario = (metodo, url, corpo) => graph(metodo, url, corpo, { _tipo: 'cal' });
+    // Convites de reunião no Outlook de quem marcou (o lembrete é do próprio Outlook/Teams, com o Prumo fechado).
+    window.portalCalendario = (metodo, url, corpo) => graph(metodo, url, corpo, { _tipo: 'cal' });
     window.portalFotoMicrosoft = async () => {
       const t = await token('eu'); if (!t) return null;
       const r = await fetch('https://graph.microsoft.com/v1.0/me/photos/240x240/$value', { headers: { Authorization: 'Bearer ' + t } });
