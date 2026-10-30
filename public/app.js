@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=130;
+const PRUMO_ATUALIZACOES=131;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
@@ -721,7 +721,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','Feedback gerado pelas observações do mês ou do trimestre (rascunho para revisar)'],
+  ['2026-10-30','Feedback automático: rascunho com o que a pessoa realizou, ausências e observações, para o diretor revisar'],
  ['2026-10-30','Equipe › Evolução: evolução de cada colaborador pelos feedbacks e observações'],
  ['2026-10-30','Admin e diretor ajustam férias e ausências já lançadas'],
  ['2026-10-30','No andamento, cada colaborador vê só o próprio andamento (só diretor e admin veem o departamento todo)'],
@@ -1491,23 +1491,53 @@ function planoDe(txt){const L=String(txt||'').split('\n'),out=[];let on=false;
 function fbPlano(){const u=ultimoFb(S.fbEd);if(!u){toast('Ainda não há feedback anterior.');return}const it=planoDe(u.texto);if(!it.length){toast('O último feedback não tem uma seção de plano de ação, direcionamentos ou próximos passos.');return}
  fbIns(`### Acompanhamento do plano de ação\n${it.map(i=>`- ${i} — **Status:** `).join('\n')}\n`);toast(`${it.length} itens do plano inseridos`)}
 function obsNovas(e){const u=ultimoFb(e);return D.observacoes.filter(o=>o.pessoa===e.pessoa&&!o.usadoEm&&!e.obsUsadas.includes(o.id)&&(!u||(o.data||'')>=(u.data||''))).sort((a,b)=>a.data<b.data?-1:1)}
-/* rascunho de feedback montado com as observações do período (sem IA: organiza o que o diretor registrou) */
-function obsPer(pid,per){const ms=per.tipo==='Mensal'?[per.mes]:mesesTri(triParse(per.tri));return (D.observacoes||[]).filter(o=>o.pessoa===pid&&ms.includes((o.data||'').slice(0,7))).sort((a,b)=>(a.data||'').localeCompare(b.data||''))}
+/* feedback automático: o diretor clica e o Prumo escreve um rascunho com o que a pessoa realizou no período
+   (lançamentos, baixas, conciliações, chamados, prazos, registro no dia), as ausências e as observações registradas.
+   Sem IA paga: o texto é montado a partir dos dados. O diretor revisa e muda o que quiser antes de salvar ou enviar. */
+function perDatas(o){if(o.tipo==='Mensal'){const f=isoD(fimMes(o.mes));return {de:o.mes+'-01',ate:f<HJ?f:HJ,ms:[o.mes]}}const t=triParse(o.tri),ms=mesesTri(t),f=fimTri(t);return {de:ms[0]+'-01',ate:f<HJ?f:HJ,ms}}
+function perAnterior(o){return o.tipo==='Mensal'?{tipo:'Mensal',mes:addMes(o.mes,-1)}:{tipo:'Trimestral',tri:triStr(triAnt(triParse(o.tri)))}}
+function obsPer(pid,o){const {ms}=perDatas(o);return (D.observacoes||[]).filter(x=>x.pessoa===pid&&ms.includes((x.data||'').slice(0,7))).sort((a,b)=>(a.data||'').localeCompare(b.data||''))}
+function dadosPer(pid,o){const {de,ate}=perDatas(o),R=realizadoPer(pid,de,ate),G=regResumo(registrosCron(de,ate).filter(x=>x.pid===pid));
+ const pa=perDatas(perAnterior(o)),RA=realizadoPer(pid,pa.de,pa.ate);
+ const aus=(D.ausencias||[]).filter(a=>a.pid===pid&&!a.cancelada&&a.de<=ate&&(a.ate||a.de)>=de).map(a=>{const d0=a.de>de?a.de:de,d1=(a.ate||a.de)<ate?(a.ate||a.de):ate;return {tipo:a.tipo,dias:diasDe(d0,d1).filter(ehUtil).length}}).filter(a=>a.dias);
+ return {de,ate,R,G,RA,aus,obs:obsPer(pid,o)}}
 function fbGerarSheet(pid){if(!fbPode())return;const p=pessoa(pid);if(!p)return;const tA=triDe(MES_ATUAL),tP=triAnt(tA);
  const OP=[{tipo:'Mensal',mes:addMes(MES_ATUAL,-1),n:`Mensal · ${mesNome(addMes(MES_ATUAL,-1))}`},{tipo:'Mensal',mes:MES_ATUAL,n:`Mensal · ${mesNome(MES_ATUAL)} (até hoje)`},{tipo:'Trimestral',tri:triStr(tP),n:`Trimestral · ${tP.q}º trimestre de ${tP.ano}`},{tipo:'Trimestral',tri:triStr(tA),n:`Trimestral · ${tA.q}º trimestre de ${tA.ano} (até hoje)`}];
  FORM={tipo:'_fbger',pid,op:OP};
- document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(p.n)}</p><h2 id="sheet-title">Gerar feedback pelas observações</h2><p class="sub" style="font-size:13px">O Prumo junta as observações do período em um rascunho: o que foi bem, os pontos de atenção e as outras anotações. Você revisa e ajusta antes de salvar ou enviar. Nada é enviado sozinho.</p></div>
- <div class="sbox">${OP.map((o,i)=>{const L=obsPer(pid,o),ps=L.filter(x=>x.tipo==='pos').length,at=L.filter(x=>x.tipo==='aten').length;return `<label class="perm"><input type="radio" name="fg_p" value="${i}" ${i===0?'checked':''} ${L.length?'':'disabled'}><span><b>${esc(o.n)}</b><small>${L.length?`${L.length} ${L.length===1?'observação':'observações'} · ${ps} positivas · ${at} de atenção`:'nenhuma observação neste período'}</small></span></label>`}).join('')}</div>
- <div class="foot"><button class="btn ghost" onclick="fechar();S.fbP='${esc(pid)}';fbIr('fbpessoa')">Registrar observação</button><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="fbGerar()">Gerar rascunho</button></div></div>`;
- document.getElementById('ov').hidden=false;const r=document.querySelector('#sheet input[name=fg_p]:checked');if(r&&r.disabled){const ok=document.querySelector('#sheet input[name=fg_p]:not([disabled])');if(ok)ok.checked=true}}
-function fbGerar(){const f=FORM;if(f?.tipo!=='_fbger')return;const i=+(document.querySelector('#sheet input[name=fg_p]:checked')?.value??-1),o=f.op[i];if(!o){toast('Escolha um período com observações.');return}
- const p=pessoa(f.pid),L=obsPer(f.pid,o);if(!L.length){toast('Não há observações neste período.');return}
- const g=k=>L.filter(x=>x.tipo===k).map(x=>`- ${String(x.texto||'').trim()}`).join('\n'),ps=g('pos'),at=g('aten'),ne=g('neu');
+ document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">${esc(p.n)}</p><h2 id="sheet-title">Criar feedback automático</h2><p class="sub" style="font-size:13px">O Prumo escreve um rascunho com o que ${esc(p.n)} realizou no período (lançamentos, baixas, conciliações, chamados e prazos), as ausências e as suas observações. Depois você revisa e muda o que quiser. Nada é enviado sozinho.</p></div>
+ <div class="sbox">${OP.map((o,i)=>{const d=dadosPer(pid,o),ps=d.obs.filter(x=>x.tipo==='pos').length,at=d.obs.filter(x=>x.tipo==='aten').length;return `<label class="perm"><input type="radio" name="fg_p" value="${i}" ${i===0?'checked':''}><span><b>${esc(o.n)}</b><small>${d.R.total} realizadas (${d.R.rot} rotinas, ${d.R.ch} chamados) · ${d.obs.length} ${d.obs.length===1?'observação':'observações'}${d.obs.length?` (${ps} positivas, ${at} de atenção)`:''}</small></span></label>`}).join('')}</div>
+ <div class="foot"><button class="btn ghost" onclick="fechar();S.fbP='${esc(pid)}';fbIr('fbpessoa')">Registrar observação antes</button><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="fbGerar()">Criar rascunho</button></div></div>`;
+ document.getElementById('ov').hidden=false}
+function fbTexto(p,o,d){const R=d.R,G=d.G,RA=d.RA,L=d.obs,li=a=>a.map(x=>`- ${x}`).join('\n');
  const per=o.tipo==='Mensal'?`mensal de ${mesNome(o.mes)}`:(()=>{const t=triParse(o.tri);return `do ${t.q}º trimestre de ${t.ano}`})();
- const tom=ps&&at?'mix':at?'mel':'pos';
- const texto=`Olá, ${tratDe(p)}!\n\nEste é o seu feedback ${per}, com base no que acompanhamos no período.\n\n${ps?`### O que você fez bem\n${ps}\n\n`:''}${at?`### Pontos que ainda precisam de atenção\n${at}\n\n`:''}${ne?`### Outras observações\n${ne}\n\n`:''}### Próximos passos\n- (escreva aqui o que fica combinado para o próximo período)\n\n${ps&&!at?'Parabéns pelo trabalho. Continue assim!':'Conte comigo para o que precisar.'}\n\n${DIR_NOME()}`;
- fechar();fbNovo({pessoa:f.pid,tipo:o.tipo,mes:o.mes,tri:o.tri,tom,texto});if(S.fbEd){S.fbEd.obsUsadas=L.filter(x=>!x.usadoEm).map(x=>x.id);S.fbEd.dirty=true}
- log(`Gerou um rascunho de feedback ${o.tipo.toLowerCase()} de ${p.n} com ${L.length} observações`);toast('Rascunho pronto. Revise o texto antes de salvar ou enviar.',6000)}
+ const perAnt=o.tipo==='Mensal'?'ao mês anterior':'ao trimestre anterior';
+ const nums=[],bem=[],aten=[],prox=[];
+ if(R.total){const et=R.etapas.slice(0,4).map(([g,n])=>`${n} de ${g.toLowerCase()}`).join(', ');nums.push(`Você realizou ${R.total} ${R.total===1?'atividade':'atividades'}: ${R.rot} ${R.rot===1?'rotina':'rotinas'} do cronograma${et?` (${et})`:''} e ${R.ch} ${R.ch===1?'chamado concluído':'chamados concluídos'}.`)}
+ else nums.push('Não há atividades registradas no Prumo neste período.');
+ if(R.chPrazo)nums.push(`${R.pct}% dos chamados com prazo foram concluídos no prazo (${R.chOk} de ${R.chPrazo}).`);
+ if(G.tot)nums.push(`${G.pct}% das rotinas foram registradas no próprio dia (${G.noDia} de ${G.tot})${G.dep?`; ${G.dep} ${G.dep===1?'ficou':'ficaram'} para depois`:''}.`);
+ const vari=RA.total?Math.round((R.total-RA.total)/RA.total*100):null;
+ if(vari!==null&&RA.total>=5)nums.push(`Em relação ${perAnt}, o volume ${vari>0?`subiu ${vari}%`:vari<0?`caiu ${-vari}%`:'ficou igual'} (${RA.total} → ${R.total}).`);
+ if(d.aus.length)nums.push(`Ausências no período: ${d.aus.map(a=>`${a.dias} ${a.dias===1?'dia útil':'dias úteis'} de ${a.tipo.toLowerCase()}`).join(', ')}${d.aus.some(a=>ausExcusa(a.tipo))?' (não contaram contra os seus indicadores)':''}.`);
+ // o que foi bem / o que pede atenção: observações do diretor primeiro, depois o que os números mostram
+ L.filter(x=>x.tipo==='pos').forEach(x=>bem.push(String(x.texto||'').trim()));
+ L.filter(x=>x.tipo==='aten').forEach(x=>aten.push(String(x.texto||'').trim()));
+ if(R.chPrazo>=2&&R.pct>=90)bem.push('Cumpriu os prazos combinados nos chamados.');
+ if(G.tot>=5&&G.pct>=85)bem.push('Manteve o cronograma em dia, registrando as rotinas no próprio dia.');
+ if(vari!==null&&RA.total>=5&&vari>=10)bem.push(`Aumentou o volume realizado em relação ${perAnt}.`);
+ if(R.chPrazo>=2&&R.pct<80){aten.push(`Alguns chamados passaram do prazo combinado (${R.chPrazo-R.chOk} de ${R.chPrazo}).`);prox.push('Avisar com antecedência quando um prazo de chamado estiver em risco e combinar uma nova data.')}
+ if(G.tot>=5&&G.pct<70){aten.push(`Parte das rotinas foi registrada depois do dia (${G.dep} de ${G.tot}).`);prox.push('Registrar no Prumo no mesmo dia o que foi lançado, baixado e conciliado.')}
+ if(vari!==null&&RA.total>=5&&vari<=-15&&!d.aus.some(a=>ausExcusa(a.tipo)))aten.push(`O volume realizado caiu em relação ${perAnt}; vale conversar sobre o que mudou.`);
+ if(!aten.length)prox.push('Manter o ritmo e o registro em dia.');
+ prox.push('(complete com o que fica combinado para o próximo período)');
+ const neu=L.filter(x=>x.tipo!=='pos'&&x.tipo!=='aten').map(x=>String(x.texto||'').trim());
+ const tom=bem.length&&aten.length?'mix':aten.length?'mel':'pos';
+ const texto=`Olá, ${tratDe(p)}!\n\nEste é o seu feedback ${per}, com base no que você realizou no período e no que acompanhamos no dia a dia.\n\n### Números do período\n${li(nums)}\n\n${bem.length?`### O que você fez bem\n${li(bem)}\n\n`:''}${aten.length?`### Pontos que ainda precisam de atenção\n${li(aten)}\n\n`:''}${neu.length?`### Outras observações\n${li(neu)}\n\n`:''}### Próximos passos\n${li(prox)}\n\n${tom==='pos'?'Parabéns pelo trabalho. Continue assim!':'Conte comigo para o que precisar.'}\n\n${DIR_NOME()}`;
+ return {texto,tom}}
+function fbGerar(){const f=FORM;if(f?.tipo!=='_fbger')return;const i=+(document.querySelector('#sheet input[name=fg_p]:checked')?.value??-1),o=f.op[i];if(!o){toast('Escolha o período.');return}
+ const p=pessoa(f.pid),d=dadosPer(f.pid,o),{texto,tom}=fbTexto(p,o,d);
+ fechar();fbNovo({pessoa:f.pid,tipo:o.tipo,mes:o.mes,tri:o.tri,tom,texto});if(S.fbEd){S.fbEd.obsUsadas=d.obs.filter(x=>!x.usadoEm).map(x=>x.id);S.fbEd.dirty=true}
+ log(`Criou um rascunho automático de feedback ${o.tipo.toLowerCase()} de ${p.n} (${d.R.total} atividades, ${d.obs.length} observações)`);toast('Rascunho pronto. Revise e ajuste antes de salvar ou enviar.',6000)}
 function fbInsObs(){const e=S.fbEd,sel=obsNovas(e).filter(o=>document.getElementById('ok_'+o.id)?.checked);if(!sel.length){toast('Marque pelo menos uma observação.');return}
  const g=k=>sel.filter(o=>o.tipo===k).map(o=>`- ${o.texto}`).join('\n');let t='';
  if(g('pos'))t+=`### Evoluções observadas\n${g('pos')}\n`;if(g('aten'))t+=`### Pontos que ainda precisam de atenção\n${g('aten')}\n`;if(g('neu'))t+=`### Outras observações\n${g('neu')}\n`;
@@ -2858,7 +2888,7 @@ fbpessoa(){const p=pessoa(S.fbP);if(!p)return head('Feedbacks','Colaborador não
  const L=fbsDe(p.id),pos=L.filter(f=>f.tom==='pos').length,mix=L.filter(f=>f.tom==='mix').length,mel=L.filter(f=>f.tom==='mel').length,u=L[0];
  const O=D.observacoes.filter(o=>o.pessoa===p.id).sort((a,b)=>a.data<b.data?1:-1);
  return `<button class="btn ghost" style="align-self:flex-start" onclick="fbIr('feedbacks')">‹ Feedbacks</button>`+
- head(`${esc(p.vinc||'Vínculo não informado')}${p.desde?' · desde '+fmt(p.desde)+'/'+p.desde.slice(0,4):''}${p.email?' · '+esc(p.email):''} · ${p.ativo===false?'Inativo':'Ativo'}`,esc(p.n),p.c?esc(p.c):'',`<button class="btn" onclick="fbNovo({pessoa:'${p.id}',tipo:'Mensal'})">+ Feedback mensal</button><button class="btn pri" onclick="fbNovo({pessoa:'${p.id}',tipo:'Trimestral'})">+ Trimestral</button>`)+
+ head(`${esc(p.vinc||'Vínculo não informado')}${p.desde?' · desde '+fmt(p.desde)+'/'+p.desde.slice(0,4):''}${p.email?' · '+esc(p.email):''} · ${p.ativo===false?'Inativo':'Ativo'}`,esc(p.n),p.c?esc(p.c):'',`<button class="btn pri" onclick="fbGerarSheet('${p.id}')">Criar feedback automático</button><button class="btn" onclick="fbNovo({pessoa:'${p.id}',tipo:'Mensal'})">+ Feedback mensal</button><button class="btn pri" onclick="fbNovo({pessoa:'${p.id}',tipo:'Trimestral'})">+ Trimestral</button>`)+
  (!p.email?`<div class="banner" style="background:var(--warn-bg);color:var(--warn)"><span>Sem e-mail cadastrado. Cadastre para poder enviar feedbacks pelo sistema.</span><button class="btn" onclick="abrir('pessoa','${p.id}')">Cadastrar e-mail</button></div>`:'')+
  `<div class="panel"><div class="ph"><h2>Evolução</h2><button class="btn ghost" onclick="S.fbTab=S.fbTab==='tabela'?'':'tabela';render()">${S.fbTab==='tabela'?'Ver em gráfico':'Ver em tabela'}</button></div>
  <div class="stats" style="margin:8px 0 16px"><div class="stat"><p>Feedbacks</p><strong>${L.length}</strong><small>${pos} positivos · ${mix} mistos · ${mel} melhorias</small></div><div class="stat"><p>Positivos</p><strong>${L.length?Math.round(pos/L.length*100):0}%</strong></div><div class="stat"><p>Último tom</p><strong style="font-size:16px">${u?TONS[u.tom]:'—'}</strong></div><div class="stat"><p>Último feedback</p><strong style="font-size:18px">${u?fmt(u.data)+'/'+u.data.slice(2,4):'—'}</strong></div></div>${graficoEvol(p.id)}</div>
@@ -3283,7 +3313,7 @@ function fbEvo(){const C=colabs();if(!C.length)return `<div class="panel">${vazi
  const p=pessoa(S.fbEvoP),d=DD[S.fbEvoP],mxO=Math.max(1,...d.obsM.map(x=>Math.max(x.pos,x.at)));
  const obsG=`<div class="evob">${d.obsM.map(x=>`<div title="${esc(mesCurto(x.m))}: ${x.pos} positivas, ${x.at} de atenção"><div class="evobc"><i class="p" style="height:${x.pos/mxO*100}%"></i><i class="a" style="height:${x.at/mxO*100}%"></i></div><small>${esc(mesCurto(x.m).slice(0,3))}</small></div>`).join('')}</div><div class="evleg"><span><i style="background:var(--ok)"></i>Evolução positiva</span><span><i style="background:var(--warn)"></i>Ponto de atenção</span></div>`;
  const tl=[...d.fbs.map(f=>({d:f.data||'',t:f.titulo||`Feedback ${String(f.tipo||'').toLowerCase()}`,s:`${f.tipo||''} · ${TONS[f.tom]||''}${f.enviado?' · enviado':' · não enviado'}`,c:TOM_C[f.tom]||'ne'})),...d.obs.map(o=>({d:o.data||'',t:o.texto,s:OBS_T[o.tipo]||'Observação',c:o.tipo==='pos'?'ok':o.tipo==='aten'?'wa':'ne'}))].sort((a,b)=>b.d.localeCompare(a.d)).slice(0,10);
- const det=`<div class="panel evo"><div class="ph"><h2><span class="quemf">${avP(p.id,p.n)}${esc(p.n)}</span></h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost" onclick="S.fbP='${esc(p.id)}';fbIr('fbpessoa')">Abrir feedbacks</button><button class="btn pri" onclick="fbGerarSheet('${esc(p.id)}')">Gerar feedback pelas observações</button></span></div>
+ const det=`<div class="panel evo"><div class="ph"><h2><span class="quemf">${avP(p.id,p.n)}${esc(p.n)}</span></h2><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost" onclick="S.fbP='${esc(p.id)}';fbIr('fbpessoa')">Abrir feedbacks</button><button class="btn pri" onclick="fbGerarSheet('${esc(p.id)}')">Criar feedback automático</button></span></div>
  <div class="evk"><div><span>Feedbacks</span><b>${d.fbs.length}</b><small>${d.ult?'último em '+fmtAno(d.ult.data):'nenhum ainda'}</small></div><div><span>Tom dos feedbacks</span><b>${d.pos}<em class="evk2"> / ${d.mix} / ${d.mel}</em></b><small><span style="color:var(--ok)">positivos</span> · <span style="color:var(--accent)">mistos</span> · <span style="color:var(--warn)">melhorias</span></small></div><div><span>Tendência</span><b style="font-size:18px;margin:6px 0 4px">${evoTend(d.tend)}</b><small>3 últimos x 3 anteriores</small></div><div><span>Mensais pendentes</span><b style="${d.pend?'color:var(--bad)':''}">${d.pend}</b><small>nos últimos 6 meses</small></div></div>
  <div class="evg"><div><h3>Tom dos últimos feedbacks</h3>${evoLinha(d.cron)}</div><div><h3>Observações por mês</h3>${obsG}</div></div>
  <h3 style="margin:18px 0 8px">Linha do tempo</h3>${tl.length?`<div class="evtl">${tl.map(x=>`<div class="evi"><i class="${x.c}"></i><div><b>${esc(x.t)}</b><span>${fmtAno(x.d)} · ${esc(x.s)}</span></div></div>`).join('')}</div>`:'<p class="meta">Nenhum feedback ou observação ainda. Use "+ registrar observação" na tela da pessoa para acompanhar a evolução.</p>'}</div>`;
