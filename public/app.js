@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=125;
+const PRUMO_ATUALIZACOES=126;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
@@ -721,7 +721,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','Aviso na tela de e-mail novo para revisar; resumo do que aconteceu para quem volta depois de 4 horas'],
+  ['2026-10-30','No andamento, cada colaborador vê só o próprio andamento (só diretor e admin veem o departamento todo)'],
+ ['2026-10-30','Aviso na tela de e-mail novo para revisar; resumo do que aconteceu para quem volta depois de 4 horas'],
  ['2026-10-30','Reunião só com quem você escolher: aparece e avisa só para os participantes'],
  ['2026-10-30','Destaques idênticos aparecem uma vez só'],
  ['2026-10-30','Destaques do mês no Painel, com a foto grande, logo abaixo da Equipe no trimestre'],
@@ -1871,16 +1872,18 @@ function mvDia(k,n){let d=S[k]||HJ;do{d=addDia(d,n)}while(!ehUtil(d));S[k]=d;ren
 /* marcação por sistema: numa rotina que vale para os dois sistemas, cada marcação guarda em qual foi feita */
 const multiSis=r=>(r.sis||[]).length>1;
 const sisDoF=(f,r)=>f.sis||((r.sis||[])[0]||'');
-const feitosSis=(r,dia,x)=>feitosDe(r.id,dia).filter(f=>!multiSis(r)||sisDoF(f,r)===x);
+let AND_SO_EU=false;const andTodos=()=>dir()||podeAdmin();
+const feitosSis=(r,dia,x)=>feitosDe(r.id,dia).filter(f=>(!multiSis(r)||sisDoF(f,r)===x)&&(!AND_SO_EU||f.pid===S.perfil));
 function estadoSis(r,dia,x){const fs=feitosSis(r,dia,x),nt=!fs.some(f=>stF(f)==='feita')&&!!semMovDe(r.id,dia,x),fe=nt||fs.some(f=>stF(f)==='feita'),an=!fe&&fs.some(f=>stF(f)==='andamento');
  const atrasoDia=!fe&&(dia<HJ||(dia===HJ&&r.hora&&agoraHM()>r.hora));
  const tarde=fe&&fs.filter(f=>stF(f)==='feita').every(f=>(f.feitoEm||dia)>dia);
  return {fs,fe,an,bad:atrasoDia,tarde,nt}}
-function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:'',x=sisAtual(),L=D.cronograma.filter(r=>ocorre(r,dia)&&(r.sis||[]).includes(x));
+function andamento(dia,k,semNav){const so=!andTodos()&&!!pessoa(S.perfil);AND_SO_EU=false;try{if(so){const x=sisAtual(),L0=D.cronograma.filter(r=>ocorre(r,dia)&&(r.sis||[]).includes(x)&&(minhaRot(r)||feitosSis(r,dia,x).some(f=>f.pid===S.perfil)));AND_SO_EU=true;return andamento0(dia,k,semNav,L0,true)}return andamento0(dia,k,semNav)}finally{AND_SO_EU=false}}
+function andamento0(dia,k,semNav,L0,so){const grp=r=>procs().includes(r.etapa)?r.etapa:'',x=sisAtual(),L=L0||D.cronograma.filter(r=>ocorre(r,dia)&&(r.sis||[]).includes(x));
  const nav=semNav?'':`<div class="cronbar"><div class="seg"><button onclick="mvDia('${k}',-1)" aria-label="Dia útil anterior">‹</button><span>${dia===HJ?'Hoje, ':''}${diaTxt(dia)}</span><button onclick="mvDia('${k}',1)" aria-label="Próximo dia útil">›</button></div>${irData(dia,k)}${dia!==HJ?`<button class="btn" onclick="S.${k}='';render()">Hoje</button>`:''}</div>`;
  const sw=`<div class="seg sis-seg" role="tablist" aria-label="Sistema">${sists().map((y,i)=>`<button role="tab" aria-selected="${y===x}" class="${y===x?'on':''}" onclick="S.cSis=sists()[${i}];render();salvarEstado()">${esc(y)}${emTeste(y)?' <small>em teste</small>':''}</button>`).join('')}</div>`;
- const fora=ausHoje(dia),topo=`<div class="ph"><h2>Andamento do departamento</h2>${sw}</div>${nav}${fora.length?`<p class="meta" style="margin:0 0 6px">${fora.map(a=>`${esc(nomeDe(a.pid))}: ${esc(a.tipo.toLowerCase())}`).join(' · ')}</p>`:''}`;
- if(!L.length){const px=proxComRotina(dia,r=>(r.sis||[]).includes(x));return `<div class="panel and">${topo}<p class="meta" style="margin:0 0 8px">Nenhuma rotina do ${esc(x)} prevista neste dia.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
+ const fora=so?[]:ausHoje(dia),topo=`<div class="ph"><h2>${so?'Seu andamento':'Andamento do departamento'}</h2>${sw}</div>${nav}${fora.length?`<p class="meta" style="margin:0 0 6px">${fora.map(a=>`${esc(nomeDe(a.pid))}: ${esc(a.tipo.toLowerCase())}`).join(' · ')}</p>`:''}`;
+ if(!L.length){const px=proxComRotina(dia,r=>(r.sis||[]).includes(x));return `<div class="panel and">${topo}<p class="meta" style="margin:0 0 8px">Nenhuma rotina ${so?'sua ':''}do ${esc(x)} prevista neste dia.</p>${px?`<button class="btn pri" onclick="S.${k}='${px}';${semNav?"S.cDia='"+px+"';":''}render()">Ver ${diaTxt(px)}</button>`:''}</div>`}
  const E=[...etapasDoSis(x,L),...(L.some(r=>!grp(r))?['']:[])];
  const cel=g=>{const l=L.filter(r=>grp(r)===g);if(!l.length)return '<td><span class="andn">—</span></td>';
   const xs=l.map(r=>({r,...estadoSis(r,dia,x)})),ok=xs.filter(o=>o.fe),an=xs.filter(o=>o.an),bad=xs.filter(o=>o.bad);
@@ -1898,8 +1901,8 @@ function andamento(dia,k,semNav){const grp=r=>procs().includes(r.etapa)?r.etapa:
  const frase=`${fe.length?`<b class="pos">Concluído:</b> ${esc(lista(fe))}. `:'<b>Nada concluído ainda.</b> '}${pa.length?`<b style="color:var(--accent)">Em andamento:</b> ${esc(lista(pa))}. `:''}${fa.length?`<b>Falta:</b> ${esc(lista(fa))}.`:pa.length?'':'<b class="pos">Tudo concluído no dia.</b>'}`;
  return `<div class="panel and">${topo}<p class="andf"><b>${esc(x)}${emTeste(x)?' (em teste)':''}</b> · ${frase}</p>
  <div class="tbl-wrap"><table class="andt"><thead><tr>${E.map(g=>`<th>${g?`${E.indexOf(g)+1}. ${esc(nomeEtS(g,x))}`:'Outras'}</th>`).join('')}</tr></thead><tbody><tr>${E.map(g=>cel(g)).join('')}</tr></tbody></table></div>
- ${quemFezDia(dia,L,E,x)}
- <p class="meta" style="margin:8px 0 0">Clique numa etapa para ver as rotinas e marcar. Cada pessoa marca o que ela fez.</p></div>`}
+ ${so?'':quemFezDia(dia,L,E,x)}
+ <p class="meta" style="margin:8px 0 0">${so?'Aqui aparece só o que é seu. Clique numa etapa para ver suas rotinas e marcar.':'Clique numa etapa para ver as rotinas e marcar. Cada pessoa marca o que ela fez.'}</p></div>`}
 function quemFezDia(dia,L,E,x){const grp=r=>procs().includes(r.etapa)?r.etapa:'',P=new Map();
  colabs().forEach(p=>P.set(p.id,{n:p.n,c:{},pid:p.id}));
  L.forEach(r=>feitosSis(r,dia,x).forEach(f=>{const em=stF(f)==='andamento';const k=f.pid&&P.has(f.pid)?f.pid:([...P.entries()].find(([,v])=>norm(v.n)===norm(f.nome))?.[0]||f.pid||f.nome);if(!P.has(k))P.set(k,{n:f.nome||'—',c:{}});const o=P.get(k).c;(o[grp(r)]=o[grp(r)]||[]).push(em?`● ${r.t} · iniciou ${hmDe(f.ini)}`:`✓ ${r.t}${f.hora?' · '+f.hora:''}`)}));
