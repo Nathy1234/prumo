@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=121;
+const PRUMO_ATUALIZACOES=122;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -721,6 +721,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Reunião só com quem você escolher: aparece e avisa só para os participantes'],
  ['2026-10-30','Destaques idênticos aparecem uma vez só'],
  ['2026-10-30','Destaques do mês no Painel, com a foto grande, logo abaixo da Equipe no trimestre'],
  ['2026-10-30','Clique duplo em Salvar não grava mais em dobro'],
@@ -2647,7 +2648,7 @@ function reuAviso(){let box=document.getElementById('reuav');
  if(!box){box=document.createElement('div');box.id='reuav';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
  if(!ME?.uid||S.modo==='carregando'||S.perfil==='pendente'||solic()||!Array.isArray(D.eventos)){box.innerHTML='';return}
  const ag=new Date(),min=ag.getHours()*60+ag.getMinutes(),mm=h=>{const m=/^(\d{1,2}):(\d{2})/.exec(h||'');return m?+m[1]*60+ +m[2]:null};
- const L=[];for(const e of D.eventos.filter(e=>e.tipo==='Reunião'&&vejoEv(e)&&evOcorre(e,HJ))){const h=mm(e.hora),falta=h===null?null:h-min;
+ const L=[];for(const e of D.eventos.filter(e=>e.tipo==='Reunião'&&paraMimEv(e)&&evOcorre(e,HJ))){const h=mm(e.hora),falta=h===null?null:h-min;
   if(falta!==null&&falta<-30)continue;
   const fase=falta!==null&&falta<=5?'antes5':falta!==null&&falta<=15?'antes':'dia',k=reuAvKey(e.id,fase);if(reuAvVisto(k))continue;
   L.push({e,k,falta})}
@@ -2655,7 +2656,7 @@ function reuAviso(){let box=document.getElementById('reuav');
  for(const {e,k,falta} of L){const kn=k+':win';if(reuAvVisto(kn))continue;
   try{if(avOk()&&Notification.permission==='granted'){const n=new Notification(falta!==null&&falta<=15?(falta<=0?'Reunião começando':'Reunião em '+falta+' min'):'Reunião hoje',{body:`${e.hora?e.hora+' · ':''}${e.t||'Reunião'}`,tag:'prumo-reu-'+k,requireInteraction:falta!==null&&falta<=15});n.onclick=()=>{window.focus();S.cal=MES_ATUAL;ir('calendario');n.close()}}}catch(x){}
   try{localStorage.setItem(kn,'1')}catch(x){}(window.__reuAv=window.__reuAv||{})[kn]=1}
- const html=L.slice(0,3).map(({e,k,falta})=>`<div class="reuav" role="status"><div class="reuav-h"><b>${falta!==null&&falta<=15?(falta<=0?'Reunião começando':'Reunião em '+falta+' min'):'Reunião hoje'}</b><button class="reuav-x" onclick="reuAvFecha('${esc(k)}')" aria-label="Fechar aviso">×</button></div><p>${e.hora?`<span>${esc(e.hora)}</span> `:''}${esc(e.t||'Reunião')}</p>${e.obs?`<small>${esc(e.obs)}</small>`:''}<div class="reuav-b"><button class="btn sm" onclick="reuAvFecha('${esc(k)}');S.cal=MES_ATUAL;ir('calendario')">Ver no calendário</button>${avPodePedir()?`<button class="btn ghost sm" onclick="ativarAvisos()" title="Mostra o aviso no canto da tela do computador, mesmo com o Prumo minimizado">Avisar no computador</button>`:''}</div></div>`).join('');
+ const html=L.slice(0,3).map(({e,k,falta})=>`<div class="reuav" role="status"><div class="reuav-h"><b>${falta!==null&&falta<=15?(falta<=0?'Reunião começando':'Reunião em '+falta+' min'):'Reunião hoje'}</b><button class="reuav-x" onclick="reuAvFecha('${esc(k)}')" aria-label="Fechar aviso">×</button></div><p>${e.hora?`<span>${esc(e.hora)}</span> `:''}${esc(e.t||'Reunião')}</p>${e.quem==='pessoas'?`<small>Com ${esc([...new Set([...(e.ps||[]).filter(x=>x!==S.perfil).map(x=>x==='dir'?DIR_NOME():nomeDe(x)),...(souCriador(e)?[]:[e.criadoNome||''])])].filter(Boolean).join(', ')||'você')}</small>`:''}${e.obs?`<small>${esc(e.obs)}</small>`:''}<div class="reuav-b"><button class="btn sm" onclick="reuAvFecha('${esc(k)}');S.cal=MES_ATUAL;ir('calendario')">Ver no calendário</button>${avPodePedir()?`<button class="btn ghost sm" onclick="ativarAvisos()" title="Mostra o aviso no canto da tela do computador, mesmo com o Prumo minimizado">Avisar no computador</button>`:''}</div></div>`).join('');
  if(box.dataset.h!==html){box.innerHTML=html;box.dataset.h=html}}
 const REP_EV=[['unica','Uma vez só'],['semanal','Toda semana'],['mensal','Todo mês']];
 const corEv=e=>e.tipo==='Fechamento'?'bad':e.tipo==='Obrigação'?'wa':e.tipo==='Reunião'?'ac':'ne';
@@ -2667,7 +2668,7 @@ function evOcorre(e,dia){const r=e.rep||'unica';if(r==='unica')return e.data===d
 /* o diretor vê tudo; "só pessoas escolhidas" aparece para elas e para quem criou */
 const souCriador=e=>real()&&!S.sim&&e.criadoUid?e.criadoUid===ME.uid:(!!e.criadoPor&&e.criadoPor===S.perfil);
 /* "Só para mim": só quem criou vê. "Pessoas escolhidas": elas, quem criou e o diretor. "Todos": todo mundo */
-const vejoEv=e=>e.quem==='eu'?souCriador(e):(dir()||e.quem!=='pessoas'||(e.ps||[]).includes(S.perfil)||souCriador(e));
+const vejoEv=e=>e.quem==='eu'?souCriador(e):(e.quem!=='pessoas'||(e.ps||[]).includes(S.perfil)||souCriador(e));
 /* avisos e alertas: só o que é para a própria pessoa (o diretor não recebe aviso do compromisso dos outros) */
 const paraMimEv=e=>e.quem==='eu'?souCriador(e):(e.quem!=='pessoas'||(e.ps||[]).includes(S.perfil)||souCriador(e));
 const proxEv=(e,de,ate)=>{for(const d of diasDe(de,ate))if(evOcorre(e,d))return d;return ''};
@@ -2691,8 +2692,8 @@ function editEv(id){const e=id?D.eventos.find(x=>x.id===id):{tipo:'Reunião',rep
  <div><label class="lbl" for="ev_data" id="evl_data">Data</label><input class="inp" id="ev_data" type="date" value="${esc(e.data||'')}"></div>
  <div><label class="lbl" for="ev_hora">Horário · opcional</label><input class="inp" id="ev_hora" type="time" value="${esc(e.hora||'')}"></div>
  <div id="evw_fim"><label class="lbl" for="ev_fim">Até · opcional</label><input class="inp" id="ev_fim" type="date" value="${esc(e.fim||'')}"><p class="meta" style="margin:4px 0 0">Vazio: continua valendo.</p></div>
- <div class="full"><span class="lbl">Quem vê</span><div class="cks"><label class="ck"><input type="radio" name="ev_quem" id="ev_q_todos" value="todos" ${e.quem!=='pessoas'?'checked':''} onchange="evVis()"> Todos</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_ps" value="pessoas" ${e.quem==='pessoas'?'checked':''} onchange="evVis()"> Pessoas escolhidas</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_eu" value="eu" ${e.quem==='eu'?'checked':''} onchange="evVis()"> Só para mim</label></div><p class="meta" style="margin:4px 0 0">Pessoas escolhidas: aparece para elas, para quem criou e para o diretor. Só para mim: ninguém mais vê.</p></div>
- <div class="full" id="evw_ps"><span class="lbl">Pessoas</span><div class="cks">${colabs().map(p=>ck('ev_p_'+p.id,(e.ps||[]).includes(p.id),p.n)).join('')}</div><p class="ferr" id="eve_ps"></p></div>
+ <div class="full"><span class="lbl">Quem vê</span><div class="cks"><label class="ck"><input type="radio" name="ev_quem" id="ev_q_todos" value="todos" ${e.quem!=='pessoas'?'checked':''} onchange="evVis()"> Todos</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_ps" value="pessoas" ${e.quem==='pessoas'?'checked':''} onchange="evVis()"> Só com quem eu escolher</label><label class="ck"><input type="radio" name="ev_quem" id="ev_q_eu" value="eu" ${e.quem==='eu'?'checked':''} onchange="evVis()"> Só para mim</label></div><p class="meta" style="margin:4px 0 0">Só com quem eu escolher: aparece e avisa no canto da tela só para você e para as pessoas marcadas. Só para mim: ninguém mais vê.</p></div>
+ <div class="full" id="evw_ps"><span class="lbl">Com quem</span><div class="cks">${[{id:'dir',n:DIR_NOME()+' (diretor)'},...colabs()].map(p=>ck('ev_p_'+p.id,(e.ps||[]).includes(p.id),p.n)).join('')}</div><p class="ferr" id="eve_ps"></p></div>
  <div class="full"><label class="lbl" for="ev_obs">Observação · opcional</label><input class="inp" id="ev_obs" value="${esc(e.obs||'')}" placeholder="Sala 2 ou link do Teams"></div><p class="ferr full" id="eve_rep"></p></div>
  <div class="foot"><div>${id&&podeEditRot()?`<button class="btn danger" id="bdel" onclick="delEv()">Excluir</button>`:''}</div><div style="display:flex;gap:8px"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" onclick="salvaEv()">${id?'Salvar alterações':'Registrar'}</button></div></div>`;
  document.getElementById('ov').hidden=false;evVis();setTimeout(()=>document.getElementById('ev_t')?.focus(),30)}
@@ -2700,7 +2701,7 @@ function evVis(){const r=val('ev_rep'),sh=(i,on)=>{const x=document.getElementBy
  sh('evw_dias',r==='semanal');sh('evw_n',r==='mensal');sh('evw_fim',r!=='unica');sh('evw_ps',document.getElementById('ev_q_ps')?.checked);
  const l=document.getElementById('evl_data');if(l)l.textContent=r==='unica'?'Data':'Começa em'}
 async function salvaEv(){['eve_t','eve_ps','eve_rep'].forEach(x=>errEl(x,''));
- const t=val('ev_t'),rep=val('ev_rep'),quem=document.getElementById('ev_q_eu').checked?'eu':document.getElementById('ev_q_ps').checked?'pessoas':'todos',ps=colabs().filter(p=>document.getElementById('ev_p_'+p.id)?.checked).map(p=>p.id);
+ const t=val('ev_t'),rep=val('ev_rep'),quem=document.getElementById('ev_q_eu').checked?'eu':document.getElementById('ev_q_ps').checked?'pessoas':'todos',ps=[{id:'dir'},...colabs()].filter(p=>document.getElementById('ev_p_'+p.id)?.checked).map(p=>p.id);
  const dias=[1,2,3,4,5,6].filter(d=>document.getElementById('ev_d_'+d)?.checked),n=Math.round(+val('ev_n')||0),data=val('ev_data')||(rep==='unica'?'':HJ),fim=rep==='unica'?'':val('ev_fim');let ok=true;
  if(!t){errEl('eve_t','Descreva o prazo ou compromisso.');ok=false}
  if(rep==='unica'&&!data){errEl('eve_rep','Informe a data.');ok=false}
@@ -3115,7 +3116,7 @@ proc(){const b=S.busca.toLowerCase(),l=D.procedimentos.filter(p=>(p.t+' '+p.a).t
 
 melhorias(){const ab=S.sugAba==='sistema'?'sistema':'reuniao',l=D.sugestoes.filter(s=>sugCat(s)===ab);
  const tabs=`<div class="tabs big" role="tablist" aria-label="Tipo de sugestão">${SUG_CAT.map(([k,n])=>{const q=D.sugestoes.filter(s=>sugCat(s)===k&&!sugFeita(s)).length;return `<button role="tab" aria-selected="${ab===k}" class="${ab===k?'on':''}" onclick="S.sugAba='${k}';render()">${n} <span class="meta">${q}</span></button>`}).join('')}</div>`;
- const topo=head('Equipe','Reuniões e ideias','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`${podeAdmin()?`<button class="btn ghost" onclick="libReuExp()" title="Quem pode baixar o relatório e os slides das reuniões">Relatório e slides: ${CFG.reuExpTodos?'liberados para a equipe':'só admin e diretor'}</button>`:''}<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
+ const topo=head('Equipe','Reuniões e ideias','Assuntos para levar às reuniões da equipe e ideias para melhorar o sistema.',`${podeAdmin()?`<button class="btn ghost" onclick="libReuExp()" title="Quem pode baixar o relatório e os slides das reuniões">Relatório e slides: ${CFG.reuExpTodos?'liberados para a equipe':'só admin e diretor'}</button>`:''}${ab==='reuniao'?`<button class="btn" onclick="editEv()" title="Marcar uma reunião com todos ou só com quem você escolher">Marcar reunião</button>`:''}<button class="btn pri" onclick="sugSheet(null,'${ab}')">${ab==='reuniao'?'Novo assunto':'Nova sugestão'}</button>`)+tabs;
  if(!l.length)return topo+`<div class="panel">${vazio(ab==='reuniao'?'Nenhum assunto para as reuniões':'Nenhuma ideia para o sistema',ab==='reuniao'?'Anote aqui o que precisa ser falado e escolha em qual reunião.':'Toda ideia de melhoria começa aqui.')}</div>`;
  if(ab==='sistema')return topo+`<div class="panel">${[...l].sort((x,y)=>sugFeita(x)-sugFeita(y)||(y.v||0)-(x.v||0)).map(linSug).join('')}</div>`;
  const R=proxReunioes(4),ks=new Set([...R.map(r=>`${r.d}|${r.h}`),...l.map(reuKey)]);
