@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=132;
+const PRUMO_ATUALIZACOES=133;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
@@ -721,7 +721,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','IA do Prumo: escreve o feedback no próprio computador, lendo só os dados do sistema'],
+  ['2026-10-30','Feedback automático no modelo feedforward: pontos fortes, resumo curto e o que fazer daqui para frente'],
+ ['2026-10-30','IA do Prumo: escreve o feedback no próprio computador, lendo só os dados do sistema'],
  ['2026-10-30','Feedback automático: rascunho com o que a pessoa realizou, ausências e observações, para o diretor revisar'],
  ['2026-10-30','Equipe › Evolução: evolução de cada colaborador pelos feedbacks e observações'],
  ['2026-10-30','Admin e diretor ajustam férias e ausências já lançadas'],
@@ -1510,32 +1511,32 @@ function fbGerarSheet(pid){if(!fbPode())return;const p=pessoa(pid);if(!p)return;
  <div class="foot"><button class="btn ghost" onclick="fechar();S.fbP='${esc(pid)}';fbIr('fbpessoa')">Registrar observação antes</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn" onclick="fbGerar()" title="Na hora, montado com os dados">Criar rascunho</button>${'gpu' in navigator?`<button class="btn pri" onclick="fbIA()" title="A IA roda neste computador e lê só os dados do Prumo">✦ Escrever com a IA do Prumo</button>`:''}</div></div>
  <div id="fg_ia" class="iabox" hidden></div>`;
  document.getElementById('ov').hidden=false}
-function fbTexto(p,o,d){const R=d.R,G=d.G,RA=d.RA,L=d.obs,li=a=>a.map(x=>`- ${x}`).join('\n');
+/* modelo feedforward: começa pelos pontos fortes, mostra o período em poucas linhas e foca no que fazer daqui para frente */
+function fbTexto(p,o,d){const R=d.R,G=d.G,RA=d.RA,L=d.obs,li=a=>a.map(x=>`- ${x}`).join('\n'),tx=x=>String(x.texto||'').trim().replace(/[.;]\s*$/,'');
  const per=o.tipo==='Mensal'?`mensal de ${mesNome(o.mes)}`:(()=>{const t=triParse(o.tri);return `do ${t.q}º trimestre de ${t.ano}`})();
- const perAnt=o.tipo==='Mensal'?'ao mês anterior':'ao trimestre anterior';
- const nums=[],bem=[],aten=[],prox=[];
- if(R.total){const et=R.etapas.slice(0,4).map(([g,n])=>`${n} de ${g.toLowerCase()}`).join(', ');nums.push(`Você realizou ${R.total} ${R.total===1?'atividade':'atividades'}: ${R.rot} ${R.rot===1?'rotina':'rotinas'} do cronograma${et?` (${et})`:''} e ${R.ch} ${R.ch===1?'chamado concluído':'chamados concluídos'}.`)}
- else nums.push('Não há atividades registradas no Prumo neste período.');
- if(R.chPrazo)nums.push(`${R.pct}% dos chamados com prazo foram concluídos no prazo (${R.chOk} de ${R.chPrazo}).`);
- if(G.tot)nums.push(`${G.pct}% das rotinas foram registradas no próprio dia (${G.noDia} de ${G.tot})${G.dep?`; ${G.dep} ${G.dep===1?'ficou':'ficaram'} para depois`:''}.`);
- const vari=RA.total?Math.round((R.total-RA.total)/RA.total*100):null;
- if(vari!==null&&RA.total>=5)nums.push(`Em relação ${perAnt}, o volume ${vari>0?`subiu ${vari}%`:vari<0?`caiu ${-vari}%`:'ficou igual'} (${RA.total} → ${R.total}).`);
- if(d.aus.length)nums.push(`Ausências no período: ${d.aus.map(a=>`${a.dias} ${a.dias===1?'dia útil':'dias úteis'} de ${a.tipo.toLowerCase()}`).join(', ')}${d.aus.some(a=>ausExcusa(a.tipo))?' (não contaram contra os seus indicadores)':''}.`);
- // o que foi bem / o que pede atenção: observações do diretor primeiro, depois o que os números mostram
- L.filter(x=>x.tipo==='pos').forEach(x=>bem.push(String(x.texto||'').trim()));
- L.filter(x=>x.tipo==='aten').forEach(x=>aten.push(String(x.texto||'').trim()));
- if(R.chPrazo>=2&&R.pct>=90)bem.push('Cumpriu os prazos combinados nos chamados.');
- if(G.tot>=5&&G.pct>=85)bem.push('Manteve o cronograma em dia, registrando as rotinas no próprio dia.');
- if(vari!==null&&RA.total>=5&&vari>=10)bem.push(`Aumentou o volume realizado em relação ${perAnt}.`);
- if(R.chPrazo>=2&&R.pct<80){aten.push(`Alguns chamados passaram do prazo combinado (${R.chPrazo-R.chOk} de ${R.chPrazo}).`);prox.push('Avisar com antecedência quando um prazo de chamado estiver em risco e combinar uma nova data.')}
- if(G.tot>=5&&G.pct<70){aten.push(`Parte das rotinas foi registrada depois do dia (${G.dep} de ${G.tot}).`);prox.push('Registrar no Prumo no mesmo dia o que foi lançado, baixado e conciliado.')}
- if(vari!==null&&RA.total>=5&&vari<=-15&&!d.aus.some(a=>ausExcusa(a.tipo)))aten.push(`O volume realizado caiu em relação ${perAnt}; vale conversar sobre o que mudou.`);
- if(!aten.length)prox.push('Manter o ritmo e o registro em dia.');
- prox.push('(complete com o que fica combinado para o próximo período)');
- const neu=L.filter(x=>x.tipo!=='pos'&&x.tipo!=='aten').map(x=>String(x.texto||'').trim());
- const tom=bem.length&&aten.length?'mix':aten.length?'mel':'pos';
- const texto=`Olá, ${tratDe(p)}!\n\nEste é o seu feedback ${per}, com base no que você realizou no período e no que acompanhamos no dia a dia.\n\n### Números do período\n${li(nums)}\n\n${bem.length?`### O que você fez bem\n${li(bem)}\n\n`:''}${aten.length?`### Pontos que ainda precisam de atenção\n${li(aten)}\n\n`:''}${neu.length?`### Outras observações\n${li(neu)}\n\n`:''}### Próximos passos\n${li(prox)}\n\n${tom==='pos'?'Parabéns pelo trabalho. Continue assim!':'Conte comigo para o que precisar.'}\n\n${DIR_NOME()}`;
- return {texto,tom,partes:{per,nums,bem,aten,neu,prox:prox.filter(x=>!x.startsWith('('))}}}
+ const perAnt=o.tipo==='Mensal'?'ao mês anterior':'ao trimestre anterior',prox=o.tipo==='Mensal'?'no próximo mês':'no próximo trimestre';
+ const fortes=[],resumo=[],frente=[],apoio=[];
+ // 1) pontos fortes: primeiro o que o diretor observou, depois o que os dados confirmam
+ L.filter(x=>x.tipo==='pos').forEach(x=>fortes.push(tx(x)+'.'));
+ const vari=RA.total>=5?Math.round((R.total-RA.total)/RA.total*100):null;
+ if(R.chPrazo>=2&&R.pct>=90)fortes.push('Compromisso com os prazos combinados nos chamados.');
+ if(G.tot>=5&&G.pct>=85)fortes.push('Organização no dia a dia: as rotinas foram registradas no próprio dia.');
+ if(vari!==null&&vari>=10)fortes.push(`Mais entregas em relação ${perAnt}.`);
+ // 2) o período em poucas linhas (apoio, não é o foco)
+ if(R.total){const et=R.etapas.slice(0,3).map(([g,n])=>`${n} de ${g.toLowerCase()}`).join(', ');resumo.push(`${R.total} ${R.total===1?'atividade realizada':'atividades realizadas'}${et?` (${et}${R.ch?`, ${R.ch} ${R.ch===1?'chamado':'chamados'}`:''})`:''}${R.chPrazo?`, ${R.pct}% dos chamados no prazo`:''}${G.tot?`, ${G.pct}% registrado no próprio dia`:''}.`)}
+ if(d.aus.length)resumo.push(`Ausências: ${d.aus.map(a=>`${a.dias} ${a.dias===1?'dia':'dias'} de ${a.tipo.toLowerCase()}`).join(', ')}.`);
+ L.filter(x=>x.tipo!=='pos'&&x.tipo!=='aten').forEach(x=>resumo.push(tx(x)+'.'));
+ // 3) daqui para frente (feedforward): pontos de atenção viram ações para o próximo período
+ L.filter(x=>x.tipo==='aten').forEach(x=>frente.push(`Daqui para frente, vamos trabalhar juntos em: ${tx(x).charAt(0).toLowerCase()+tx(x).slice(1)}.`));
+ if(R.chPrazo>=2&&R.pct<80)frente.push('Quando um prazo de chamado estiver em risco, avisar antes e combinar uma nova data.');
+ if(G.tot>=5&&G.pct<70)frente.push('Registrar no Prumo, no mesmo dia, o que foi lançado, baixado e conciliado.');
+ if(vari!==null&&vari<=-15&&!d.aus.some(a=>ausExcusa(a.tipo)))frente.push('Conversarmos sobre o volume do período, para entender o que mudou e o que pode ajudar.');
+ if(fortes.length)frente.push(`Continuar ${fortes.length>1?'com esses pontos fortes':'com esse ponto forte'}, que fazem diferença para a equipe.`);
+ if(!frente.length)frente.push(`Manter o ritmo ${prox}.`);
+ apoio.push('Se precisar de alguma orientação, ferramenta ou ajuste na rotina, me fale.');
+ const tem=L.length>0,tom=fortes.length&&L.some(x=>x.tipo==='aten')||fortes.length&&frente.length>2?'mix':!fortes.length&&frente.length>1?'mel':'pos';
+ const texto=`Olá, ${tratDe(p)}!\n\nEste é o seu feedback ${per}. A ideia é olhar para frente: o que você já faz bem e o que podemos fazer ${prox} para você crescer ainda mais.\n\n### Seus pontos fortes\n${fortes.length?li(fortes):'- (acrescente o que você percebeu de positivo no período)'}\n\n### O período em resumo\n${li(resumo.length?resumo:['(sem atividades registradas no Prumo neste período)'])}\n${tem?'':'\n(sem observações registradas no período: acrescente o que você acompanhou no dia a dia)\n'}\n### Para ${prox.replace('no ','o ')}\n${li(frente)}\n- (complete com o que fica combinado entre vocês)\n\n### Como posso apoiar\n${li(apoio)}\n\nConte comigo. Bom trabalho!\n\n${DIR_NOME()}`;
+ return {texto,tom,partes:{per,nums:resumo,bem:fortes,aten:frente,neu:[],prox:apoio}}}
 /* IA do Prumo: roda neste computador (WebGPU), sem serviço pago e sem mandar dados para fora.
    Lê só o que o Prumo entrega (números do período, observações e um feedback anterior como exemplo de estilo). */
 const IA_LIB='https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';let IA_ENG=null,IA_CARR=null;
@@ -1553,8 +1554,8 @@ async function fbIA(){const f=FORM;if(f?.tipo!=='_fbger')return;const i=+(docume
  try{const eng=await iaMotor(r=>{pg(r.progress||0);st(r.progress<1?`Baixando a IA (só na primeira vez, cerca de 2 GB): ${Math.round((r.progress||0)*100)}%`:'Carregando a IA…')});
   pg(1);st('Escrevendo o feedback…');
   const lista=(t,a)=>a.length?`${t}:\n${a.map(x=>'- '+x).join('\n')}\n`:'';
-  const fatos=`Colaborador: ${p.n} (chamar de ${tratDe(p)})\nCargo: ${p.c||'não informado'}\nFeedback: ${P.per}\nTom esperado: ${TONS[tom]}\n\n${lista('Números do período',P.nums)}${lista('Pontos positivos (observações do diretor e números)',P.bem)}${lista('Pontos de atenção (observações do diretor e números)',P.aten)}${lista('Outras observações',P.neu)}${lista('Próximos passos sugeridos',P.prox)}`;
-  const sys='Você escreve feedbacks de desempenho para colaboradores do departamento Financeiro e Contábil, em nome do diretor. Escreva em português do Brasil, em tom humano, respeitoso e direto, falando com a pessoa ("você"). Use APENAS os fatos fornecidos: não invente números, tarefas, elogios nem problemas. Não use dados de fora. Estrutura: saudação com o nome; um parágrafo de abertura; as seções "### O que você fez bem", "### Pontos que ainda precisam de atenção" (só se houver) e "### Próximos passos", com listas curtas; um fechamento de uma frase. Não assine. Até 300 palavras.';
+  const fatos=`Colaborador: ${p.n} (chamar de ${tratDe(p)})\nCargo: ${p.c||'não informado'}\nFeedback: ${P.per}\nTom esperado: ${TONS[tom]}\n\n${lista('Números do período',P.nums)}${lista('Pontos fortes (observações do diretor e dados)',P.bem)}${lista('Para o próximo período (pontos de atenção já em forma de ação)',P.aten)}${lista('Apoio do diretor',P.prox)}`;
+  const sys='Você escreve feedbacks de desempenho para colaboradores do departamento Financeiro e Contábil, em nome do diretor. Escreva em português do Brasil, em tom humano, respeitoso e direto, falando com a pessoa ("você"). Use APENAS os fatos fornecidos: não invente números, tarefas, elogios nem problemas. Não use dados de fora. Use o modelo FEEDFORWARD: o foco é o futuro, não críticas ao passado. Os pontos de atenção viram sugestões práticas para o próximo período, em tom construtivo. Os números são só apoio, em uma ou duas linhas. Estrutura: saudação com o nome; abertura curta dizendo que o foco é olhar para frente; "### Seus pontos fortes"; "### O período em resumo" (curto); "### Para o próximo período" (ações concretas, começando por verbos); "### Como posso apoiar"; fechamento de uma frase. Não assine. Até 300 palavras.';
   const msgs=[{role:'system',content:sys},...(ex?[{role:'user',content:'Exemplo de feedback já escrito pelo diretor, só para seguir o estilo (não copie os fatos):\n\n'+ex},{role:'assistant',content:'Entendido. Vou seguir esse estilo usando só os fatos que você mandar.'}]:[]),{role:'user',content:'Escreva o feedback com estes fatos:\n\n'+fatos}];
   let out='';const it=await eng.chat.completions.create({messages:msgs,temperature:0.5,max_tokens:900,stream:true});
   for await(const ch of it){out+=ch.choices?.[0]?.delta?.content||'';const e=document.getElementById('ia_txt');if(e){e.textContent=out;e.scrollTop=e.scrollHeight}}
