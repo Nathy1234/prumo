@@ -634,3 +634,7 @@ button.tqp{font:inherit;color:inherit;cursor:pointer;text-align:left}button.tqp:
 .hdfoto{display:flex;flex-direction:column;align-items:center;gap:8px;padding:6px 0 10px;margin-bottom:6px;border-bottom:1px solid var(--line)}
 .hdfoto img{width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .hdfoto b{font-size:14px;font-weight:600}
+
+#voltaav{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:61;width:min(420px,calc(100vw - 32px))}
+.voltaav{background:var(--solid,var(--panel));border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:14px;padding:12px 14px;box-shadow:0 14px 40px rgba(0,0,0,.28);animation:reuavIn .25s ease-out}
+.voltaav ul{margin:8px 0 0;padding-left:18px;display:grid;gap:6px}.voltaav li{font-size:13px}.voltaav .lnk{font-size:13px;padding:0;text-align:left;color:var(--ink);text-decoration:underline}

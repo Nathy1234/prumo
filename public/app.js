@@ -713,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=124;
+const PRUMO_ATUALIZACOES=125;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div><div class="full"><label class="lbl" for="cr_de">E-mail do diretor</label><input class="inp" id="cr_de" type="email" maxlength="120" value="${esc(CFG.diretorEmail||'')}" placeholder="nome@fatecie.edu.br"><p class="meta" style="margin:4px 0 0">Para ele receber os convites de reunião no Outlook.</p></div></div>
@@ -721,7 +721,8 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME(),de=(val('cr_de')||'').trim().toLowerCase().slice(0,120);if(!n)return;if(de&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(de)){toast('Confira o e-mail do diretor.');return}try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn,diretorEmail:de});CFG.criador=n;CFG.diretorNome=dn;CFG.diretorEmail=de;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
-  ['2026-10-30','Reunião só com quem você escolher: aparece e avisa só para os participantes'],
+  ['2026-10-30','Aviso na tela de e-mail novo para revisar; resumo do que aconteceu para quem volta depois de 4 horas'],
+ ['2026-10-30','Reunião só com quem você escolher: aparece e avisa só para os participantes'],
  ['2026-10-30','Destaques idênticos aparecem uma vez só'],
  ['2026-10-30','Destaques do mês no Painel, com a foto grande, logo abaixo da Equipe no trimestre'],
  ['2026-10-30','Clique duplo em Salvar não grava mais em dobro'],
@@ -2215,7 +2216,28 @@ function cantoAviso(a){let c=document.getElementById('avcanto');if(!c){c=documen
 function avisarCanto(a){avMarca(a.k);let so=false;
  try{if(avOk()&&Notification.permission==='granted'){const n=new Notification('Prumo · '+a.t,{body:a.s||'',tag:'prumo-'+a.k});n.onclick=()=>{window.focus();ir(a.ir);n.close()};so=document.visibilityState!=='visible'}}catch(e){}
  if(!so)cantoAviso(a)}
-function checarAvisos(){if(S.modo==='carregando'||!DB)return;try{const ja=avJa();avisosDevidos().filter(a=>!ja.includes(a.k)).slice(0,4).forEach(avisarCanto)}catch(e){}}
+/* e-mail novo para revisar: aviso na tela para quem tem a permissão E-mails recebidos */
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+function emailAviso(){if(!pode('email')||solic()||S.perfil==='pendente')return;const k='emVistos_'+(ME.uid||S.perfil),L=emPend(),vistos=lsGet(k,null),ids=L.map(e=>e.id);
+ if(!Array.isArray(vistos)){lsSet(k,ids);return}
+ const novos=L.filter(e=>!vistos.includes(e.id));lsSet(k,[...new Set([...vistos,...ids])].slice(-500));if(!novos.length)return;
+ avisarCanto({k:'em_'+novos.map(e=>e.id).join('_').slice(0,120),t:novos.length>1?`${novos.length} e-mails novos para revisar`:'E-mail novo para revisar',s:novos.slice(0,2).map(e=>`${e.deNome||e.de||''}: ${e.assunto||'(sem assunto)'}`).join(' · '),ir:'triagem'})}
+/* quem fica mais de 4 horas sem abrir o Prumo vê, ao voltar, o que aconteceu enquanto estava fora */
+function marcaPresenca(f){if((f||document.visibilityState==='visible')&&ME?.uid&&S.modo!=='carregando')lsSet('ultVez_'+ME.uid,Date.now())}
+let VOLTA_FEITO=false;
+function resumoVolta(){if(VOLTA_FEITO||S.modo==='carregando'||!ME?.uid||solic()||S.perfil==='pendente'||!Array.isArray(D.chamados))return;VOLTA_FEITO=true;
+ const ult=+lsGet('ultVez_'+ME.uid,0);marcaPresenca();if(!ult||Date.now()-ult<4*3600e3)return;const desde=new Date(ult).toISOString(),it=[];
+ if(pode('email')){const n=D.emails.filter(e=>(e.recebido||'')>desde).length,pd=emPend().length;if(n||pd)it.push(['triagem',`${n} ${n===1?'e-mail chegou':'e-mails chegaram'}${pd?` · ${pd} para revisar`:''}`])}
+ if(pode('chamados')){const nc=D.chamados.filter(c=>(c.abertoEm||c.recebidoEm||'')>desde).length,meus=D.chamados.filter(c=>c.st!=='Concluído'&&c.resp===S.perfil&&(c.aceitoEm||c.abertoEm||'')>desde).length,atr=D.chamados.filter(c=>c.st!=='Concluído'&&c.resp===S.perfil&&chAtrasado(c)).length;
+  if(nc)it.push(['chamados',`${nc} ${nc===1?'chamado novo':'chamados novos'}`]);if(meus)it.push(['chamados',`${meus} ${meus===1?'chamado ficou':'chamados ficaram'} com você`]);if(atr)it.push(['chamados',`${atr} ${atr===1?'chamado seu está atrasado':'chamados seus estão atrasados'}`])}
+ const reu=D.eventos.filter(e=>e.tipo==='Reunião'&&paraMimEv(e)&&evOcorre(e,HJ));if(reu.length)it.push(['calendario',`Reunião hoje: ${reu.map(e=>(e.hora?e.hora+' ':'')+e.t).slice(0,2).join(' · ')}`]);
+ const pz=proxPrazos(1,true).filter(x=>x.d===HJ&&!/reuni/i.test(x.t||''));if(pz.length)it.push(['calendario',`${pz.length} ${pz.length===1?'prazo hoje':'prazos hoje'}`]);
+ const atrR=atrasosCron(vejoRot).length;if(atrR&&pessoa(S.perfil))it.push(['rotinas',`${atrR} ${atrR===1?'rotina em atraso':'rotinas em atraso'} no cronograma`]);
+ if(!it.length)return;const h=Math.round((Date.now()-ult)/3600e3),qd=h>=48?`${Math.round(h/24)} dias`:`${h} horas`;
+ let c=document.getElementById('voltaav');if(!c){c=document.createElement('div');c.id='voltaav';c.setAttribute('role','dialog');c.setAttribute('aria-label','Enquanto você esteve fora');document.body.appendChild(c)}
+ c.innerHTML=`<div class="voltaav"><div class="reuav-h"><b>Enquanto você esteve fora · ${qd}</b><button class="reuav-x" onclick="document.getElementById('voltaav').remove()" aria-label="Fechar">×</button></div><ul>${it.map(([t,x])=>`<li><button class="lnk" onclick="document.getElementById('voltaav').remove();ir('${t}')">${esc(x)}</button></li>`).join('')}</ul></div>`}
+function checarAvisos(){if(S.modo==='carregando'||!DB)return;try{emailAviso()}catch(e){}try{resumoVolta()}catch(e){}try{const ja=avJa();avisosDevidos().filter(a=>!ja.includes(a.k)).slice(0,4).forEach(avisarCanto)}catch(e){}}
 
 /* chegada dos pedidos: a equipe marca à mão se o e-mail ou chamado chegou atrasado; o diretor vê por departamento */
 function ajusteSheet(ref,pre){const [k,id]=ref.split(':'),x=(k==='e'?D.emails:D.chamados).find(y=>y.id===id);if(!x)return;FORM={tipo:'_ajuste',ref};
@@ -3806,7 +3828,7 @@ render();
   first=false;later()},()=>{});
  iniciarAutoSync();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
- setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);setTimeout(reuAviso,5000);setInterval(reuAviso,3e4);
+ setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);setInterval(marcaPresenca,6e4);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{marcaPresenca(1)}catch(e){}}});window.addEventListener('pagehide',()=>{try{marcaPresenca(1)}catch(e){}});setTimeout(reuAviso,5000);setInterval(reuAviso,3e4);
  setTimeout(limparHorasModelo,6000);setInterval(limparHorasModelo,3e4);
  setTimeout(autoOrganizar,9000);setInterval(autoOrganizar,3e4);setTimeout(autoCategorias,12000);setInterval(autoCategorias,6e4);setTimeout(categoriasPelaMensagem,15000);setInterval(categoriasPelaMensagem,45e3);
 })();
