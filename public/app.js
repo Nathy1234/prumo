@@ -243,7 +243,8 @@ function triNav(){return `<div class="seg"><button onclick="mvTri(-1)" aria-labe
 function mesNav(k){return `<div class="seg"><button onclick="mvMes('${k}',-1)" aria-label="Mês anterior">‹</button><span>${mesNome(S[k])}</span><button onclick="mvMes('${k}',1)" aria-label="Próximo mês">›</button></div>`}
 function mvTri(n){let {ano,q}=S.tri;q+=n;if(q>4){q=1;ano++}if(q<1){q=4;ano--}S.tri={ano,q};render()}
 function mvMes(k,n){S[k]=addMes(S[k],n);render()}
-function cardDest(d){return `<div class="hcard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tag ${d.tipo==='Reconhecimento'?'ac':d.tipo==='Meta batida'?'ok':d.tipo==='Melhoria implantada'?'wa':'ne'}">${esc(d.tipo)}</span>${pode('feedbacks')?editar('destaque',d.id):''}</div><b>${esc(d.t)}</b>${d.desc?`<p>${esc(d.desc)}</p>`:''}<span class="meta">${d.pessoa?esc(nomeDe(d.pessoa))+' · ':''}${mesCurto(d.mes)}</span></div>`}
+function cardDest(d){const u=d.pessoa?uidDePessoa(d.pessoa):null,f=u&&PROF[u]?.avatarUrl,foto=fotoOk(f)?f:'';
+ return `<div class="hcard${foto?' hfoto':''}">${foto?`<div class="hdfoto"><img src="${foto}" alt="Foto de ${esc(nomeDe(d.pessoa))}"><b>${esc(nomeDe(d.pessoa))}</b></div>`:''}<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tag ${d.tipo==='Reconhecimento'?'ac':d.tipo==='Meta batida'?'ok':d.tipo==='Melhoria implantada'?'wa':'ne'}">${esc(d.tipo)}</span>${pode('feedbacks')?editar('destaque',d.id):''}</div><b>${esc(d.t)}</b>${d.desc?`<p>${esc(d.desc)}</p>`:''}<span class="meta">${d.pessoa?esc(nomeDe(d.pessoa))+' · ':''}${mesCurto(d.mes)}</span></div>`}
 /* realizado no trimestre: chamados concluídos e o que cada um marcou como feito no cronograma.
    O prazo vale só para os chamados (concluído até o prazo combinado). */
 function realizadoTri(pid,t){const ms=mesesTri(t),ini=ms[0]+'-01',fim=fimTri(t),den=d=>d&&d>=ini&&d<=fim;
@@ -706,7 +707,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=117;
+const PRUMO_ATUALIZACOES=118;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -714,6 +715,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Destaques do mês mostram a foto de perfil grande de quem foi destaque'],
  ['2026-10-30','Equipe centralizada: Pessoas, Feedbacks e Férias e ausências; só diretor, admin e quem o admin escolher'],
  ['2026-10-30','Relatórios organizados em abas: Equipe, Chamados, Cronograma, Reuniões e ideias, Destaques'],
  ['2026-10-30','Botão do meio do mouse (ou Ctrl + clique) abre a área em nova aba'],
