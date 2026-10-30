@@ -685,7 +685,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=105;
+const PRUMO_ATUALIZACOES=106;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -693,6 +693,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Admin arrasta os itens do menu lateral para mudar a ordem; botão Organizar menu'],
  ['2026-10-30','Admin muda a ordem do menu; Metas e a fazer fora do menu; itens a fazer aparecem no calendário'],
  ['2026-10-30','A área Melhorias passou a se chamar Reuniões e ideias'],
  ['2026-10-30','Equipe no trimestre leva ao calendário filtrado por pessoa ou etapa; L, B e C em dia conta todos os dias úteis'],
@@ -3573,7 +3574,16 @@ function vigiarDB(db){const marca=p=>{const c=String(p).split('/')[0];if(FORM&&!
 function nav(){const pm=pode('whats')?pendMsg():0,na=alertas().filter(a=>a.c==='bad').length,nc=D.chamados.filter(c=>c.st==='Aberto'&&!c.resp).length,nt=emPend().length,np=D.pedidos.filter(p=>!acessoDe(p.id)).length;
  const nr=atrasosCron(vejoRot).length;const badge=(k)=>k==='rotinas'&&nr?`<span class="count" style="background:var(--bad-bg);color:var(--bad)" title="Rotinas em atraso">${nr}</span>`:k==='whats'&&pm?`<span class="count">${pm}</span>`:k==='chamados'&&(nc||(pode('email')&&nt))?`<span class="count" style="background:var(--accent-soft);color:var(--accent-ink)" title="${nc} sem responsável${pode('email')&&nt?` · ${nt} e-mails para revisar`:''}">${nc+(pode('email')?nt:0)}</span>`:k==='usuarios'&&np?`<span class="count">${np}</span>`:k==='alertas'&&na?`<span class="count" style="background:var(--bad-bg);color:var(--bad)">${na}</span>`:'';
  document.getElementById('nav').innerHTML=(solic()||S.perfil==='pendente'||S.modo==='carregando'?'':`<button class="nav reg ${S.tela==='registrar'?'on':''}" onclick="ir('registrar')" title="Registrar">${ic('reg')}<span>Registrar</span></button>`)+
- (S.modo==='carregando'?'':vis().map(([k,n])=>`<button class="nav ${(MENU_PAI[S.tela]||S.tela)===k?'on':''}" onclick="ir('${k}')" title="${esc(n)}">${ic(k)}<span>${n}</span>${badge(k)}</button>`).join(''))}
+ (S.modo==='carregando'?'':vis().map(([k,n])=>{if(k==='equipe'&&!metasOn())n='Equipe';const arr=podeAdmin()&&!solic();return `<button class="nav ${(MENU_PAI[S.tela]||S.tela)===k?'on':''}" onclick="ir('${k}')" title="${esc(n)}${arr?' · arraste para mudar a ordem':''}"${arr?` draggable="true" data-mk="${k}" ondragstart="navArr(event,'${k}')" ondragover="navSobre(event)" ondragleave="this.classList.remove('arrsob')" ondrop="navSolta(event,'${k}')" ondragend="navFim()"`:''}>${ic(k)}<span>${n}</span>${badge(k)}</button>`}).join('')+(podeAdmin()&&!solic()?`<button class="nav navord" onclick="menuSheet()" title="Organizar o menu: mudar a ordem, mostrar ou ocultar">⇅<span>Organizar menu</span></button>`:''))}
+/* admin arrasta os itens do menu lateral para mudar a ordem (vale para todos) */
+let NAV_ARR='';
+function navArr(e,k){NAV_ARR=k;try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',k)}catch(x){}e.currentTarget.classList.add('arrando')}
+function navSobre(e){if(!NAV_ARR)return;e.preventDefault();e.currentTarget.classList.add('arrsob')}
+function navFim(){NAV_ARR='';document.querySelectorAll('#nav .arrando,#nav .arrsob').forEach(b=>b.classList.remove('arrando','arrsob'))}
+async function navSolta(e,alvo){e.preventDefault();const k=NAV_ARR;navFim();if(!k||k===alvo||!podeAdmin())return;
+ const o=menuOrd().map(m=>m[0]).filter(x=>x!==k);o.splice(o.indexOf(alvo),0,k);const ant=CFG.menuOrdem;CFG.menuOrdem=o;render();
+ try{await DB.doc('config/estrutura').set({...CFG,menuOrdem:o});log(`Mudou a ordem do menu: ${(MENU.find(m=>m[0]===k)||[,k])[1]} antes de ${(MENU.find(m=>m[0]===alvo)||[,alvo])[1]}`);toast('Ordem do menu salva')}
+ catch(x){CFG.menuOrdem=ant;render();toast('Não consegui salvar a ordem. Tente de novo.')}}
 /* menu lateral recolhido: só os ícones, e a área de trabalho fica maior (fica lembrado neste computador) */
 function tgLateral(f){const a=document.getElementById('app');if(!a)return;const on=f===undefined?!a.classList.contains('menumini'):!!f;a.classList.toggle('menumini',on);
  const b=document.getElementById('recolher');if(b){b.textContent=on?'›':'‹';b.setAttribute('aria-label',on?'Abrir o menu':'Recolher o menu');b.title=on?'Abrir o menu':'Recolher o menu'}
