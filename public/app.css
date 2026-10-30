@@ -590,3 +590,7 @@ table.andt th[scope=row]{text-transform:none;letter-spacing:0;font-size:13px;col
 .let.nt{background:var(--line-soft);color:var(--ink-3);text-decoration:line-through}.pill.ntp,.dashp .pill.ntp{background:var(--line-soft);color:var(--ink-3)}
 
 .let{position:relative}.refp{position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--accent);border:1px solid var(--panel)}
+
+.tqlink{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;border-radius:10px;padding:4px 6px;margin:-4px -6px}.tqlink:hover{background:var(--line-soft)}.tqlink:focus-visible{outline:2px solid var(--accent)}
+button.tqp{font:inherit;color:inherit;cursor:pointer;text-align:left}button.tqp:hover{border-color:var(--accent)}
+.chips2 .chip{cursor:pointer}

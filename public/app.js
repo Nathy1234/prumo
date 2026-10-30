@@ -685,7 +685,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=102;
+const PRUMO_ATUALIZACOES=103;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -693,6 +693,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Equipe no trimestre leva ao calendário filtrado por pessoa ou etapa; L, B e C em dia conta todos os dias úteis'],
  ['2026-10-29','Link público do painel, ao vivo e sem login'],
  ['2026-10-29','Só as etapas do fluxo (L, B, C e Pagar) contam no realizado'],
  ['2026-10-29','Calendário mais limpo: L, B e C uma vez por dia'],
@@ -797,6 +798,15 @@ const podeReuExp=()=>podeAdmin()||dir()||CFG.reuExpTodos===true;
 async function libReuExp(){if(!podeAdmin()||!DB)return;const v=!CFG.reuExpTodos;try{await DB.doc('config/estrutura').set({...CFG,reuExpTodos:v});CFG.reuExpTodos=v;log(v?'Liberou o relatório e os slides das reuniões para a equipe':'Deixou o relatório e os slides das reuniões só para admin e diretor');toast(v?'Liberado para a equipe':'Agora só admin e diretor',3500);render()}catch(e){toast('Só administradores podem mudar.')}}
 // só conta o que faz parte do fluxo de cada sistema (WAE: L, B, C · Protheus: L, P, C); etapas antigas ficam fora
 const noFluxo=r=>!!r&&(r.sis||[]).some(x=>(ETAPAS_SIS[x]||procs()).includes(r.etapa));
+/* L, B e C em dia: cada dia útil (desde a primeira marcação do sistema) vale uma marcação por etapa.
+   Conta como em dia: feito para aquele dia, "não teve" ou o responsável de férias/atestado. */
+function lbcEmDia(de,ate){let tot=0,ok=0;const R=registrosCron('','');
+ for(const x of sists()){const E=ETAPAS_SIS[x]||[],meus=R.filter(o=>o.sis===x&&E.includes(o.g)&&!o.par);if(!meus.length)continue;
+  const ini=[...meus.map(o=>o.ref)].sort()[0],d0=ini>de?ini:de;
+  for(const d of diasDe(d0,ate)){if(!ehUtil(d))continue;for(const g of E){tot++;
+   if(meus.some(o=>o.ref===d&&o.g===g))ok++;
+   else{const rots=D.cronograma.filter(r=>r.etapa===g&&(r.sis||[]).includes(x));if(rots.some(r=>ausRot(r,d)))ok++}}}}
+ return {tot,ok}}
 const saud=()=>{const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'};
 const fotoOk=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(u);
 const avU=uid=>{const p=PROF[uid];return fotoOk(p?.avatarUrl)?`<img class="av" src="${p.avatarUrl}" alt="">`:`<span class="av">${esc((nomeU(uid)||'?')[0])}</span>`};
@@ -2988,7 +2998,7 @@ calendario(){
  const fimM=isoD(new Date(y,m,0)),evs=D.eventos.filter(vejoEv);
  evs.forEach(e=>{for(const d of diasDe(S.cal+'-01',fimM))if(evOcorre(e,d))put(d,(e.hora?e.hora+' ':'')+e.t,corEv(e))});
  minhas().forEach(t=>put(t.prazo,t.t,t.s==='feita'?'ok':atrasada(t)?'bad':'ne'));
- const RG=registrosCron(S.cal+'-01',fimM),RR=registrosCron('','').filter(o=>o.ref.slice(0,7)===S.cal&&o.done!==o.ref&&!o.par),ordL=g=>{const i=[...procs(),'Comprovantes','Controladoria','Impressão de caixas'].indexOf(g);return i<0?99:i};
+ const RG=registrosCron(S.cal+'-01',fimM).filter(o=>(!S.calPes||o.pid===S.calPes)&&(!S.calEt||o.g===S.calEt)),RR=registrosCron('','').filter(o=>o.ref.slice(0,7)===S.cal&&o.done!==o.ref&&!o.par),ordL=g=>{const i=[...procs(),'Comprovantes','Controladoria','Impressão de caixas'].indexOf(g);return i<0?99:i};
  const porDia={};RG.forEach(o=>{(porDia[o.done]=porDia[o.done]||[]).push(o)});
  const refDia={};RR.forEach(o=>{const m=refDia[o.ref]=refDia[o.ref]||{};(m[letraS(o.g,o.sis)]=m[letraS(o.g,o.sis)]||new Set()).add(fmt(o.done))});
  let c='';['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach(d=>c+=`<div class="dn">${d}</div>`);
@@ -2997,6 +3007,7 @@ calendario(){
   const fx=Object.values(gx).map(o=>({...o,nt:o.todosNt,par:o.algumPar&&!o.todosNt})).sort((a,b)=>(a.sis==='Protheus')-(b.sis==='Protheus')||ordL(a.g)-ordL(b.g)),rf=null;
   c+=`<div class="day ${iso===HJ?'today':''}${fx.length||rf?' clic':''}" ${fx.length||rf?`onclick="diaFeitosSheet('${iso}')" title="Ver o que foi feito"`:''}>${d}${fx.length?`<span class="lets">${fx.map(o=>`<span class="let ${o.sis==='Protheus'?'pro':''} ${o.par?'par':''} ${o.nt?'nt':''}" title="${esc(o.sis)} · ${esc(nomeEtS(o.g,o.sis))}${[...o.refs].some(r=>r!==iso)?' · referente a '+[...o.refs].sort().map(fmt).join(', '):''}${o.par?' · em parte':''}${o.nt?' · não teve no dia':''}: ${esc(o.n.join('; '))}"><b>${esc(letraS(o.g,o.sis))}</b>${[...o.refs].some(r=>r!==iso)?'<i class="refp" aria-hidden="true"></i>':''}</span>`).join('')}</span>`:''}${rf?`<span class="meta" style="font-size:10.5px;line-height:1.3">${Object.entries(rf).map(([l,ds])=>`${esc(l)} feito em ${[...ds].join(', ')}`).join(' · ')}</span>`:''}${(ev[d]||[]).slice(0,3).map(e=>`<span class="ev ${e[1]}" title="${esc(e[0])}">${esc(e[0])}</span>`).join('')}${(ev[d]||[]).length>3?`<span class="meta">+${ev[d].length-3}</span>`:''}</div>`}
  return head('Agenda do departamento','Calendário','O que foi feito em cada dia, reuniões e obrigações.',mesNav('cal')+novo('evento','Novo prazo'))+
+ `<div class="filtros cronf"><button class="chip ${!S.calPes?'on':''}" onclick="S.calPes='';render()">Todas as pessoas</button>${colabs().map(p=>`<button class="chip ${S.calPes===p.id?'on':''}" onclick="S.calPes='${esc(p.id)}';render()">${esc(p.n)}</button>`).join('')}<span class="sep"></span><button class="chip ${!S.calEt?'on':''}" onclick="S.calEt='';render()">L, B e C</button>${[...new Set(sists().flatMap(x=>ETAPAS_SIS[x]||[]))].map(g=>`<button class="chip ${S.calEt===g?'on':''}" onclick="S.calEt='${esc(g)}';render()">${esc(g)}</button>`).join('')}</div>`+
  (podeAdmin()&&!CFG.ajusteOut26?`<div class="banner"><span>Outubro ainda está com as marcações antigas. Aplique o ajuste para deixar L, B e C como combinado (01 a 23/10, e L e B em 26 e 27/10).</span><button class="btn pri" onclick="ajusteOutSheet()">Aplicar o ajuste de outubro</button></div>`:'')+
  `<div class="panel"><div class="cal">${c}</div></div><div class="legend"><span><b class="let">L</b> Lançamento / Lançar</span><span><b class="let">B</b> Baixa</span><span><b class="let">C</b> Conciliação / Conciliar</span><span><b class="let">P</b> Pagar (Protheus)</span><span><b class="let">L</b> WAE</span><span><b class="let pro">L</b> Protheus</span><span><b class="let par">L</b> feito em parte</span><span><b class="let nt">L</b> não teve no dia</span><span><b class="let">L<i class="refp"></i></b> inclui dia anterior</span></div><div class="legend"><span><i style="background:var(--accent)"></i>Reunião</span><span><i style="background:var(--warn)"></i>Obrigação</span><span><i style="background:var(--bad)"></i>Fechamento ou atrasada</span><span><i style="background:var(--ok)"></i>Concluída</span></div><p class="meta" style="margin:0">Cada letra aparece uma vez no dia em que foi feita. O pontinho indica que inclui dia anterior. Clique no dia para ver o que foi feito, a que dia se refere, por quem e a que horas.</p>`+
  (()=>{const L=evs.filter(e=>(e.rep||'unica')!=='unica'?(!e.fim||e.fim>=S.cal+'-01')&&(!e.data||e.data<=fimM):(e.data||'').slice(0,7)===S.cal).sort((a,b)=>((a.rep||'unica')==='unica')-((b.rep||'unica')==='unica')||(a.data||'').localeCompare(b.data||''));
@@ -3297,13 +3308,14 @@ function trimBloco(){const t=triAgora(),ini=mesesTri(t)[0]+'-01',fim=fimTri(t),T
  const barra=(rot,pct,sub,cor)=>`<div class="tq"><p><span>${rot}</span><b>${pct===null?'—':pct+'%'}</b></p><div class="bar"><i style="width:${pct||0}%;${cor?'background:'+cor:''}"></i></div><small>${sub}</small></div>`;
  const ps=colabs().map(p=>({p,r:realizadoPer(p.id,ini,HJ)}));
  // calendário: rotinas previstas no cronograma até hoje × feitas (ou "não teve", ou pessoa de férias/atestado)
- let cT=0,cO=0;const fS=r=>r.freq!=='avulsa'&&(r.sis||[]).some(x=>sists().includes(x)&&(ETAPAS_SIS[x]||[]).includes(r.etapa));for(const d of diasDe(ini,HJ)){const c=contaDia(d,fS);cT+=c.tot;cO+=c.ok}
+ const LB=lbcEmDia(ini,HJ),cT=LB.tot,cO=LB.ok;
  const pC=cT?Math.round(cO/cT*100):null;
  return `<div class="panel"><div class="ph"><h2>Equipe no ${t.q}º trimestre de ${t.ano}</h2><span>${falta>0?`faltam ${falta} ${falta===1?'dia':'dias'} para o fechamento`:'trimestre encerrado'}</span></div>
  <div class="tqtop"><div class="tqbig"><span>A equipe realizou até agora</span><b>${T.total}</b><small>${T.ch} chamados concluídos · ${T.rot} rotinas do cronograma</small></div>
- <div class="tqbars">${barra('Trimestre percorrido',pT,`${pas} de ${tot} dias`)}${barra('L, B e C em dia (calendário)',pC,cT?`${cO} de ${cT} marcações previstas até hoje: feitas, "não teve" ou com férias`:'nada previsto ainda','var(--ok)')}${barra('Chamados resolvidos',pR,rec.length?`${res} de ${rec.length} recebidos no trimestre`:'nenhum recebido ainda','var(--ok)')}${barra('Chamados no prazo',T.pct,T.chPrazo?`${T.chOk} de ${T.chPrazo} concluídos até o prazo`:'sem chamados com prazo concluídos','var(--accent)')}</div></div>
- ${ps.length?`<div class="tqpess">${ps.map(({p,r})=>`<div class="tqp">${avP(p.id,p.n)}<div><b>${esc(p.n)}</b><small>${r.total} realizadas · ${r.pct===null?'—':r.pct+'% no prazo'}</small></div></div>`).join('')}</div>`:''}
- ${T.etapas.length?`<div class="chips2">${T.etapas.map(([g,n])=>`<span class="chip" style="cursor:default">${esc(g)} ${n}</span>`).join('')}</div>`:''}</div>`}
+ <div class="tqbars">${barra('Trimestre percorrido',pT,`${pas} de ${tot} dias`)}<button class="tqlink" onclick="calFiltro()" title="Ver no calendário">${barra('L, B e C em dia (calendário)',pC,cT?`${cO} de ${cT} marcações dos dias úteis até hoje: feitas, "não teve" ou com férias · ver no calendário ›`:'nada marcado ainda','var(--ok)')}</button><button class="tqlink" onclick="ir('chamados')" title="Abrir os chamados">${barra('Chamados resolvidos',pR,rec.length?`${res} de ${rec.length} recebidos no trimestre`:'nenhum recebido ainda','var(--ok)')}</button><button class="tqlink" onclick="ir('chamados')" title="Abrir os chamados">${barra('Chamados no prazo',T.pct,T.chPrazo?`${T.chOk} de ${T.chPrazo} concluídos até o prazo`:'sem chamados com prazo concluídos','var(--accent)')}</button></div></div>
+ ${ps.length?`<div class="tqpess">${ps.map(({p,r})=>`<button class="tqp" onclick="calFiltro('${esc(p.id)}')" title="Ver no calendário o que ${esc(p.n)} fez">${avP(p.id,p.n)}<div><b>${esc(p.n)}</b><small>${r.total} realizadas · ${r.pct===null?'—':r.pct+'% no prazo'}</small></div></button>`).join('')}</div>`:''}
+ ${T.etapas.length?`<div class="chips2">${T.etapas.map(([g,n])=>`<button class="chip" onclick="calFiltro('','${esc(g)}')" title="Ver ${esc(g)} no calendário">${esc(g)} ${n}</button>`).join('')}</div>`:''}</div>`}
+function calFiltro(pid,et){S.calPes=pid||'';S.calEt=et||'';S.cal=MES_ATUAL;ir('calendario')}
 /* resumo da semana no Teams (teste): o Prumo monta e manda para o Workflows do Teams, que entrega ao diretor */
 function teamsSheet(){FORM={tipo:'_teams'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Teams</p><h2 id="sheet-title">Resumo da semana no Teams</h2><p class="sub" style="font-size:13px">O Prumo manda para o Teams do diretor: chamados em aberto e atrasados, o que chegou e foi concluído na semana e o que a equipe fez no cronograma. Sem custo: usa o Workflows do próprio Teams.</p></div>
