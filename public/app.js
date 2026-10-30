@@ -246,6 +246,9 @@ function triNav(){return `<div class="seg"><button onclick="mvTri(-1)" aria-labe
 function mesNav(k){return `<div class="seg"><button onclick="mvMes('${k}',-1)" aria-label="Mês anterior">‹</button><span>${mesNome(S[k])}</span><button onclick="mvMes('${k}',1)" aria-label="Próximo mês">›</button></div>`}
 function mvTri(n){let {ano,q}=S.tri;q+=n;if(q>4){q=1;ano++}if(q<1){q=4;ano--}S.tri={ano,q};render()}
 function mvMes(k,n){S[k]=addMes(S[k],n);render()}
+/* destaques idênticos (gravados em dobro por clique duplo) aparecem uma vez só; nada é apagado */
+const destChave=d=>[d.mes,d.tipo,d.pessoa||'',norm(d.t||''),norm(d.desc||'')].join('|');
+const destUnicos=L=>{const v=new Set();return L.filter(d=>{const k=destChave(d);if(v.has(k))return false;v.add(k);return true})};
 function cardDest(d){const u=d.pessoa?uidDePessoa(d.pessoa):null,f=u&&PROF[u]?.avatarUrl,foto=fotoOk(f)?f:'';
  return `<div class="hcard${foto?' hfoto':''}">${foto?`<div class="hdfoto"><img src="${foto}" alt="Foto de ${esc(nomeDe(d.pessoa))}"><b>${esc(nomeDe(d.pessoa))}</b></div>`:''}<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="tag ${d.tipo==='Reconhecimento'?'ac':d.tipo==='Meta batida'?'ok':d.tipo==='Melhoria implantada'?'wa':'ne'}">${esc(d.tipo)}</span>${pode('feedbacks')?editar('destaque',d.id):''}</div><b>${esc(d.t)}</b>${d.desc?`<p>${esc(d.desc)}</p>`:''}<span class="meta">${d.pessoa?esc(nomeDe(d.pessoa))+' · ':''}${mesCurto(d.mes)}</span></div>`}
 /* realizado no trimestre: chamados concluídos e o que cada um marcou como feito no cronograma.
@@ -710,7 +713,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=120;
+const PRUMO_ATUALIZACOES=121;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -718,6 +721,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Destaques idênticos aparecem uma vez só'],
  ['2026-10-30','Destaques do mês no Painel, com a foto grande, logo abaixo da Equipe no trimestre'],
  ['2026-10-30','Clique duplo em Salvar não grava mais em dobro'],
  ['2026-10-30','Destaques do mês mostram a foto de perfil grande de quem foi destaque'],
@@ -2991,7 +2995,7 @@ painel(){
  const exemplos=COLS.some(c=>D[c].some(x=>x.exemplo));
  const ban=dir()&&exemplos?`<div class="banner"><span>Os registros atuais são exemplos para você testar. Quando for usar de verdade, limpe e registre os dados reais.</span><button class="btn" onclick="limparEx()">${S.limpar?'Confirmar limpeza':'Limpar exemplos'}</button></div>`:'';
  const tm=D.tarefas.filter(x=>x.prazo&&x.prazo.slice(0,7)===MES_ATUAL),fm=tm.filter(x=>x.s==='feita').length;
- const atr=D.tarefas.filter(atrasada),pm=pendMsg(),dm=D.destaques.filter(d=>d.mes===MES_ATUAL);
+ const atr=D.tarefas.filter(atrasada),pm=pendMsg(),dm=destUnicos(D.destaques.filter(d=>d.mes===MES_ATUAL));
  const prox=proxPrazos(6);
  if(!dir()&&!pode('ver_tudo')){const p=pessoa(S.perfil),mt=minhas(),r=realizadoTri(S.perfil,S.tri);const meuF=r=>minhaRot(r),cm=contaDia(HJ,meuF),meus=D.cronograma.filter(r=>meuF(r)&&ocorre(r,HJ)).sort(ordR),meusAtr=atrasosCron(meuF).filter(o=>o.dia<HJ);
   return head(hojeTxt(),`${avP(S.perfil,p?.n,'avg')}${saud()}, <em>${esc(p?.n||'')}</em>`,'Seu dia no cronograma, suas demandas e seu desempenho no trimestre.',`<button class="btn pri" onclick="S.cTab='dia';S.cDia='';ir('rotinas')">Abrir cronograma</button>`)+chegadaPainel()+comecarBtn()+andamento(S.pDia||HJ,'pDia')+`<div class="panel"><div class="ph"><h2>Outras atividades de hoje</h2><span>clique no que fez</span></div>${outrasOpcoes(HJ)}</div>`+
@@ -3042,7 +3046,7 @@ painel(){
  return head(hojeTxt(),`${real()&&ME.uid?avU(ME.uid).replace('class="av"','class="av avg"'):''}${saud()}, <em>${esc(primeiroNome())}</em>`,'Visão geral do departamento hoje.',`<span class="chip">Competência ${mesCurto(MES_ATUAL)}</span>${podeReuExp()?`<button class="btn pri" onclick="emitirSheet()">Emitir relatório ou slides</button>`:''}`)+alertaTop+ban+`<div class="porg">${dir()||podeAdmin()?`<button class="btn ghost" onclick="cfgResumo()" title="E-mail com os atrasos no dia e hora que você escolher">Resumo e avisos${cfgRes().ativo||cfgAv().ativo?' · ligado':''}</button><button class="btn ghost" onclick="teamsSheet()" title="Resumo da semana no Teams do diretor">Resumo no Teams</button>${podeReuExp()?`<button class="btn ghost" onclick="linkSheet()" title="Painel ao vivo para quem tiver o link, sem login">Link público${CFG.linkPublico?.ativo?' · ligado':''}</button>`:''}`:''}<button class="btn ghost" onclick="orgPainel()" title="Mudar a ordem dos blocos ou esconder algum">Organizar painel</button></div>`+`<div class="pgrid">${painelOrdem().filter(k=>B[k]&&!painelOculto().includes(k)).map(k=>{const h=B[k]();return h?`<section class="pb ${BLOCO_LARGO.includes(k)?'f':'h'}" id="pb_${k}"><button class="pbx" onclick="painelVer('${k}',false)" title="Tirar este bloco do painel" aria-label="Tirar ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])} do painel">×</button>${h}</section>`:''}).join('')}</div>`+
  (painelOculto().filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k)).length?`<div class="pocult"><span class="meta">Fora do painel, clique para voltar:</span>${painelOculto().filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k)).map(k=>`<button class="chip" onclick="painelVer('${k}',true)">+ ${esc((BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1])}</button>`).join('')}</div>`:'')},
 
-destaques(){const l=D.destaques.filter(d=>d.mes===S.mesDest);
+destaques(){const l=destUnicos(D.destaques.filter(d=>d.mes===S.mesDest));
  return head('Reconhecimento','Destaques do mês','Conquistas, metas batidas e reconhecimentos da equipe.',mesNav('mesDest')+(pode('feedbacks')?novo('destaque','Registrar destaque'):''))+
  (l.length?`<div class="hl">${l.map(cardDest).join('')}</div>`:`<div class="panel">${vazio(`Nenhum destaque em ${mesNome(S.mesDest)}`,'Registre o que a equipe conquistou no mês.',pode('feedbacks')?'destaque':null,'Registrar destaque')}</div>`)+
  (pode('feedbacks')?note('Os destaques do mês entram automaticamente no relatório do trimestre e podem virar uma mensagem de reconhecimento no WhatsApp.'):'')},
@@ -3136,7 +3140,7 @@ sistema(){if(!podeAdmin()&&!dir())return V.painel();
  <div class="panel"><div class="ph"><h2>Novidades recentes</h2><span>últimas mudanças no Prumo</span></div>${NOVIDADES.slice(0,15).map(([d,t])=>`<div class="row"><span class="meta" style="width:52px">${fmt(d)}</span><div class="t"><b style="font-weight:400">${esc(t)}</b></div></div>`).join('')}</div>`+
  `<div class="sb-fim"><div class="sb-logo">${document.querySelector('.brand .mark')?.innerHTML||''}</div><div><b>Prumo · Financeiro e Contábil</b><span>Criado por ${esc(CFG.criador||'Natalia Araujo')} em ${esc(PRUMO_INICIO)} · ${PRUMO_ATUALIZACOES} atualizações publicadas${vs?` · versão ${esc(vs)}`:''}</span></div>${podeAdmin()?`<button class="btn ghost" onclick="editCriador()">Editar nome</button>`:''}</div>`+
  note('Só administradores e o diretor veem esta tela. Os números são do momento em que você abre e mudam sozinhos conforme a equipe usa o Prumo.')},
-relat(){const ms=mesesTri(S.tri),de=ms[0]+'-01',ft=fimTri(S.tri),ate=ft<HJ?ft:HJ,dq=D.destaques.filter(d=>ms.includes(d.mes));
+relat(){const ms=mesesTri(S.tri),de=ms[0]+'-01',ft=fimTri(S.tri),ate=ft<HJ?ft:HJ,dq=destUnicos(D.destaques.filter(d=>ms.includes(d.mes)));
  const vazioT=de>HJ;const T=realizadoPer(null,de,ate),K=dashCh(de,ate),LB=lbcEmDia(de,ate),pLB=LB.tot?Math.round(LB.ok/LB.tot*100):null;
  const reuK=[...new Set(D.sugestoes.filter(x=>sugCat(x)==='reuniao'&&x.reuData&&x.reuData>=de&&x.reuData<=ft).map(reuKey))].sort().reverse(),ideias=D.sugestoes.filter(x=>sugCat(x)==='sistema');
  const ent=modOn('entregas')&&D.entregas.length;
