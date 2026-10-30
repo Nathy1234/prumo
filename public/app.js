@@ -700,7 +700,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=110;
+const PRUMO_ATUALIZACOES=111;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nome de quem criou</h2></div><div><label class="lbl" for="cr_n">Nome</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div>
@@ -708,6 +708,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80);if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n});CFG.criador=n;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Aviso no canto da tela das reuniões do dia e 15 minutos antes'],
  ['2026-10-30','Cartões dos chamados mais compactos, com a etiqueta de chegada dentro do cartão'],
  ['2026-10-30','Chamados: visão Por data de entrega, com os em aberto separados por dia'],
  ['2026-10-30','Itens a fazer no calendário abrem ao clicar: editar, marcar como feito ou excluir'],
@@ -2163,7 +2164,7 @@ function avMarca(k){const l=avJa();l.push(k);try{localStorage.setItem(AV_K(),JSO
 function avisosDevidos(){if(solic()||S.perfil==='pendente')return [];const mn=t=>{const [h,m]=String(t).split(':').map(Number);return h*60+(m||0)},ag=mn(agoraHM()),L=[];
  if(dir()){const c=cfgRes();if(resumoHoje(c)&&agoraHM()>=(c.hora||'08:00')){const r=dadosResumo(c),tot=r.secoes.reduce((a,x)=>a+(x.k==='ia'?0:x.total),0);if(tot||!c.soSeHouver)L.push({k:'resumo_'+HJ,t:tot?`Resumo do dia: ${tot} ${tot>1?'pendências':'pendência'}`:'Resumo do dia: tudo em dia',s:r.secoes.filter(x=>x.k!=='ia').map(x=>x.t).slice(0,3).join(' · '),ir:'painel'})}}
  const hoje=proxPrazos(30,true).filter(x=>x.d===HJ);if(hoje.length)L.push({k:'dia',t:`Hoje: ${hoje.length} ${hoje.length>1?'prazos':'prazo'}`,s:hoje.slice(0,3).map(x=>(x.h?x.h+' ':'')+x.t).join(' · '),ir:'painel'});
- D.eventos.filter(e=>paraMimEv(e)&&e.hora&&evOcorre(e,HJ)).forEach(e=>{const d=mn(e.hora)-ag;if(d<=15&&d>=-5)L.push({k:'ev_'+e.id,t:`${e.hora} · ${e.t}`,s:d>0?`Começa em ${d} min`:'Começando agora',ir:'calendario'})});
+ D.eventos.filter(e=>e.tipo!=='Reunião'&&paraMimEv(e)&&e.hora&&evOcorre(e,HJ)).forEach(e=>{const d=mn(e.hora)-ag;if(d<=15&&d>=-5)L.push({k:'ev_'+e.id,t:`${e.hora} · ${e.t}`,s:d>0?`Começa em ${d} min`:'Começando agora',ir:'calendario'})});
  D.cronograma.filter(r=>vejoRot(r)&&r.hora&&ocorre(r,HJ)&&exDe(r.id,HJ)?.s!=='feita').forEach(r=>{const d=mn(r.hora)-ag;
   if(d<=15&&d>0)L.push({k:'rt_'+r.id,t:`${r.hora} · ${r.t}`,s:`Em ${d} min · ${nomesRs(r)}`,ir:'rotinas'});else if(d<=0&&d>-180)L.push({k:'ra_'+r.id,t:`Atrasada: ${r.t}`,s:`Era às ${r.hora} · ${nomesRs(r)}`,ir:'rotinas'})});
  const ant=atrasosCron(vejoRot).filter(o=>o.dia<HJ).length;if(ant)L.push({k:'ant',t:`${ant} ${ant>1?'rotinas de dias anteriores':'rotina de dia anterior'} em atraso`,s:'Veja em Cronograma',ir:'rotinas'});
@@ -2613,6 +2614,24 @@ async function fluxoTirar(id){const f=D.fluxo.find(x=>x.id===id);if(!f)return;if
 
 /* ---------- prazos e compromissos: fixos (toda semana, todo mês) ou de uma vez ---------- */
 const TIPOS_EV=['Reunião','Obrigação','Fechamento','Outro'];
+/* aviso no canto da tela: reuniões do dia (ao abrir o Prumo) e de novo 15 minutos antes */
+const reuAvKey=(id,f)=>`reuAv:${id}:${HJ}:${f}`;
+const reuAvVisto=k=>{try{return localStorage.getItem(k)==='1'}catch(e){return !!(window.__reuAv||{})[k]}};
+function reuAvFecha(k){try{localStorage.setItem(k,'1')}catch(e){}(window.__reuAv=window.__reuAv||{})[k]=1;reuAviso()}
+function reuAviso(){let box=document.getElementById('reuav');
+ if(!box){box=document.createElement('div');box.id='reuav';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
+ if(!ME?.uid||S.modo==='carregando'||S.perfil==='pendente'||solic()||!Array.isArray(D.eventos)){box.innerHTML='';return}
+ const ag=new Date(),min=ag.getHours()*60+ag.getMinutes(),mm=h=>{const m=/^(\d{1,2}):(\d{2})/.exec(h||'');return m?+m[1]*60+ +m[2]:null};
+ const L=[];for(const e of D.eventos.filter(e=>e.tipo==='Reunião'&&vejoEv(e)&&evOcorre(e,HJ))){const h=mm(e.hora),falta=h===null?null:h-min;
+  if(falta!==null&&falta<-30)continue;
+  const fase=falta!==null&&falta<=15?'antes':'dia',k=reuAvKey(e.id,fase);if(reuAvVisto(k))continue;
+  L.push({e,k,falta})}
+ L.sort((a,b)=>(a.e.hora||'99')<(b.e.hora||'99')?-1:1);
+ for(const {e,k,falta} of L){const kn=k+':win';if(reuAvVisto(kn))continue;
+  try{if(avOk()&&Notification.permission==='granted'){const n=new Notification(falta!==null&&falta<=15?(falta<=0?'Reunião começando':'Reunião em '+falta+' min'):'Reunião hoje',{body:`${e.hora?e.hora+' · ':''}${e.t||'Reunião'}`,tag:'prumo-reu-'+k,requireInteraction:falta!==null&&falta<=15});n.onclick=()=>{window.focus();S.cal=MES_ATUAL;ir('calendario');n.close()}}}catch(x){}
+  try{localStorage.setItem(kn,'1')}catch(x){}(window.__reuAv=window.__reuAv||{})[kn]=1}
+ const html=L.slice(0,3).map(({e,k,falta})=>`<div class="reuav" role="status"><div class="reuav-h"><b>${falta!==null&&falta<=15?(falta<=0?'Reunião começando':'Reunião em '+falta+' min'):'Reunião hoje'}</b><button class="reuav-x" onclick="reuAvFecha('${esc(k)}')" aria-label="Fechar aviso">×</button></div><p>${e.hora?`<span>${esc(e.hora)}</span> `:''}${esc(e.t||'Reunião')}</p>${e.obs?`<small>${esc(e.obs)}</small>`:''}<div class="reuav-b"><button class="btn sm" onclick="reuAvFecha('${esc(k)}');S.cal=MES_ATUAL;ir('calendario')">Ver no calendário</button>${avPodePedir()?`<button class="btn ghost sm" onclick="ativarAvisos()" title="Mostra o aviso no canto da tela do computador, mesmo com o Prumo minimizado">Avisar no computador</button>`:''}</div></div>`).join('');
+ if(box.dataset.h!==html){box.innerHTML=html;box.dataset.h=html}}
 const REP_EV=[['unica','Uma vez só'],['semanal','Toda semana'],['mensal','Todo mês']];
 const corEv=e=>e.tipo==='Fechamento'?'bad':e.tipo==='Obrigação'?'wa':e.tipo==='Reunião'?'ac':'ne';
 function evOcorre(e,dia){const r=e.rep||'unica';if(r==='unica')return e.data===dia;
@@ -3662,7 +3681,7 @@ render();
   first=false;later()},()=>{});
  iniciarAutoSync();
  setTimeout(backupDiario,8000);setInterval(backupDiario,30*6e4);
- setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);
+ setTimeout(checarAvisos,12000);setInterval(checarAvisos,6e4);setTimeout(reuAviso,5000);setInterval(reuAviso,3e4);
  setTimeout(limparHorasModelo,6000);setInterval(limparHorasModelo,3e4);
  setTimeout(autoOrganizar,9000);setInterval(autoOrganizar,3e4);setTimeout(autoCategorias,12000);setInterval(autoCategorias,6e4);setTimeout(categoriasPelaMensagem,15000);setInterval(categoriasPelaMensagem,45e3);
 })();
