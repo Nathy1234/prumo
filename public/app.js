@@ -710,7 +710,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=119;
+const PRUMO_ATUALIZACOES=120;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -718,6 +718,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Destaques do mês no Painel, com a foto grande, logo abaixo da Equipe no trimestre'],
  ['2026-10-30','Clique duplo em Salvar não grava mais em dobro'],
  ['2026-10-30','Destaques do mês mostram a foto de perfil grande de quem foi destaque'],
  ['2026-10-30','Equipe centralizada: Pessoas, Feedbacks e Férias e ausências; só diretor, admin e quem o admin escolher'],
@@ -2270,9 +2271,9 @@ function chegadaPainel(enxuto){if(!(dir()||pode('painel_chamados')))return '';co
 /* ---------- painel do diretor: cada um organiza a ordem dos blocos ---------- */
 const BLOCOS_NOVOS=['trimestre','registro','aniver','ausencias','dash','dashGraf','dashAtr'];
 const BLOCOS_PAINEL=[['trimestre','Equipe no trimestre'],['registro','Realizado no cronograma · 7 dias'],['aniver','Aniversários e tempo de casa'],['ausencias','Férias e ausências'],['dash','Painel dos chamados do mês'],['dashGraf','Pedidos por categoria e por setor'],['dashAtr','Atrasos dos chamados'],['numeros','Números principais'],['chegada','Pedidos dos departamentos · em dia ou atrasados'],['andamento','Andamento do dia no cronograma'],['atencao','Precisa da sua atenção'],['prazos','Próximos prazos'],['destaques','Destaques do mês'],['cron','Cronograma por etapa'],['metas','Metas do mês'],['fech','Fechamento D+N'],['dem','Demandas'],['entregas','Entregas por departamento'],['atrasosDep','Atrasos de departamentos'],['estrutura','Estruturação do departamento']];
-const BLOCO_LARGO=['registro','trimestre','dash','dashGraf','dashAtr','numeros','chegada','andamento','cron','metas','fech','dem'];
-function prefPainel(){const p=S.prefs||{};let l={};try{l=JSON.parse(localStorage.getItem('painel_'+(ME.uid||S.perfil))||'{}')}catch(e){}return {ordem:p.painel||l.ordem||[],oculto:p.painelOculto||l.oculto||[]}}
-function painelOrdem(){let o=prefPainel().ordem.filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k));if(!(S.prefs||{}).painelV3)o=[...BLOCOS_NOVOS,...o.filter(k=>!BLOCOS_NOVOS.includes(k))];if(!(S.prefs||{}).painelV2&&o[0]!=='numeros'){const i=o.indexOf('numeros');if(i>0)o.splice(i,1);o.unshift('numeros')}return [...new Set([...o,...BLOCOS_PAINEL.map(b=>b[0])])]}
+const BLOCO_LARGO=['registro','trimestre','destaques','dash','dashGraf','dashAtr','numeros','chegada','andamento','cron','metas','fech','dem'];
+function prefPainel(){const p=S.prefs||{};let l={};try{l=JSON.parse(localStorage.getItem('painel_'+(ME.uid||S.perfil))||'{}')}catch(e){}const oc=p.painelOculto||l.oculto||[];return {ordem:p.painel||l.ordem||[],oculto:p.painelV4?oc:oc.filter(k=>k!=='destaques')}}
+function painelOrdem(){let o=prefPainel().ordem.filter(k=>BLOCOS_PAINEL.some(b=>b[0]===k));if(!(S.prefs||{}).painelV3)o=[...BLOCOS_NOVOS,...o.filter(k=>!BLOCOS_NOVOS.includes(k))];if(!(S.prefs||{}).painelV2&&o[0]!=='numeros'){const i=o.indexOf('numeros');if(i>0)o.splice(i,1);o.unshift('numeros')}o=[...new Set([...o,...BLOCOS_PAINEL.map(b=>b[0])])];if(!(S.prefs||{}).painelV4){o=o.filter(k=>k!=='destaques');const t=o.indexOf('trimestre');o.splice(t<0?0:t+1,0,'destaques')}return o}
 const painelOculto=()=>prefPainel().oculto;
 function orgPainel(){FORM={tipo:'_painel',ordem:painelOrdem(),oculto:[...painelOculto()]};desenhaOrg();document.getElementById('ov').hidden=false}
 function desenhaOrg(){const f=FORM;if(f?.tipo!=='_painel')return;const nome=k=>(BLOCOS_PAINEL.find(b=>b[0]===k)||[k,k])[1];
@@ -2284,12 +2285,12 @@ function orgVer(k,v){FORM.oculto=FORM.oculto.filter(x=>x!==k);if(!v)FORM.oculto.
 // tirar um bloco do painel com o ×, e voltar clicando no nome dele embaixo
 async function painelVer(k,ver){const pr=prefPainel(),ordem=painelOrdem(),oculto=pr.oculto.filter(x=>x!==k);if(!ver)oculto.push(k);
  try{localStorage.setItem('painel_'+(ME.uid||S.perfil),JSON.stringify({ordem,oculto}))}catch(e){}
- S.prefs={...(S.prefs||{}),painel:ordem,painelOculto:oculto,painelV2:true,painelV3:true};
+ S.prefs={...(S.prefs||{}),painel:ordem,painelOculto:oculto,painelV2:true,painelV3:true,painelV4:true};
  if(DB&&ME.uid&&!S.sim){try{await DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs)}catch(e){}}
  toast(ver?'Bloco de volta no painel':'Bloco tirado do painel. Para voltar, clique no nome dele no fim do painel.',4000);render()}
 async function salvaOrg(){const ordem=[...FORM.ordem],oculto=[...FORM.oculto];
  try{localStorage.setItem('painel_'+(ME.uid||S.perfil),JSON.stringify({ordem,oculto}))}catch(e){}
- S.prefs={...(S.prefs||{}),painel:ordem,painelOculto:oculto,painelV2:true,painelV3:true};
+ S.prefs={...(S.prefs||{}),painel:ordem,painelOculto:oculto,painelV2:true,painelV3:true,painelV4:true};
  if(DB&&ME.uid&&!S.sim){try{await DB.doc('data/users/'+ME.uid+'/prefs').set(S.prefs)}catch(e){}}
  toast('Painel organizado');fechar();render()}
 /* ---------- relatório dos chamados: Excel, HTML e análise com IA ---------- */
@@ -3033,7 +3034,7 @@ painel(){
    ${!cAtr.length&&!atr.length&&!pm&&(!fbPode()||colabs().every(p=>seloMes(p.id,addMes(MES_ATUAL,-1))[0]!=='ne'))?vazio('Tudo em dia','Nada pendente para você agora.'):''}
   </div></div>`,
  destaques:()=>`<div class="panel"><div class="ph"><h2>Destaques de ${MESES[HOJE.getMonth()]}</h2><button class="btn ghost" onclick="ir('destaques')">Ver todos</button></div>
-   ${dm.length?dm.slice(0,3).map(d=>`<div class="row"><div class="t"><b>${esc(d.t)}</b><span>${esc(d.tipo)}${d.pessoa?' · '+esc(nomeDe(d.pessoa)):''}</span></div></div>`).join(''):vazio('Nenhum destaque neste mês','Registre conquistas e reconhecimentos.','destaque','Registrar destaque')}</div>`,
+   ${dm.length?`<div class="hl">${dm.slice(0,4).map(cardDest).join('')}</div>${dm.length>4?`<p class="meta" style="margin:8px 0 0">e mais ${dm.length-4}</p>`:''}`:vazio('Nenhum destaque neste mês','Registre conquistas e reconhecimentos.','destaque','Registrar destaque')}</div>`,
  prazos:()=>`<div class="panel"><div class="ph"><h2>Próximos prazos</h2><button class="btn ghost" onclick="ir('calendario')">Calendário</button></div>
    ${prox.length?prox.map(linPrazo).join(''):vazio('Sem prazos próximos','','evento','Registrar prazo')}<div style="margin-top:8px">${novo('evento','Novo prazo')}</div></div>`,
  estrutura:()=>`<div class="panel"><div class="ph"><h2>Estruturação do departamento</h2>${podeAdmin()?'<button class="btn ghost" onclick="editEstr()">Atualizar</button>':''}</div>
