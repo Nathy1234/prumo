@@ -190,7 +190,8 @@ function fechar(){if(FORM&&FORM.gravou){const k=chaveSheet();if(k)limparRascunho
 document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')fechar()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FORM)fechar()});
 
-async function enviar(){
+async function enviar(){if(FORM&&FORM._env)return;if(FORM)FORM._env=true;try{return await enviar0()}finally{if(FORM)FORM._env=false}}
+async function enviar0(){
   const f=F[FORM.tipo],o={};let ok=true;
   for(const [k,l,tp] of f.campos){
     const opt=tp.endsWith('?'),t=tp.replace('?',''),el=document.getElementById('f_'+k),err=document.getElementById('e_'+k);
@@ -212,8 +213,10 @@ async function enviar(){
   let id=FORM.id;
   if(await salvar(f.col,id,data,ant?'Alterações salvas':'Registrado'))fechar()}
 
+const SALV_REC=new Map();
 async function salvar(col,id,data,msg,lg){
   if(!DB){toast('O armazenamento não está disponível nesta visualização. Nada foi salvo.');return false}
+  if(!id){let ass='';try{ass=col+'|'+JSON.stringify(data)}catch(e){}const ag=Date.now(),t=ass&&SALV_REC.get(ass);if(t&&ag-t<8000)return true;if(ass){SALV_REC.set(ass,ag);if(SALV_REC.size>50)SALV_REC.delete(SALV_REC.keys().next().value)}}
   try{const novo=!id||!D[col]?.some(x=>x.id===id);if(id)await DB.collection(col).doc(id).set(data);else await DB.collection(col).add(data);if(msg)toast(msg);if(lg!==false)log(lg||`${novo?'Registrou':'Alterou'} ${NOMES[col]||col}: ${tituloDe(data)}`);return true}
   catch(e){toast(e?.code==='invalid_argument'?'Você não tem permissão para registrar aqui.':e?.code==='quota_exceeded'?'O limite de registros foi atingido. Exclua registros antigos.':'Não foi possível salvar. Tente de novo.');return false}}
 async function patch(col,id,mud,msg,lg){const ant=D[col].find(x=>x.id===id);if(!ant)return;const {id:_,...b}=ant;return salvar(col,id,{...b,...mud},msg,lg)}
@@ -707,7 +710,7 @@ const SOBRE={
  backup:['Cópia diária automática (7 dias) e cópia para baixar.',()=>{const b=[...D.backups].sort((a,c)=>(c.criado||'').localeCompare(a.criado||''))[0];return b?`último em ${fmtHora(b.criado)}`:'nenhum ainda'}]};
 /* dados do próprio Prumo: início e quantas atualizações já foram publicadas (somar 1 a cada publicação) */
 const PRUMO_INICIO='outubro de 2026';
-const PRUMO_ATUALIZACOES=118;
+const PRUMO_ATUALIZACOES=119;
 const RESUMO_PRUMO='O Prumo reúne num só lugar o trabalho do Financeiro e Contábil. Ele lê sozinho os pedidos que chegam na caixa do contas a pagar, separa por categoria, confere o padrão das solicitações e controla prazos (D-8 de chegada e pagamento em D-5). Registra o que a equipe faz no WAE e no Protheus, com quem fez, quando e a que dia se refere, e mostra tudo no calendário. Para o diretor, entrega painel com os números do mês e do trimestre, atrasos por setor e o que cada pessoa realizou, além de relatórios e slides prontos. Também organiza a pauta das reuniões, guarda o histórico de tudo e faz backup todo dia, sem custo extra.';
 async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
  document.getElementById('sheet').innerHTML=`<div><p class="eyebrow">Sobre o sistema</p><h2 id="sheet-title">Nomes</h2></div><div class="fgrid"><div class="full"><label class="lbl" for="cr_n">Quem criou</label><input class="inp" id="cr_n" maxlength="80" value="${esc(CFG.criador||'Natalia Araujo')}"></div><div class="full"><label class="lbl" for="cr_d">Diretor do departamento</label><input class="inp" id="cr_d" maxlength="80" value="${esc(DIR_NOME())}"><p class="meta" style="margin:4px 0 0">Aparece nos relatórios, slides e painel.</p></div></div>
@@ -715,6 +718,7 @@ async function editCriador(){if(!podeAdmin()||!DB)return;FORM={tipo:'_criador'};
 async function salvaCriador(){const n=val('cr_n').slice(0,80),dn=(val('cr_d')||'').slice(0,80)||DIR_NOME();if(!n)return;try{await DB.doc('config/estrutura').set({...CFG,criador:n,diretorNome:dn});CFG.criador=n;CFG.diretorNome=dn;toast('Nome salvo');fechar();render()}catch(e){toast('Só administradores podem mudar.')}}
 /* novidades: a mudança mais recente primeiro */
 const NOVIDADES=[
+ ['2026-10-30','Clique duplo em Salvar não grava mais em dobro'],
  ['2026-10-30','Destaques do mês mostram a foto de perfil grande de quem foi destaque'],
  ['2026-10-30','Equipe centralizada: Pessoas, Feedbacks e Férias e ausências; só diretor, admin e quem o admin escolher'],
  ['2026-10-30','Relatórios organizados em abas: Equipe, Chamados, Cronograma, Reuniões e ideias, Destaques'],
